@@ -1,0 +1,401 @@
+/* Physik EF – Mechanik | Gestaltung
+   Farbwerte liegen als Variablen auf :root, das dunkle Schema überschreibt nur diese. */
+
+:root {
+  --grund: #fbfaf8;
+  --flaeche: #ffffff;
+  --flaeche-2: #f2efea;
+  --rand: #ddd7cd;
+  --rand-stark: #b9b1a3;
+  --schrift: #23201c;
+  --schrift-leise: #625b50;
+  --akzent: #1f5f8b;
+  --akzent-schrift: #ffffff;
+  --richtig: #2c6e49;
+  --richtig-flaeche: #e6f2ea;
+  --falsch: #9c3229;
+  --falsch-flaeche: #f8e9e7;
+  --hinweis: #8a5a12;
+  --hinweis-flaeche: #fbf1de;
+  --merk-flaeche: #eaf1f6;
+  --schatten: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  --radius: 10px;
+  --spalte: 74ch;
+}
+
+[data-thema="dunkel"] {
+  --grund: #16181b;
+  --flaeche: #1d2024;
+  --flaeche-2: #24282d;
+  --rand: #343a41;
+  --rand-stark: #4d555e;
+  --schrift: #e8e6e3;
+  --schrift-leise: #a7a29b;
+  --akzent: #7ab6e0;
+  --akzent-schrift: #10222f;
+  --richtig: #7dc59b;
+  --richtig-flaeche: #1c2b23;
+  --falsch: #e79a91;
+  --falsch-flaeche: #2e1e1c;
+  --hinweis: #e0b871;
+  --hinweis-flaeche: #2b2418;
+  --merk-flaeche: #1b2733;
+  --schatten: none;
+}
+
+* { box-sizing: border-box; }
+
+html { color-scheme: light; }
+[data-thema="dunkel"] html, html[data-thema="dunkel"] { color-scheme: dark; }
+
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--schrift);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid var(--akzent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.nur-lesegeraet {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.sprungmarke {
+  position: absolute; left: -999px; top: 0; z-index: 100;
+  background: var(--akzent); color: var(--akzent-schrift);
+  padding: .6em 1em; text-decoration: none;
+}
+.sprungmarke:focus { left: 0; }
+
+/* ---------- Kopfzeile ---------- */
+
+.kopf {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: .75rem;
+  padding: .5rem .9rem;
+  background: var(--flaeche);
+  border-bottom: 1px solid var(--rand);
+}
+
+.marke {
+  font-weight: 600; letter-spacing: .01em;
+  color: var(--schrift); text-decoration: none;
+  margin-right: auto;
+}
+.marke span { color: var(--schrift-leise); font-weight: 400; }
+
+.menue-schalter, .thema-schalter {
+  background: none; border: 1px solid var(--rand);
+  color: var(--schrift); border-radius: var(--radius);
+  font-size: 1rem; line-height: 1; padding: .5rem .6rem; cursor: pointer;
+}
+.menue-schalter:hover, .thema-schalter:hover { background: var(--flaeche-2); }
+.menue-schalter { display: none; }
+
+/* ---------- Grundraster ---------- */
+
+.rumpf { display: flex; align-items: flex-start; }
+
+.seitenleiste {
+  flex: 0 0 16rem;
+  position: sticky; top: 3.25rem;
+  max-height: calc(100vh - 3.25rem);
+  overflow-y: auto;
+  padding: 1rem .75rem 3rem;
+  border-right: 1px solid var(--rand);
+}
+
+.hauptbereich {
+  flex: 1 1 auto; min-width: 0;
+  padding: 1.5rem 1.25rem 5rem;
+}
+.hauptbereich > * { max-width: var(--spalte); }
+.hauptbereich:focus { outline: none; }
+
+/* ---------- Navigation ---------- */
+
+.nav-titel {
+  font-size: .78rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--schrift-leise); margin: 1rem .5rem .4rem;
+}
+
+.nav-modul {
+  display: flex; align-items: baseline; gap: .55rem;
+  padding: .45rem .55rem; margin-bottom: .1rem;
+  border-radius: var(--radius);
+  color: var(--schrift); text-decoration: none;
+  font-size: .93rem;
+}
+.nav-modul:hover { background: var(--flaeche-2); }
+.nav-modul[aria-current="page"] { background: var(--merk-flaeche); font-weight: 600; }
+.nav-modul .kuerzel { color: var(--schrift-leise); font-variant-numeric: tabular-nums; font-size: .85em; }
+.nav-modul.leer { color: var(--schrift-leise); }
+.nav-modul.leer .kuerzel { opacity: .7; }
+
+.leer-marke {
+  font-size: .7rem; border: 1px dashed var(--rand-stark); color: var(--schrift-leise);
+  border-radius: 99px; padding: 0 .45em; margin-left: auto; white-space: nowrap;
+}
+
+/* ---------- Typografie ---------- */
+
+h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 .3rem; }
+h2 { font-size: 1.22rem; line-height: 1.3; margin: 2.2rem 0 .6rem; }
+h3 { font-size: 1.02rem; margin: 1.5rem 0 .4rem; }
+p { margin: .7rem 0; }
+ul, ol { margin: .7rem 0; padding-left: 1.3rem; }
+li { margin: .25rem 0; }
+
+.vorspann { color: var(--schrift-leise); margin-bottom: 1.5rem; }
+.leise { color: var(--schrift-leise); }
+.klein { font-size: .88rem; }
+
+/* ---------- Bausteine ---------- */
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin: 1.1rem 0;
+  box-shadow: var(--schatten);
+}
+
+.merksatz {
+  background: var(--merk-flaeche);
+  border-left: 4px solid var(--akzent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: .85rem 1rem;
+  margin: 1.2rem 0;
+}
+.merksatz .etikett {
+  display: block; font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--akzent); font-weight: 700; margin-bottom: .25rem;
+}
+
+.fehlvorstellung { border-left: 4px solid var(--hinweis); background: var(--hinweis-flaeche); }
+.fehlvorstellung .behauptung { font-style: italic; }
+.fehlvorstellung .stufe { margin-top: .6rem; }
+.fehlvorstellung .stufe b { color: var(--hinweis); }
+
+.experiment { border-left: 4px solid var(--richtig); }
+.experiment dl { margin: .5rem 0 0; }
+.experiment dt { font-weight: 600; margin-top: .55rem; font-size: .93rem; }
+.experiment dd { margin: .1rem 0 0; }
+
+.sprachkasten table { width: 100%; border-collapse: collapse; font-size: .94rem; }
+.sprachkasten th, .sprachkasten td {
+  text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--rand); vertical-align: top;
+}
+.sprachkasten th { color: var(--schrift-leise); font-weight: 600; width: 30%; }
+
+/* ---------- Formeln ---------- */
+
+.formel-block {
+  margin: 1.1rem 0;
+  padding: .7rem 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.formel { font-size: 1.12rem; white-space: nowrap; display: inline-block; }
+.formel .var { font-style: italic; font-family: Georgia, "Times New Roman", serif; }
+.formel .zahl, .formel .einheit { font-style: normal; }
+.formel .einheit { font-family: inherit; }
+.formel .op { margin: 0 .3em; }
+.formel .op-punkt { margin: 0 .18em; }
+.formel .bruch {
+  display: inline-flex; flex-direction: column; vertical-align: middle;
+  text-align: center; margin: 0 .18em;
+}
+.formel .bruch .zaehler { border-bottom: 1.3px solid currentColor; padding: 0 .35em .1em; }
+.formel .bruch .nenner { padding: .1em .35em 0; }
+.formel .wurzel { border-top: 1.3px solid currentColor; padding: .1em .15em 0 .1em; }
+.formel sub, .formel sup { font-size: .68em; font-style: normal; }
+.formel .vektor { position: relative; }
+.formel .vektor::after {
+  content: "→"; position: absolute; left: 0; right: 0; top: -.72em;
+  font-size: .62em; text-align: center; font-style: normal;
+}
+
+.zeichenliste { margin: .5rem 0 0; padding: 0; list-style: none; font-size: .92rem; }
+.zeichenliste li { display: flex; gap: .5rem; margin: .18rem 0; }
+.zeichenliste .zeichen { flex: 0 0 3.2rem; font-family: Georgia, serif; font-style: italic; }
+.zeichenliste .einheit { color: var(--schrift-leise); }
+
+/* ---------- Diagramme und Simulation ---------- */
+
+.figur { margin: 1.2rem 0; }
+.figur svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.figur figcaption { font-size: .87rem; color: var(--schrift-leise); margin-top: .4rem; }
+
+.regler-feld {
+  display: grid; grid-template-columns: minmax(7rem, auto) 1fr minmax(4.5rem, auto);
+  gap: .45rem .7rem; align-items: center; margin: .8rem 0;
+  font-size: .92rem;
+}
+.regler-feld label { color: var(--schrift-leise); }
+.regler-feld input[type="range"] { width: 100%; accent-color: var(--akzent); }
+.regler-feld output { font-variant-numeric: tabular-nums; text-align: right; }
+
+.knopfreihe { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0 0; }
+
+button.knopf {
+  font: inherit; font-size: .92rem;
+  padding: .45rem .9rem; border-radius: var(--radius);
+  border: 1px solid var(--rand-stark); background: var(--flaeche);
+  color: var(--schrift); cursor: pointer;
+}
+button.knopf:hover { background: var(--flaeche-2); }
+button.knopf.haupt { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-schrift); }
+button.knopf.haupt:hover { filter: brightness(1.08); }
+button.knopf:disabled { opacity: .5; cursor: default; }
+
+/* ---------- Aufgaben ---------- */
+
+.aufgabe { border-left: 4px solid var(--rand-stark); }
+.aufgabe.niveau-basis { border-left-color: #7aa8c4; }
+.aufgabe.niveau-standard { border-left-color: var(--akzent); }
+.aufgabe.niveau-vertiefung { border-left-color: #7d5ba6; }
+
+.aufgabe-kopf {
+  display: flex; flex-wrap: wrap; gap: .4rem .6rem; align-items: baseline;
+  margin-bottom: .5rem;
+}
+.aufgabe-kopf .nummer { font-weight: 700; }
+.marken { display: flex; flex-wrap: wrap; gap: .3rem; margin-left: auto; }
+.marke-klein {
+  font-size: .7rem; letter-spacing: .03em;
+  border: 1px solid var(--rand); border-radius: 99px;
+  padding: .05em .55em; color: var(--schrift-leise); white-space: nowrap;
+}
+.aufgabe .kontext { color: var(--schrift-leise); font-size: .93rem; margin-bottom: .3rem; }
+.aufgabe .operator { font-weight: 600; }
+
+.antwortfeld { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .8rem 0 0; }
+.antwortfeld input[type="text"] {
+  font: inherit; padding: .45rem .6rem; min-width: 9rem; flex: 0 1 14rem;
+  border: 1px solid var(--rand-stark); border-radius: var(--radius);
+  background: var(--grund); color: var(--schrift);
+}
+
+.optionen { list-style: none; padding: 0; margin: .8rem 0 0; }
+.optionen li { margin: .35rem 0; }
+.optionen label {
+  display: flex; gap: .6rem; align-items: flex-start;
+  padding: .5rem .65rem; border: 1px solid var(--rand); border-radius: var(--radius);
+  cursor: pointer;
+}
+.optionen label:hover { background: var(--flaeche-2); }
+.optionen input { margin-top: .28rem; accent-color: var(--akzent); }
+.optionen li.gewaehlt label { border-color: var(--rand-stark); }
+.optionen li.war-richtig label { background: var(--richtig-flaeche); border-color: var(--richtig); }
+.optionen li.war-falsch label { background: var(--falsch-flaeche); border-color: var(--falsch); }
+
+.rueckmeldung { margin: .85rem 0 0; padding: .7rem .85rem; border-radius: var(--radius); font-size: .95rem; }
+.rueckmeldung.richtig { background: var(--richtig-flaeche); border: 1px solid var(--richtig); }
+.rueckmeldung.falsch { background: var(--falsch-flaeche); border: 1px solid var(--falsch); }
+.rueckmeldung.teilweise { background: var(--hinweis-flaeche); border: 1px solid var(--hinweis); }
+.rueckmeldung b { display: block; margin-bottom: .2rem; }
+
+details.hilfe, details.loesung {
+  margin: .6rem 0 0; border: 1px solid var(--rand); border-radius: var(--radius);
+  background: var(--flaeche-2);
+}
+details.hilfe > summary, details.loesung > summary {
+  cursor: pointer; padding: .5rem .75rem; font-size: .92rem; font-weight: 600;
+  list-style: none;
+}
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸ "; color: var(--schrift-leise); }
+details[open] > summary::before { content: "▾ "; }
+details.hilfe > div, details.loesung > div { padding: 0 .85rem .8rem; }
+
+.rechenweg { list-style: none; padding: 0; margin: .4rem 0 0; counter-reset: schritt; }
+.rechenweg > li { padding: .45rem 0; border-top: 1px solid var(--rand); }
+.rechenweg > li:first-child { border-top: none; }
+.rechenweg .schritt-name {
+  display: block; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--schrift-leise); font-weight: 700;
+}
+
+.fehlerliste { margin: .5rem 0 0; padding: 0; list-style: none; font-size: .92rem; }
+.fehlerliste li { padding: .35rem 0 .35rem .8rem; border-left: 2px solid var(--hinweis); margin: .35rem 0; }
+
+/* ---------- Messtabelle ---------- */
+
+table.messwerte { border-collapse: collapse; font-size: .92rem; margin: .8rem 0; }
+table.messwerte th, table.messwerte td {
+  border: 1px solid var(--rand); padding: .3rem .6rem; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+table.messwerte th { background: var(--flaeche-2); font-weight: 600; }
+.tabellen-rahmen { overflow-x: auto; }
+
+/* ---------- Fortschritt ---------- */
+
+.raster { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: .93rem; margin: 1rem 0; }
+.raster th, .raster td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--rand); }
+.raster th { color: var(--schrift-leise); font-weight: 600; font-size: .84rem; }
+.raster .stand { white-space: nowrap; font-weight: 600; }
+.stand-sicher { color: var(--richtig); }
+.stand-hilfe { color: var(--hinweis); }
+.stand-offen { color: var(--schrift-leise); }
+
+.balken { height: .5rem; background: var(--flaeche-2); border-radius: 99px; overflow: hidden; min-width: 5rem; }
+.balken > i { display: block; height: 100%; background: var(--akzent); }
+
+.empfehlung { border-left: 4px solid var(--akzent); }
+
+/* ---------- Lerneinheit-Navigation ---------- */
+
+.einheit-liste { list-style: none; padding: 0; margin: 1rem 0; }
+.einheit-liste li { margin: .4rem 0; }
+.einheit-liste a {
+  display: flex; align-items: baseline; gap: .6rem;
+  padding: .7rem .85rem; border: 1px solid var(--rand); border-radius: var(--radius);
+  background: var(--flaeche); text-decoration: none; color: var(--schrift);
+}
+.einheit-liste a:hover { border-color: var(--rand-stark); background: var(--flaeche-2); }
+.einheit-liste .dauer { margin-left: auto; color: var(--schrift-leise); font-size: .85rem; white-space: nowrap; }
+.einheit-liste .haken { color: var(--richtig); font-weight: 700; }
+
+.blaettern { display: flex; justify-content: space-between; gap: 1rem; margin: 2.5rem 0 0; padding-top: 1rem; border-top: 1px solid var(--rand); }
+
+.brotkrumen { font-size: .85rem; color: var(--schrift-leise); margin-bottom: .6rem; }
+.brotkrumen a { color: var(--schrift-leise); }
+
+.platzhalter {
+  border: 1px dashed var(--rand-stark); background: none;
+  text-align: center; color: var(--schrift-leise); padding: 2rem 1rem;
+}
+
+/* ---------- Schmale Bildschirme ---------- */
+
+@media (max-width: 780px) {
+  .menue-schalter { display: inline-flex; align-items: center; gap: .4rem; }
+  .seitenleiste {
+    display: none; position: fixed; inset: 3.25rem 0 0 0;
+    max-height: none; z-index: 15; background: var(--grund);
+    border-right: none; padding: 1rem 1.25rem 4rem;
+  }
+  .seitenleiste.offen { display: block; }
+  .hauptbereich { padding: 1.1rem 1rem 4rem; }
+  h1 { font-size: 1.35rem; }
+  .regler-feld { grid-template-columns: 1fr; gap: .2rem; }
+  .regler-feld output { text-align: left; }
+}
+
+@media print {
+  .kopf, .seitenleiste, .knopfreihe, .blaettern { display: none; }
+  .hauptbereich { padding: 0; }
+  details { open: true; }
+  .karte { break-inside: avoid; }
+}
