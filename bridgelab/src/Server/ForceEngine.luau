@@ -11,7 +11,9 @@
 	  4. Ergebnis zurueckgeben: Kraft je Bauteil, Auslastung, instabile Knoten.
 
 	Alles laeuft ausschliesslich auf dem Server. Der Client bekommt nur das
-	fertige Ergebnis zu sehen (Farben der Bauteile, Stabilitaetswarnung).
+	fertige Ergebnis zu sehen (Farben der Bauteile, Belastungszahlen, Warnung).
+
+	Wie Structure ist auch das hier eine Klasse: jede Arena rechnet fuer sich.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,11 +21,15 @@ local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
 local TrussSolver = require(Shared.TrussSolver)
 
-local Structure = require(script.Parent.Structure)
-
 local ForceEngine = {}
+ForceEngine.__index = ForceEngine
 
-local ctx
+function ForceEngine.new(level, structure)
+	local self = setmetatable({}, ForceEngine)
+	self.level = level
+	self.structure = structure
+	return self
+end
 
 --------------------------------------------------------------------------------
 -- Grenzwert eines Bauteils, abhaengig von der Belastungsrichtung
@@ -58,8 +64,9 @@ end
 		maxUtilisation = number,
 	}
 ]]
-function ForceEngine.evaluate(vehicleLoads: { [number]: number }?)
-	local members = Structure.activeMembers()
+function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
+	local structure = self.structure
+	local members = structure:activeMembers()
 
 	if #members == 0 then
 		return { solved = true, unstable = false, worstNodeIndex = nil, maxUtilisation = 0 }
@@ -80,10 +87,10 @@ function ForceEngine.evaluate(vehicleLoads: { [number]: number }?)
 	local solverToSnap: { [number]: number } = {}
 
 	-- In fester Reihenfolge durchgehen, damit das Ergebnis reproduzierbar ist.
-	for snapIndex = 1, #ctx.level.snapPoints do
+	for snapIndex = 1, #self.level.snapPoints do
 		if isUsed[snapIndex] then
-			local position = Structure.nodePosition(snapIndex)
-			local snap = ctx.level.snapPoints[snapIndex]
+			local position = structure:nodePosition(snapIndex)
+			local snap = self.level.snapPoints[snapIndex]
 			table.insert(solverNodes, {
 				x = position.X,
 				y = position.Y,
@@ -129,7 +136,7 @@ function ForceEngine.evaluate(vehicleLoads: { [number]: number }?)
 	-- Eigengewicht: jedes Bauteil gibt die Haelfte seiner Masse an jedes Ende ab.
 	for _, member in members do
 		local spec = Config.PartTypes[member.kind]
-		local length = (Structure.nodePosition(member.b) - Structure.nodePosition(member.a)).Magnitude
+		local length = (structure:nodePosition(member.b) - structure:nodePosition(member.a)).Magnitude
 		local weight = length * spec.massPerStud * Config.Gravity
 		addLoad(snapToSolver[member.a], weight / 2)
 		addLoad(snapToSolver[member.b], weight / 2)
@@ -193,20 +200,24 @@ function ForceEngine.evaluate(vehicleLoads: { [number]: number }?)
 end
 
 --------------------------------------------------------------------------------
--- Faerbung
+-- Faerbung und Zahlen
 --------------------------------------------------------------------------------
 
 -- Faerbt alle Bauteile nach ihrer Auslastung: gruen = locker, rot = am Limit.
-function ForceEngine.applyColors()
-	for _, member in Structure.activeMembers() do
-		if member.part then
-			member.part.Color = Config.utilisationColor(ForceEngine.utilisation(member))
+function ForceEngine:applyColors()
+	for _, member in self.structure:activeMembers() do
+		if member.stressParts then
+			local color = Config.utilisationColor(ForceEngine.utilisation(member))
+			for _, part in member.stressParts do
+				part.Color = color
+			end
 		end
 	end
 end
 
-function ForceEngine.init(context)
-	ctx = context
+-- Traegt die aktuellen Kraefte in die Tafeln ueber den Bauteilen ein.
+function ForceEngine:updateLabels()
+	self.structure:updateStressLabels(ForceEngine.utilisation)
 end
 
 return ForceEngine

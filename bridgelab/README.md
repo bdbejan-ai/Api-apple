@@ -1,321 +1,388 @@
 # BridgeLab
 
-Ein Physik-Baurätsel für Roblox, in Luau geschrieben. Der Spieler baut aus einem
-begrenzten Budget eine Konstruktion über eine 40 Studs breite Schlucht. Danach
-fährt ein 1000 Einheiten schweres Testfahrzeug hinüber. Hält die Konstruktion,
-ist das Level geschafft.
+Ein Physik-Baurätsel für Roblox: Du baust aus Balken, Seilen und Stützen eine
+Brücke über eine Schlucht. Danach fährt ein 1000 Einheiten schweres Fahrzeug
+darüber. Hält die Konstruktion, hast du gewonnen.
 
-„BridgeLab" ist ein Arbeitstitel und lässt sich jederzeit ändern – der Name
-steht nur in `default.project.json` und in den Ordnernamen.
+Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umbenennen)).
 
 ---
 
-## 1. Installation
+## Inhalt
 
-### 1.1 Rojo installieren
+1. [Was das Spiel kann](#was-das-spiel-kann)
+2. [Installation](#installation)
+3. [Die manuellen Schritte in Roblox Studio](#die-manuellen-schritte-in-roblox-studio)
+4. [Robux-Tipps einrichten](#robux-tipps-einrichten)
+5. [Steuerung](#steuerung)
+6. [Welche Datei macht was](#welche-datei-macht-was)
+7. [Eigene Level bauen](#eigene-level-bauen)
+8. [Getroffene Annahmen](#getroffene-annahmen)
+9. [Bekannte Grenzen](#bekannte-grenzen)
 
-Rojo verbindet die Dateien auf der Festplatte mit Roblox Studio. Es gibt zwei
-Wege; **Weg A** ist für Anfänger der einfachere.
+---
 
-**Weg A – Fertige Programmdatei (empfohlen)**
+## Was das Spiel kann
 
-1. <https://github.com/rojo-rbx/rojo/releases> öffnen.
-2. Beim neuesten Eintrag die Datei für das eigene Betriebssystem laden
-   (`rojo-*-windows-x86_64.zip` bzw. `rojo-*-macos-*.zip`).
-3. Entpacken. Es entsteht eine Datei `rojo.exe` (Windows) bzw. `rojo` (macOS).
-4. Diese Datei in einen Ordner legen, der im `PATH` liegt – oder einfacher:
-   direkt in den Ordner `bridgelab/` kopieren und später mit `.\rojo`
-   bzw. `./rojo` aufrufen.
+| | |
+|---|---|
+| **Level-Auswahl** | Sechs Level mit angezeigtem Schwierigkeitsgrad (1–5 Punkte), Budget, Lückenbreite und Haken für geschaffte Level |
+| **Interaktive Anleitung** | Startet beim allerersten Spielstart automatisch. Neun Schritte, in denen man wirklich selbst baut. Texte passen sich dem Eingabegerät an |
+| **Seitenansicht** | Keine Spielfigur. Die Kamera schaut waagerecht auf die Brücke, wie ein Brettspiel von der Seite |
+| **Belastungsanzeige** | Über jedem Bauteil steht während des Tests, wie stark es belastet ist — in Prozent und in Newton, dazu ein Farbbalken |
+| **Langsamer Test** | Das Fahrzeug fährt mit 3,2 Studs/s (statt vorher 8), mit Countdown davor. Man kann in Ruhe zusehen |
+| **Tipps** | Drei Tipps pro Level. In Level 1–3 ist der erste gratis, in Level 4–6 kostet schon der erste Robux |
+| **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp-Gutscheine werden dauerhaft gespeichert |
+| **Mehrspieler** | Jeder Spieler bekommt seine eigene Arena und kann ein eigenes Level spielen |
 
-**Weg B – Über Rokit (Versionsverwaltung, praktisch bei mehreren Projekten)**
+---
 
-```bash
-# Rokit einmalig installieren: https://github.com/rojo-rbx/rokit
-rokit add rojo-rbx/rojo
-rokit install
+## Installation
+
+Du brauchst zwei Dinge: **Roblox Studio** (das Programm, in dem das Spiel läuft)
+und **Rojo** (ein Werkzeug, das die Code-Dateien von deiner Festplatte in
+Studio schiebt). Rojo ist kein Fenster-Programm — es läuft im Terminal.
+
+### Windows
+
+PowerShell öffnen (Windows-Taste → „PowerShell" tippen → Enter):
+
+```powershell
+winget install -e --id Rojo.Rojo
 ```
 
-Prüfen, ob es geklappt hat:
+PowerShell danach **einmal schließen und neu öffnen**, sonst kennt Windows den
+Befehl noch nicht. Dann prüfen:
 
-```bash
+```powershell
 rojo --version
 ```
 
-### 1.2 Rojo-Plugin für Roblox Studio installieren
+Es sollte eine Versionsnummer erscheinen, z. B. `Rojo 7.4.4`.
+
+> Falls `winget` unbekannt ist: Windows aktualisieren (winget kommt mit dem
+> „App Installer" aus dem Microsoft Store), oder Rojo als fertige `.exe` von
+> <https://github.com/rojo-rbx/rojo/releases> herunterladen.
+
+### macOS
 
 ```bash
+brew install rojo
+```
+
+Ohne Homebrew: die Datei für macOS von <https://github.com/rojo-rbx/rojo/releases>
+laden und entpacken.
+
+### Das Studio-Plugin installieren
+
+```powershell
 rojo plugin install
 ```
 
-Das legt das Plugin direkt in den Studio-Plugin-Ordner. Falls der Befehl
-fehlschlägt, geht es auch von Hand: im Roblox-Creator-Store nach **„Rojo"**
-suchen und das offizielle Plugin von `rojo-rbx` installieren.
+Das legt das Rojo-Plugin automatisch in deinem Studio-Plugin-Ordner ab.
+Studio danach neu starten.
 
-### 1.3 Server starten
+---
 
-Im Ordner `bridgelab/` (dort, wo `default.project.json` liegt):
+## Die manuellen Schritte in Roblox Studio
 
-```bash
-rojo serve
+Diese Dinge kann kein Skript für dich tun — das musst du einmalig selbst in der
+Studio-Oberfläche anklicken.
+
+### 1. Rojo verbinden
+
+1. Terminal in **diesem Ordner** öffnen (dort, wo `default.project.json` liegt)
+   und starten:
+   ```
+   rojo serve
+   ```
+   Es erscheint etwa `Rojo server listening on port 34872`.
+   **Dieses Fenster offen lassen**, solange du arbeitest.
+
+2. In Studio ein neues Projekt anlegen: **Baseplate**.
+
+3. Den mitgelieferten Part „Baseplate" im **Explorer** anklicken und mit
+   `Entf` löschen. BridgeLab baut seine Welt komplett selbst.
+   > Explorer nicht sichtbar? Reiter **VIEW → Explorer**.
+
+4. Reiter **PLUGINS → Rojo → Connect**. Adresse `localhost`, Port `34872`.
+
+Wenn es geklappt hat, erscheinen im Explorer sofort:
+
+```
+ReplicatedStorage → BridgeLab      (Config, Levels, Remotes, TrussSolver)
+ServerScriptService → BridgeLabServer
+StarterPlayer → StarterPlayerScripts → BridgeLabClient
 ```
 
-In der Konsole erscheint eine Adresse, meist `localhost:34872`. Das Fenster
-bleibt offen, solange gearbeitet wird.
+### 2. DataStore freischalten (für den Fortschritt)
+
+Ohne diesen Schritt läuft das Spiel ganz normal — der Fortschritt ist nach dem
+Beenden nur wieder weg, und im Output steht eine Warnung.
+
+**Home → Game Settings → Security → „Enable Studio Access to API Services"**
+einschalten. Das Spiel muss dafür einmal veröffentlicht sein
+(**File → Publish to Roblox**).
+
+### 3. Testen
+
+`F5` drücken (oder **Home → Play**).
+
+> **Wichtig:** „Play", nicht „Run". Nur „Play" startet auch einen Client, und
+> die ganze Oberfläche ist Client-Code.
+
+Beim allerersten Start springt das Spiel direkt in Level 1 und die Anleitung
+öffnet sich. Danach landest du immer in der Levelauswahl.
 
 ---
 
-## 2. Diese Schritte musst du einmalig selbst in Roblox Studio machen
+## Robux-Tipps einrichten
 
-Alles Folgende lässt sich nicht aus Dateien heraus erledigen – es sind
-Klickschritte in der Studio-Oberfläche.
+**Das Spiel funktioniert komplett ohne diesen Schritt.** Solange nichts
+eingetragen ist, erscheint statt des Kauffensters die Meldung „Der Tipp-Kauf ist
+noch nicht eingerichtet". Gratis-Tipps funktionieren normal.
 
-1. **Roblox Studio öffnen** und ein neues Projekt anlegen:
-   *New* → **Baseplate**.
+Wenn du echte Käufe möchtest:
 
-2. **Baseplate löschen** (optional, aber empfohlen).
-   Im *Explorer* unter `Workspace` das Objekt `Baseplate` anklicken und `Entf`
-   drücken. BridgeLab baut seine eigene Landschaft.
-   Lässt du die Baseplate stehen, ist das kein Fehler – sie liegt bei y = 0 und
-   damit unterhalb der Schlucht. Ein herunterfallendes Fahrzeug landet dann
-   darauf statt ins Leere zu fallen.
+1. Das Spiel veröffentlichen (**File → Publish to Roblox**).
+2. Auf <https://create.roblox.com/dashboard/creations> dein Spiel öffnen.
+3. **Monetization → Developer Products → Create Developer Product**.
+   - Name z. B. „Tipp freischalten"
+   - Preis z. B. 15 Robux
+4. Die **Product-ID** kopieren (eine lange Zahl).
+5. In `src/Shared/Config.luau` eintragen:
 
-3. **Rojo-Plugin verbinden.**
-   Oben im Menüband auf den Reiter **PLUGINS** wechseln → **Rojo** anklicken →
-   im aufgehenden Fenster auf **Connect**. Host und Port stehen schon richtig
-   drin (`localhost` / `34872`), sofern `rojo serve` läuft.
-   Beim ersten Mal fragt Studio nach Erlaubnis für HTTP-Zugriff – **Allow**.
+```lua
+Config.Monetisation = {
+    hintProductId = 123456789,  -- <- hier deine Zahl
+    hintPrice = 15,             -- nur für die Anzeige im Knopf
+}
+```
 
-4. **Ergebnis prüfen.** Im *Explorer* müssen jetzt auftauchen:
-   - `ReplicatedStorage` → `BridgeLab` (Config, Level1, Remotes, TrussSolver)
-   - `ServerScriptService` → `BridgeLabServer`
-   - `StarterPlayer` → `StarterPlayerScripts` → `BridgeLabClient`
+### Wie der Kauf abläuft
 
-   Fehlt etwas, war die Verbindung nicht erfolgreich – noch einmal *Connect*.
+Gekauft wird nicht ein bestimmter Tipp, sondern ein **Tipp-Gutschein**. Beim
+nächsten kostenpflichtigen Tipp wird ein Gutschein eingelöst. Das ist
+absichtlich so: Ein Kauf geht dadurch auch dann nicht verloren, wenn der Spieler
+zwischendurch das Level wechselt oder die Verbindung abbricht.
 
-5. **HTTP-Requests sind nicht nötig**, aber diese Einstellung schon:
-   *Home* → *Game Settings* → *Security* → **Allow HTTP Requests** darf aus
-   bleiben. BridgeLab braucht kein Internet.
-
-6. **Testen:** Reiter *TEST* → **Play** (oder `F5`).
-   Die Spielfigur erscheint auf der linken Plattform, unten erscheint die
-   Werkzeugleiste.
-
-7. **Speichern nicht vergessen:** `Strg+S`. Rojo synchronisiert nur Skripte –
-   die Studio-Datei (`.rbxl`) musst du selbst sichern.
-
-### Wenn du später weiterarbeitest
-
-Nur noch: `rojo serve` starten → Studio öffnen → Plugin *Connect*. Änderungen an
-den `.luau`-Dateien landen sofort in Studio.
+Weil es hier um echtes Geld geht, ist der Beleg-Ablauf in
+`src/Server/Monetisation.luau` bewusst streng: Jeder Kaufbeleg wird über
+`UpdateAsync` in einem eigenen DataStore vermerkt, bevor gutgeschrieben wird.
+So kann derselbe Beleg nicht zweimal gutgeschrieben werden, und ein bezahlter
+Kauf geht auch dann nicht verloren, wenn der Server im falschen Moment abstürzt
+— Roblox fragt dann später erneut nach.
 
 ---
 
-## 3. Spielen
+## Steuerung
 
-| Aktion | Bedienung |
-|---|---|
-| Bauteil wählen | Knopf unten anklicken, oder Taste `1` `2` `3` |
-| Entfernen-Modus | Knopf „Entfernen", oder Taste `4` |
-| Bauteil setzen | ersten Ankerpunkt anklicken, dann zweiten |
-| Auswahl abbrechen | Rechtsklick, oder denselben Punkt noch einmal anklicken |
-| Bauteil löschen | Rechtsklick auf das Bauteil |
-| Test starten | Knopf „Test starten" |
-| Zurücksetzen | Knopf „Zurücksetzen" |
+Das Spiel erkennt selbst, womit gespielt wird, und stellt Texte und
+Knopfgrößen darauf ein. Wechselt man mitten im Spiel das Gerät, passt es sich
+sofort an.
 
-**Farben der Bauteile** zeigen die Auslastung: grün = viel Reserve,
-gelb = etwa halb ausgelastet, rot = kurz vor dem Bruch.
+| | Maus + Tastatur | Touch | Gamepad |
+|---|---|---|---|
+| Ankerpunkt wählen | Linksklick | kurz tippen | **A** |
+| Abbrechen / entfernen | Rechtsklick | Abriss-Knopf, dann tippen | **B** / **X** |
+| Ansicht schieben | rechte Maustaste ziehen, oder WASD | **zwei** Finger ziehen | rechter Stick |
+| Zoomen | Mausrad | zwei Finger auf-/zuziehen | **LT** / **RT** |
+| Zeiger bewegen | Maus | Finger | linker Stick |
+| Bauteil 1/2/3 | Tasten `1` `2` `3` | Knöpfe unten | Knöpfe unten |
+| Abrissmodus | Taste `4` | Knopf „Abriss" | **X** |
 
-**Oben links** steht, ob sich die Konstruktion überhaupt selbst trägt. Steht dort
-„Nicht ausgesteift", markiert eine rote Kugel den Ankerpunkt, an dem die Last
-nicht abgetragen werden kann. Dort fehlt eine Stütze oder eine Verstrebung.
-
-### Eine Lösung für Level 1
-
-Falls du nicht weiterkommst – diese Konstruktion besteht den Test und kostet
-110 von 200 Einheiten:
-
-1. **Fünf Balken** als Fahrbahn, jeweils über zwei Rasterfelder (8 Studs):
-   von x = −20 nach −12, −12 nach −4, −4 nach 4, 4 nach 12, 12 nach 20.
-2. **Vier Stützen** senkrecht vom Schluchtgrund zu den vier freien
-   Fahrbahnknoten bei x = −12, −4, 4 und 12.
-
-Die höchste Auslastung liegt dabei bei 89 % (eine Stütze trägt kurzzeitig
-etwa 713 N von 800 N). Es gibt weitere Lösungen – zum Beispiel kürzere
-Fahrbahnbalken mit entsprechend mehr Stützen, solange das Budget reicht.
+**Warum bei Touch zwei Finger für die Kamera?** Ein Finger wird zum Bauen
+gebraucht. Würde ein Finger auch die Kamera schieben, könnte das Spiel nie
+sicher unterscheiden, ob jemand bauen oder schauen will.
 
 ---
 
-## 4. Aufbau des Projekts
+## Welche Datei macht was
 
 ```
 bridgelab/
-  default.project.json         Rojo-Zuordnung Dateien -> Roblox-Instanzen
-  src/
-    Shared/                    -> ReplicatedStorage.BridgeLab
-      Config.luau              Bauteilwerte, Physikregler, Remote-Namen
-      Level1.luau              Maße, Ankerpunkte und Fahrzeug für Level 1
-      Remotes.luau             RemoteEvents anlegen bzw. finden
-      TrussSolver.luau         der Fachwerk-Rechner (reine Mathematik)
-    Server/                    -> ServerScriptService.BridgeLabServer
-      init.server.luau         Hauptskript: Zustand und RemoteEvents
-      LevelBuilder.luau        baut Landschaft, Ankerpunkte, Bruch-Effekt
-      Structure.luau           verwaltet Bauplan, Parts und Constraints
-      ForceEngine.luau         füttert den Rechner und färbt die Bauteile
-      TestRun.luau             Belastungstest mit Fahrzeug
-    Client/                    -> StarterPlayerScripts.BridgeLabClient
-      init.client.luau         verbindet Oberfläche und Steuerung
-      BuildGui.luau            ScreenGui, komplett im Code aufgebaut
-      BuildController.luau     Anklicken der Ankerpunkte, Vorschau
+├── default.project.json      Rojo-Bauplan: welche Datei landet wo in Studio
+├── tools/
+│   └── check_levels.luau     Prüfwerkzeug: sind die Level lösbar?
+└── src/
+    ├── Shared/               kennen Server UND Client
+    │   ├── Config.luau       ALLE Einstellungen: Bauteile, Physik, Preise
+    │   ├── Levels.luau       die sechs Level als reine Zahlen
+    │   ├── Remotes.luau      legt die RemoteEvents an
+    │   └── TrussSolver.luau  der Fachwerk-Rechner (reine Mathematik)
+    │
+    ├── Server/               läuft nur auf dem Server (nicht manipulierbar)
+    │   ├── init.server.luau  Hauptskript: prüft alle Wünsche der Clients
+    │   ├── Arena.luau        die Spielsitzung EINES Spielers
+    │   ├── LevelBuilder.luau baut Plattformen, Schlucht, Pylone, Ankerpunkte
+    │   ├── Structure.luau    verwaltet die gesetzten Bauteile
+    │   ├── ForceEngine.luau  Bindeglied zum Fachwerk-Rechner
+    │   ├── TestRun.luau      der Belastungstest mit dem Fahrzeug
+    │   ├── PlayerData.luau   Fortschritt speichern (DataStore)
+    │   └── Monetisation.luau Robux-Käufe
+    │
+    └── Client/               läuft beim Spieler (nur Anzeige und Eingabe)
+        ├── init.client.luau      verdrahtet alle Teile
+        ├── Device.luau           erkennt Maus / Touch / Gamepad
+        ├── Theme.luau            Farben und UI-Bausteine
+        ├── CameraController.luau die Seitenansicht
+        ├── BuildController.luau  Bau-Interaktion für alle drei Geräte
+        ├── LevelSelectGui.luau   das Startmenü
+        ├── BuildHud.luau         Oberfläche im Spiel
+        └── TutorialGui.luau      die interaktive Anleitung
 ```
 
-### Wo ändere ich was?
+### Die wichtigste Regel im Code
 
-| Ich möchte … | Datei |
-|---|---|
-| Kosten oder Grenzwerte eines Bauteils ändern | `Shared/Config.luau` |
-| Durchbiegen stärker/schwächer machen | `Config.Physics.loadForceScale` |
-| Lücke, Budget, Zeitlimit, Ankerraster ändern | `Shared/Level1.luau` |
-| Fahrzeugmasse oder -geschwindigkeit ändern | `Shared/Level1.luau`, `Level1.vehicle` |
-| Aussehen der Oberfläche ändern | `Client/BuildGui.luau` |
+**Der Client schickt nur Wünsche, der Server entscheidet.** Ein manipulierter
+Client kann höchstens unsinnige Anfragen stellen — ob ein Bauteil entsteht, ob
+ein Tipp freigeschaltet wird und ob der Test bestanden ist, prüft immer der
+Server. Jede Zahl, die hereinkommt, wird geprüft, bevor sie benutzt wird.
 
 ---
 
-## 5. Wie die Physik funktioniert
+## Eigene Level bauen
 
-Es laufen **zwei getrennte Rechnungen** nebeneinander:
+In `src/Shared/Levels.luau` einen Eintrag kopieren und die Zahlen ändern. Die
+Ankerpunkte entstehen automatisch.
 
-**1. Die Roblox-Physik-Engine** kümmert sich nur um das Aussehen: das
-Durchbiegen unter Last, das Einstürzen nach einem Bruch, das Fahrzeug.
-Dafür sitzt an jedem benutzten Ankerpunkt eine kleine Kugel („Knoten"), und
-zwischen den Knoten hängen die Constraints:
+### Zwei Fallen, die ein Level unlösbar machen
 
-- **Balken und Stützen**: `RodConstraint` – hält den Abstand starr, in beide
-  Richtungen.
-- **Seile**: `RopeConstraint` – verhindert nur, dass die Knoten weiter
-  auseinandergehen.
+Beide sind mir beim Bauen selbst passiert — deshalb stehen sie hier:
 
-**2. Ein eigener Fachwerk-Rechner** (`TrussSolver.luau`) entscheidet, ob ein
-Bauteil bricht. Das ist nötig, weil Roblox die tatsächlich in einem Constraint
-wirkende Kraft nicht ausliest – es gibt schlicht keine solche Eigenschaft.
-Der Rechner stellt darum an jedem beweglichen Knoten das Kräftegleichgewicht
-auf und löst das entstehende Gleichungssystem als Ausgleichsrechnung
-(kleinste Fehlerquadrate).
+1. **Die obere Reihe zu hoch ansetzen.** `upperY - deckY` darf höchstens 10
+   Studs betragen (die maximale Balkenlänge). Sonst kommt man mit keinem Balken
+   dorthin, und die Reihe ist nutzlos.
 
-Wichtige Eigenschaft dieses Modells: Jedes Bauteil ist ein **Stab mit Gelenken
-an beiden Enden**. Es kann nur längs gezogen oder gedrückt werden und sich nicht
-verbiegen. Deshalb trägt eine schnurgerade Fahrbahn ohne Stützen oder Dreiecke
-gar nichts – jeder freie Knoten braucht eine Abstützung. Genau das ist die
-eigentliche Rätselaufgabe.
+2. **Die Schlucht zu tief machen.** `deckY - groundY` darf höchstens 40 Studs
+   betragen (die maximale Stützenlänge). Stützen vom Schluchtgrund sind der
+   einzige Weg, senkrechte Last wirklich abzutragen. Ist der Grund unerreichbar,
+   ist das Level nicht lösbar.
 
-Bleibt an einem Knoten eine Kraft übrig, die sich nicht ausgleichen lässt
-(„Restkraft"), ist die Konstruktion dort nicht ausgesteift. Im Baumodus wird
-das als Warnung angezeigt, im Test führt es zum Versagen.
+> **Warum ist das so?** Ein Fachwerk zwischen Fahrbahn und oberer Reihe wäre die
+> Alternative — aber bei nur 8 Studs Bauhöhe entstehen in den Gurten Kräfte weit
+> über 500 N, und der Balken bricht. Eine Hängebrücke funktioniert in diesem
+> Modell ebenfalls nicht: Ein gerader Obergurt aus gelenkig gelagerten Stäben
+> kann senkrechte Lasten nicht abtragen.
 
-**Einheiten:** Das Kräftemodell rechnet mit g = 1. Eine Masse von 1000 Einheiten
-erzeugt also 1000 N Gewichtskraft. Dadurch passen die vorgegebenen Grenzwerte
-(500 N / 300 N / 800 N) und die Fahrzeugmasse (1000) unmittelbar zusammen: das
-Fahrzeug muss von mehreren Bauteilen gemeinsam getragen werden.
+### Level prüfen, bevor du sie spielst
 
----
+Im Ordner `tools/` liegt ein Prüfskript. Es baut mehrere Standard-Brückenformen,
+lässt das Fahrzeug rechnerisch darüberfahren und meldet Kosten und höchste
+Auslastung — ohne dass Roblox überhaupt laufen muss.
 
-## 6. Getroffene Annahmen
+Dafür brauchst du das Luau-Programm von
+<https://github.com/luau-lang/luau/releases> (Datei `luau-ubuntu.zip`,
+`luau-windows.zip` bzw. `luau-macos.zip`). Dann:
 
-Alles, was in der Aufgabenstellung offen war, ist hier so entschieden worden –
-jeweils zugunsten der einfachsten sinnvollen Lösung.
+```bash
+cd tools
+luau check_levels.luau
+```
 
-### Physikmodell
+Ausgabe pro Level, zum Beispiel:
 
-1. **Fachwerk statt Balkenbiegung.** Bauteile werden als Stäbe mit Gelenken an
-   beiden Enden gerechnet (nur Normalkraft, keine Biegung). Das ist die
-   klassische Vereinfachung im Brückenbau und kommt ohne FEM aus. Folge: eine
-   gerade Fahrbahn ohne Abstützung versagt.
-2. **Zweidimensional.** Es wird nur in der XY-Ebene gerechnet, die Brücke liegt
-   ohnehin flach bei z = 0.
-3. **Einheitensystem mit g = 1** (siehe oben). Die Roblox-Schwerkraft
-   (196,2 Studs/s²) betrifft nur die Darstellung.
-4. **Statisch unbestimmte Konstruktionen** werden über die Lösung mit der
-   kleinsten Kraftsumme aufgelöst. Das entspricht der Annahme, dass alle
-   Bauteile gleich steif sind.
-5. **Kein Knicken.** Ein Balken auf Druck hält genauso viel aus wie auf Zug,
-   unabhängig von seiner Länge. Die Aufgabenstellung gibt beide Werte mit
-   500 N an, das wurde übernommen.
-6. **Kraftglättung.** Die berechnete Kraft wird geglättet (Faktor 0,35), damit
-   einzelne Rechenspitzen kein Bauteil zerstören. Erst 0,5 Sekunden nach
-   Teststart kann überhaupt etwas brechen.
+```
+Level1   Budget 200   Luecke 40   Fahrbahn y=40  Boden y=20  oben y=48
+   Stuetzen (8er Fahrbahn)   Kosten 110/200  max  89%  LOESUNG [Pillar]
+   => LOESBAR ueber 'Stuetzen (8er Fahrbahn)' fuer 110 (45% Budget uebrig)
+```
 
-### Bauteile und Raster
+Wenn dort `NICHT LOESBAR` steht, schlägt das Skript ein passendes Budget vor.
+Trägst du neue Level ein, musst du sie auch in der `LEVELS`-Tabelle **im
+Prüfskript** ergänzen — es liest `Levels.luau` nicht selbst aus.
 
-7. **Maximale Spannweiten**: Balken 10 Studs, Seil und Stütze 26 Studs.
-   Ohne eine solche Grenze könnte man die Lücke mit einem einzigen Balken
-   überbrücken, und das Rätsel wäre keines. Die 10 Studs erlauben Balken über
-   ein oder zwei Rasterfelder sowie Diagonalen zur oberen Reihe.
-8. **Mindestlänge 3 Studs** für alle Bauteile.
-9. **Kosten sind längenunabhängig** (so vorgegeben). Lange Balken sind damit
-   günstiger je Stud – das ist bewusst so gelassen.
-10. **„Nur vertikal"** bei der Stütze heißt: beide Ankerpunkte haben dieselbe
-    X-Koordinate.
-11. **Zwei feste Ankerpunkte lassen sich nicht verbinden.** Das würde nur
-    Budget kosten und nichts bewirken.
-12. **Drei Reihen von Ankerpunkten** statt nur einer entlang der Lücke:
-    Fahrbahnhöhe, 8 Studs darüber (für Türme und Abspannungen) und am
-    Schluchtgrund (Fußpunkte für Stützen). Mit nur einer Reihe wären
-    Dreiecksverbände unmöglich.
-13. **Kollision**: Nur Balken und Stützen sind fest; Seile und die Knotenkugeln
-    gehen durch. Das Fahrzeug soll nur auf der Fahrbahn aufliegen.
+**Alle sechs mitgelieferten Level sind damit geprüft** und haben zwischen 18 %
+und 45 % Budgetreserve gegenüber der günstigsten funktionierenden Lösung.
 
-### Testlauf
+### Umbenennen
 
-14. **Das Fahrzeug gleitet, es rollt nicht.** Ein einzelner Block wird jeden
-    Frame auf konstante Waagerechtgeschwindigkeit gesetzt; senkrecht wirkt die
-    Schwerkraft normal. Ein Fahrzeug mit echten Rädern wäre deutlich mehr
-    Aufwand und für den Belastungstest ohne Gewinn.
-15. **Geschwindigkeit 8 Studs/s.** Die Strecke von 68 Studs dauert damit rund
-    9 Sekunden – gut innerhalb des Zeitlimits von 30 Sekunden.
-16. **Jeder Bruch während des Tests bedeutet Misserfolg**, nicht nur ein Bruch
-    direkt unter dem Fahrzeug. Die Aufgabenstellung nennt beim Erfolg
-    ausdrücklich „ohne dass ein Bauteil bricht".
-17. **Die Last wird an drei Stellen abgetastet** (hinten, Mitte, vorne des
-    Fahrzeugs) und über die getroffenen Bauteile auf deren Endknoten verteilt.
-    So verteilt sich das Gewicht über die Fahrzeuglänge statt an einem Punkt zu
-    hängen.
-18. **Kippen** zählt ab etwa 45 Grad Neigung als Misserfolg.
-19. **Absacken** wird an der Starthöhe des Fahrzeugs gemessen, nicht an der
-    Fahrbahnoberkante – der Unterschied beträgt eine halbe Fahrzeughöhe.
-20. **Im Baumodus ist die Physik eingefroren.** Alle Knoten sind verankert; der
-    Test löst die Bremse. Sonst würde eine halbfertige Konstruktion schon beim
-    Bauen einstürzen.
-21. **Nach dem Test bleibt der Bauplan erhalten.** „Zurücksetzen" baut auch
-    zerbrochene Teile wieder auf, ohne dass man neu anfangen muss.
-
-### Aufbau und Mehrspieler
-
-22. **Ein gemeinsames Level für alle Spieler auf dem Server.** Alle bauen an
-    derselben Brücke, jeder darf testen und zurücksetzen. Getrennte Level je
-    Spieler wären deutlich mehr Aufwand.
-23. **Kein Fortschritt wird gespeichert.** Kein DataStore, keine Punkte.
-24. **Die Spielfigur wird beim Test nicht berücksichtigt.** Steht sie auf der
-    Brücke, drückt sie in der Roblox-Physik zwar mit, geht aber nicht in die
-    Kräfteberechnung ein. Sie startet seitlich neben der Fahrspur.
-25. **Die Landschaft entsteht im Code**, nicht als Rojo-Instanzen. So stehen
-    alle Maße an einer Stelle (`Level1.luau`) und lassen sich lesen und ändern.
-26. **Die Oberfläche wird im Code aufgebaut.** GUI-Instanzen über Rojo würden
-    Binärdateien (`.rbxmx`) erfordern, die sich weder lesen noch von Hand
-    ändern lassen.
-27. **Nur Maus und Tastatur.** Keine Bedienung für Touch oder Gamepad.
-28. **Kein Ton.** Der Bruch-Effekt ist ein einfacher Partikelausstoß, wie in der
-    Aufgabenstellung als Platzhalter zugelassen.
+„BridgeLab" steht an vier Stellen: `default.project.json` (`name`), die
+Ordnernamen `BridgeLab` / `BridgeLabServer` / `BridgeLabClient` ebendort, die
+Überschrift in `LevelSelectGui.luau` und `Config.RemoteFolderName`. Änderst du
+die Ordnernamen, müssen die `WaitForChild("BridgeLab")`-Zeilen mitgeändert
+werden — am einfachsten mit Suchen-und-Ersetzen über den ganzen `src`-Ordner.
 
 ---
 
-## 7. Weiterbauen
+## Getroffene Annahmen
 
-**Level 2 anlegen:** `Shared/Level1.luau` kopieren, Werte anpassen, in
-`Server/init.server.luau` in der Zeile `require(Shared.Level1)` das neue Modul
-eintragen. Alles andere liest die Maße aus dem Level-Modul.
+Überall dort, wo deine Vorgabe offen war, habe ich die einfachste sinnvolle
+Lösung gewählt. Hier die vollständige Liste:
 
-**Balance ändern:** Alle Zahlen zu Kosten und Grenzwerten stehen in
-`Shared/Config.luau` unter `Config.PartTypes`.
+### Physik und Balance
 
-**Der Rechner ist getestet.** `TrussSolver.luau` hängt an keiner Roblox-API und
-lässt sich mit dem Luau-Kommandozeilenprogramm einzeln ausführen und prüfen
-(z. B. gegen die Handrechnung eines einfachen Dreiecks).
+1. **Einheiten mit g = 1.** Eine Masse von 1000 erzeugt genau 1000 N. Dadurch
+   passen die vorgegebenen Grenzwerte (500 / 300 / 800 N) direkt zur
+   Fahrzeugmasse: ein einzelnes Bauteil kann das Fahrzeug nie allein tragen.
+2. **Zwei getrennte Physiken.** Die Roblox-Engine ist nur fürs Aussehen
+   zuständig (Durchbiegen, Einsturz). Ob ein Bauteil bricht, entscheidet
+   ausschließlich der eigene Fachwerk-Rechner auf dem Server.
+3. **Gelenkige Stäbe, kein Biegen.** Jedes Bauteil kann nur längs gezogen oder
+   gedrückt werden. Deshalb trägt sich eine schnurgerade Fahrbahn nicht selbst —
+   genau das ist die Rätselaufgabe.
+4. **Reichweite geändert.** Seil und Stütze reichen jetzt 40 statt 26 Studs.
+   Mit 26 waren vier der sechs Level nachweislich unlösbar.
+5. **Fahrgeschwindigkeit 3,2 statt 8 Studs/s**, damit man die Belastungszahlen
+   lesen kann. Die Zeitlimits sind entsprechend großzügig.
+6. **Bauteile brechen erst nach 0,6 s Schonfrist**, sonst zerstört der Ruck
+   beim Lösen der Verankerung sofort etwas.
+
+### Spielaufbau
+
+7. **Eine eigene Arena pro Spieler**, senkrecht gestapelt im Abstand von 500
+   Studs. Nötig, weil jeder ein eigenes Level wählen darf.
+8. **Keine Spielerfigur.** `CharacterAutoLoads` ist aus, die Kamera ist fest
+   auf Seitenansicht gestellt.
+9. **Der Bauplan überlebt den Test.** Bricht etwas, bleibt der Plan erhalten —
+   „Zurücksetzen" stellt alles wieder her, ohne dass man neu bauen muss.
+10. **Höchstens 16 Spieler gleichzeitig** in eigenen Arenen (`Config.Arena`).
+
+### Tipps und Robux
+
+11. **Drei Tipps pro Level**, von allgemein zu konkret. Der dritte nennt die
+    Lösung mit Stückzahlen.
+12. **Gratis-Regel an den Schwierigkeitsgrad gekoppelt:** Stufe 1–3 bekommt
+    einen Gratis-Tipp, Stufe 4–5 keinen. Das setzt deine Vorgabe („bei den
+    Anfangsleveln der erste gratis, bei den späteren nicht") in eine Regel um,
+    die auch für neue Level automatisch gilt.
+13. **Ein einziges Robux-Produkt** für alle Tipps statt eines pro Level.
+14. **Jedes Level ist ohne Tipps lösbar.** Das steht auch so in der Anleitung.
+
+### Oberfläche
+
+15. **Ein gemeinsamer „Zeigepunkt"** für alle drei Eingabearten. Deshalb gibt
+    es die Trefferlogik nur einmal.
+16. **Zwei Finger für die Kamera** auf Touch (Begründung oben).
+17. **Die Anleitung startet automatisch beim ersten Mal in Level 1** und ist
+    danach über das Menü wieder erreichbar.
+18. **Belastungszahlen als BillboardGui am Bauteil** — die überträgt Roblox von
+    selbst zum Client, dafür braucht es kein eigenes RemoteEvent.
+19. **Deutsche Texte ohne Umlaute im Spiel** (`ue` statt `ü`). Roblox-Schriften
+    stellen Umlaute nicht überall zuverlässig dar. In dieser README stehen
+    Umlaute normal.
+
+---
+
+## Bekannte Grenzen
+
+Ehrlich gesagt, was noch fehlt oder wacklig ist:
+
+- **Nicht in Roblox getestet.** Ich konnte den Code hier nicht in Studio
+  ausführen. Geprüft ist: alle 20 Dateien kompilieren mit dem echten
+  Luau-Compiler, und die Lösbarkeit aller Level wurde mit dem echten
+  Fachwerk-Rechner nachgerechnet. Was das *nicht* abdeckt, sind Laufzeitfehler,
+  die erst mit echten Roblox-Objekten auftreten — falsch platzierte Fenster,
+  eine Kamera, die woanders steht als gedacht, ähnliches. Rechne damit, dass
+  beim ersten Start noch Kleinigkeiten zu richten sind, und schick mir die
+  Fehlermeldungen aus **VIEW → Output**.
+- **Die Fußleiste kann auf sehr schmalen Bildschirmen eng werden.** Die Knöpfe
+  skalieren mit, aber unter etwa 600 Pixel Breite wird es gedrängt.
+- **Der Gamepad-Zeiger** ist selbstgebaut (ein Ring, den der linke Stick
+  bewegt). Roblox bietet dafür nichts Fertiges, wenn es keine Spielfigur gibt.
+- **Seile hängen nicht durch.** Ein schlaffes Seil wird weiterhin als gerade
+  Linie gezeichnet. Echtes Durchhängen bräuchte mehrere Teilstücke pro Seil.
+- **`allowedParts` ist eingebaut, aber ungenutzt.** Man kann damit einzelne
+  Bauteile pro Level sperren. Ich habe es nicht verwendet, weil jedes Level
+  ohne Stützen unlösbar wäre.
+- **Keine Bestenliste, keine Sterne-Wertung, kein Level-Editor.**
