@@ -136,6 +136,40 @@ Beim allerersten Start springt das Spiel direkt in Level 1 und die Anleitung
 
 ---
 
+## Wenn etwas nicht funktioniert
+
+### Die Oberfläche ist da, aber das Level ist unsichtbar
+
+Fast immer ist **Streaming** schuld. Bei eingeschaltetem `StreamingEnabled`
+schickt der Server einem Spieler nur die Umgebung rund um **seine Spielfigur**.
+Die gibt es in BridgeLab absichtlich nicht (Seitenansicht) — ohne Bezugspunkt
+bekommt der Client deshalb gar keine Welt übertragen. Die Oberfläche liegt in
+der PlayerGui und wird immer übertragen, die Brücke fehlt komplett.
+
+**Prüfen:** Explorer → **Workspace** anklicken → im Fenster **Properties** die
+Zeile **StreamingEnabled** suchen. Der Haken muss **weg** sein.
+
+Der Server schaltet das beim Start selbst ab, und in `default.project.json`
+steht es ebenfalls. Setzt du den Haken in Studio von Hand wieder, ist das Spiel
+allerdings wieder blind.
+
+### Im Output steht „Arena nicht gefunden"
+
+Gleiche Ursache wie oben — siehe dort.
+
+### Gar nichts passiert, keine Oberfläche
+
+Hast du **Play** gedrückt oder **Run**? Nur „Play" startet auch einen Client,
+und die gesamte Oberfläche ist Client-Code.
+
+### Im Output steht eine Warnung zum DataStore
+
+Normal, solange „Enable Studio Access to API Services" aus ist. Das Spiel läuft
+trotzdem, der Fortschritt wird nur nicht gespeichert. Siehe
+[DataStore freischalten](#2-datastore-freischalten-für-den-fortschritt).
+
+---
+
 ## Robux-Tipps einrichten
 
 **Das Spiel funktioniert komplett ohne diesen Schritt.** Solange nichts

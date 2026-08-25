@@ -37,6 +37,21 @@ local Monetisation = require(script.Monetisation)
 -- Keine Spielerfigur: das Spiel laeuft in der Seitenansicht.
 Players.CharacterAutoLoads = false
 
+--[[
+	STREAMING MUSS AUS BLEIBEN - SONST SIEHT MAN GAR NICHTS.
+
+	Bei eingeschaltetem Streaming schickt der Server einem Spieler nur die
+	Umgebung rund um SEINE SPIELFIGUR. Genau die gibt es hier aber nicht,
+	weil das Spiel von der Seite gespielt wird. Ohne Bezugspunkt bekommt der
+	Client dann ueberhaupt nichts von der Welt zu sehen: die Oberflaeche ist
+	da (sie liegt in der PlayerGui), die Bruecke fehlt komplett.
+
+	In default.project.json steht die Einstellung ebenfalls. Hier wird sie
+	zusaetzlich zur Laufzeit gesetzt, damit ein von Hand gesetzter Haken in
+	den Studio-Eigenschaften das Spiel nicht wieder unbrauchbar macht.
+]]
+Workspace.StreamingEnabled = false
+
 Remotes.createAll()
 
 local worldRoot = Workspace:FindFirstChild("BridgeLab")

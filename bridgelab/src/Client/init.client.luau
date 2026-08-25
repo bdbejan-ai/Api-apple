@@ -133,10 +133,26 @@ local function enterLevel(state)
 	task.spawn(function()
 		local folder = waitForArenaFolder()
 		if not folder then
-			hud:showNotice("Die Bauflaeche konnte nicht geladen werden.", Theme.colors.danger)
+			--[[
+				Haeufigste Ursache: Workspace.StreamingEnabled ist eingeschaltet.
+				Ohne Spielerfigur hat der Client keinen Bezugspunkt und bekommt
+				gar keine Welt uebertragen. Der Server schaltet Streaming beim
+				Start ab; wurde es danach von Hand wieder gesetzt, landet man
+				hier.
+			]]
+			warn("[BridgeLab] Arena nicht gefunden. Ist Workspace.StreamingEnabled aus?")
+			hud:showNotice(
+				"Die Bauflaeche konnte nicht geladen werden. Pruefe Workspace.StreamingEnabled.",
+				Theme.colors.danger
+			)
 			return
 		end
 		app.arenaFolder = folder
+		print(string.format(
+			"[BridgeLab] Arena '%s' geladen, %d Ankerpunkte.",
+			folder.Name,
+			#folder:WaitForChild("SnapPoints"):GetChildren()
+		))
 
 		controller:setArena(folder)
 		controller:setEnabled(true)

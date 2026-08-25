@@ -252,6 +252,21 @@ end
 --------------------------------------------------------------------------------
 
 function CameraController:update(dt: number)
+	--[[
+		Roblox kann die aktive Kamera jederzeit durch eine neue ersetzen.
+		Haetten wir uns die Kamera nur beim Start gemerkt, wuerden wir danach
+		ein totes Objekt bewegen - das Bild bliebe stehen. Deshalb jedes Bild
+		kurz nachsehen, ob es noch dieselbe ist.
+	]]
+	local current = workspace.CurrentCamera
+	if current and current ~= self.camera then
+		self.camera = current
+		self.camera.FieldOfView = Config.Camera.fieldOfView
+	end
+	if not self.camera then
+		return
+	end
+
 	----------------------------------------------------------------------------
 	-- Gamepad: rechter Stick schiebt, Trigger zoomen
 	----------------------------------------------------------------------------
