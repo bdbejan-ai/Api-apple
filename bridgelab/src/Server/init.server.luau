@@ -46,11 +46,22 @@ Players.CharacterAutoLoads = false
 	Client dann ueberhaupt nichts von der Welt zu sehen: die Oberflaeche ist
 	da (sie liegt in der PlayerGui), die Bruecke fehlt komplett.
 
-	In default.project.json steht die Einstellung ebenfalls. Hier wird sie
-	zusaetzlich zur Laufzeit gesetzt, damit ein von Hand gesetzter Haken in
-	den Studio-Eigenschaften das Spiel nicht wieder unbrauchbar macht.
+	ACHTUNG: StreamingEnabled laesst sich NICHT aus einem Skript heraus
+	aendern. Roblox erlaubt das nur im Bearbeitungsmodus. Ein Schreibversuch
+	an dieser Stelle wuerde das ganze Serverskript sofort abbrechen - und dann
+	entstuenden nicht einmal die RemoteEvents.
+
+	Deshalb wird hier nur GELESEN und im Zweifel gewarnt. Abgeschaltet wird
+	die Einstellung in default.project.json.
 ]]
-Workspace.StreamingEnabled = false
+if Workspace.StreamingEnabled then
+	warn(
+		"[BridgeLab] Workspace.StreamingEnabled ist EINGESCHALTET. "
+			.. "Das Spiel hat keine Spielerfigur, deshalb bekommt der Client damit keine Welt "
+			.. "uebertragen - die Oberflaeche erscheint, das Level bleibt unsichtbar. "
+			.. "Bitte in Studio unter Workspace den Haken bei StreamingEnabled entfernen."
+	)
+end
 
 Remotes.createAll()
 

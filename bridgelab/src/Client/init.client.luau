@@ -34,10 +34,86 @@ local TutorialGui = require(script.TutorialGui)
 
 local player = Players.LocalPlayer
 
--- Alle RemoteEvents in eine Tabelle holen: remote.PlaceMember usw.
+--------------------------------------------------------------------------------
+-- Notfallmeldung, falls der Server nicht antwortet
+--------------------------------------------------------------------------------
+
+--[[
+	Zeigt einen gut sichtbaren Hinweis auf dem Bildschirm. Wird nur gebraucht,
+	wenn etwas so grundlegend schiefgeht, dass das Spiel gar nicht erst
+	starten kann - ohne das saehe der Spieler nur einen leeren Bildschirm und
+	wuesste nicht, woran es liegt.
+]]
+local function showStartupError(headline: string, detail: string)
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "BridgeLabStartupError"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 100
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	local panel = Instance.new("Frame")
+	panel.Size = UDim2.fromOffset(560, 190)
+	panel.Position = UDim2.new(0.5, -280, 0.5, -95)
+	panel.BackgroundColor3 = Theme.colors.panel
+	panel.BorderSizePixel = 0
+	panel.Parent = gui
+	Theme.corner(panel, 10)
+	Theme.stroke(panel, Theme.colors.danger, 2)
+
+	Theme.label(panel, "Headline", {
+		size = UDim2.new(1, -40, 0, 30),
+		position = UDim2.fromOffset(20, 20),
+		text = headline,
+		textSize = 20,
+		bold = true,
+		color = Theme.colors.danger,
+	})
+
+	Theme.label(panel, "Detail", {
+		size = UDim2.new(1, -40, 1, -70),
+		position = UDim2.fromOffset(20, 56),
+		text = detail,
+		textSize = 14,
+		color = Theme.colors.text,
+		wrapped = true,
+		alignY = Enum.TextYAlignment.Top,
+	})
+end
+
+--------------------------------------------------------------------------------
+-- Alle RemoteEvents holen: remote.PlaceMember usw.
+--------------------------------------------------------------------------------
+
 local remote = {}
+local missingRemote = nil
+
 for _, name in Config.RemoteNames do
-	remote[name] = Remotes.get(name)
+	local event = Remotes.get(name, 10)
+	if not event then
+		missingRemote = name
+		break
+	end
+	remote[name] = event
+end
+
+if missingRemote then
+	--[[
+		Kommt praktisch nur vor, wenn das SERVERSKRIPT abgestuerzt ist. Dann
+		wurden die RemoteEvents nie angelegt. Die Ursache steht dann als roter
+		Fehler im Output-Fenster - und zwar die ERSTE rote Zeile, nicht diese.
+	]]
+	warn("[BridgeLab] RemoteEvent '" .. missingRemote .. "' kam nicht an. Laeuft das Serverskript?")
+	showStartupError(
+		"Der Server antwortet nicht",
+		"BridgeLab konnte nicht starten: das RemoteEvent '"
+			.. missingRemote
+			.. "' ist nicht angekommen.\n\n"
+			.. "Das heisst fast immer, dass das Serverskript einen Fehler hatte. "
+			.. "Oeffne in Studio VIEW -> Output und sieh dir die ERSTE rote Zeile an - "
+			.. "dort steht die eigentliche Ursache."
+	)
+	return
 end
 
 --------------------------------------------------------------------------------
