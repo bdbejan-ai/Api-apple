@@ -105,13 +105,57 @@ for stem, variable in [("BuildHud", "hud"), ("BuildController", "controller"), (
 tutorial = (SRC / "Client" / "TutorialGui.luau").read_text(encoding="utf-8")
 hud_source = (SRC / "Client" / "BuildHud.luau").read_text(encoding="utf-8")
 
+# Manche Knopfnamen setzt das HUD zur Laufzeit zusammen, etwa
+# "Material_" .. key. Nach dem fertigen Namen zu suchen, findet die also nie.
+# Deshalb wird zusaetzlich geprueft, ob es ein passendes Namenspraefix gibt -
+# sonst meldet die Pruefung dauernd Fehler, die keine sind, und man gewoehnt
+# sich an, sie zu ueberlesen.
+BUILT_PREFIXES = re.findall(r'"([A-Za-z]+_)"\s*\.\.', hud_source)
+
 for m in re.finditer(r'highlight\s*=\s*"([^"]+)"', tutorial):
     name = m.group(1)
-    generated = name.startswith("Part_") and '"Part_" .. key' in hud_source
+    generated = any(name.startswith(prefix) for prefix in BUILT_PREFIXES)
     if f'"{name}"' not in hud_source and not generated:
         note(f'Anleitung hebt "{name}" hervor - im HUD gibt es das nicht')
 
-# --- 6: doppelte Kommentarbloecke ---------------------------------------------
+# --- 6: Ordnernamen der Arena -------------------------------------------------
+
+# Der LevelBuilder legt die Ordner an; Server und Client suchen sie darin
+# wieder. Verwendet eine Seite einen Namen, den die andere nie anlegt, faellt
+# das erst zur Laufzeit auf - und dann als leerer Bildschirm ohne Fehlermeldung.
+# Genau so ist mir "Vehicle" gegen "Fahrzeuge" durchgerutscht.
+builder = (SRC / "Server" / "LevelBuilder.luau").read_text(encoding="utf-8")
+
+returned = set()
+tail = builder[builder.rindex("return {"):] if "return {" in builder else ""
+for m in re.finditer(r"^\s*(\w+)\s*=\s*\w+\s*,\s*$", tail, re.M):
+    returned.add(m.group(1))
+
+created = set(re.findall(r'folder\("([^"]+)"\)', builder))
+
+for path in SRC.rglob("*.luau"):
+    if path.name == "LevelBuilder.luau":
+        continue
+    text = path.read_text(encoding="utf-8")
+    seen = set()
+    for m in re.finditer(r"(?:self\.)?folders\.(\w+)", text):
+        key = m.group(1)
+        if returned and key not in returned and key not in seen:
+            seen.add(key)
+            note(f'{path.stem}: folders.{key} - den Ordner liefert LevelBuilder nicht')
+
+# Der Client sucht die Ordner ueber ihren Namen in der Welt.
+client_text = (SRC / "Client").rglob("*.luau")
+for path in client_text:
+    text = path.read_text(encoding="utf-8")
+    for m in re.finditer(r'FindFirstChild\("(Bauteile|Knoten|Fahrzeuge|Welt|Anker|Effekte|Zierrat|[A-Z]\w*)"\)', text):
+        name = m.group(1)
+        # Nur Namen pruefen, die aussehen wie Arena-Ordner.
+        if name in created or name not in {"Bauteile", "Knoten", "Fahrzeuge", "Welt", "Anker", "Effekte", "Zierrat"}:
+            continue
+        note(f'{path.stem}: sucht Ordner "{name}", den der LevelBuilder nicht anlegt')
+
+# --- 7: doppelte Kommentarbloecke ---------------------------------------------
 
 for f, t in texts.items():
     blocks = [" ".join(b.split()) for b in re.findall(r"--\[\[(.*?)\]\]", t, re.S)]

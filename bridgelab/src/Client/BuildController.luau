@@ -11,21 +11,30 @@
 	  Touch   -> die Stelle, an der der Finger liegt
 	  Gamepad -> ein eigener Zeiger, den der linke Stick bewegt
 
-	Von diesem Punkt aus geht ein Strahl in die Welt. Der Ankerpunkt, der
-	diesem Strahl am naechsten liegt, gilt als getroffen. Das ist unabhaengig
-	von der Kameraposition und funktioniert auch, wenn ein Bauteil den Punkt
-	halb verdeckt.
+	WIE AUS DEM ZEIGEPUNKT EIN RASTERPUNKT WIRD
+	Frueher wurde der naechstgelegene ANKER gesucht - es gab ja nur eine
+	Handvoll erlaubter Punkte. Beim freien Bauen ist jeder Rasterpunkt
+	erlaubt, und die Rechnung wird dadurch sogar einfacher und genauer:
 
-	ABLAUF BEIM BAUEN
-	  1. Bauteiltyp im Menue waehlen.
-	  2. Ersten Ankerpunkt waehlen  -> wird gemerkt.
-	  3. Zweiten Ankerpunkt waehlen -> Wunsch geht an den Server.
+	  1. Vom Zeigepunkt geht ein Strahl in die Welt.
+	  2. Die Bauebene ist eine senkrechte Ebene bei z = 0 - die Bruecke ist
+	     flach, die Kamera schaut von der Seite darauf.
+	  3. Der Schnittpunkt von Strahl und Ebene ist der gemeinte Punkt.
+	  4. Dieser Punkt wird auf das 2-Studs-Raster gerundet.
+
+	Das trifft immer, unabhaengig von Kameraposition und Zoomstufe, und es
+	kann nichts verdecken - anders als bei einem Raycast auf Bauteile.
+
+	ABLAUF BEIM BAUEN: ZIEHEN
+	  1. Baustoff in der Leiste waehlen.
+	  2. Maustaste druecken und ZIEHEN - die Vorschau folgt mit.
+	  3. Loslassen -> der Wunsch geht an den Server.
 	Der Server entscheidet, ob das Bauteil wirklich entsteht.
 
-	WARUM BEI TOUCH NUR EIN KURZES TIPPEN BAUT
-	Ein Finger, der sich bewegt, will meistens etwas anderes. Deshalb gilt
-	nur ein kurzes Tippen ohne grosse Bewegung als Auswahl. Ziehen mit zwei
-	Fingern gehoert der Kamera (siehe CameraController).
+	Warum Ziehen und nicht zweimal Klicken: beim Ziehen sieht man waehrend
+	der ganzen Bewegung, was entsteht, und ein Versehen bricht man einfach
+	ab, indem man wieder zum Anfangspunkt zurueckzieht. Genau so baut man
+	auch im grossen Vorbild.
 ]]
 
 local Players = game:GetService("Players")
@@ -35,23 +44,13 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
+local Materials = require(Shared.Materials)
+local Terrain = require(Shared.Terrain)
 
 local Device = require(script.Parent.Device)
 
 local BuildController = {}
 BuildController.__index = BuildController
-
--- Wie weit der Zeiger vom Ankerpunkt entfernt sein darf (in Studs, quer zum
--- Sichtstrahl gemessen). Waechst mit der Entfernung mit, damit weit entfernte
--- Punkte nicht unmoeglich zu treffen sind.
-local function pickRadius(distance: number, touch: boolean): number
-	local base = distance * (if touch then 0.05 else 0.03)
-	return math.clamp(base, if touch then 2.5 else 1.5, if touch then 9 else 6)
-end
-
--- Ein kurzes Tippen: hoechstens so lang und mit hoechstens so viel Bewegung.
-local TAP_MAX_SECONDS = 0.4
-local TAP_MAX_PIXELS = 18
 
 --[[
 	Kuerzester Abstand zwischen einem Strahl und einer Strecke.
@@ -102,28 +101,30 @@ function BuildController.new()
 	self.player = Players.LocalPlayer
 	self.camera = workspace.CurrentCamera
 
-	self.selectedKind = "Beam"
+	self.selectedMaterial = "Road"
 	self.removeMode = false
-	self.firstSnap = nil
-	self.firstSnapPosition = nil
 	self.phase = "Idle" -- "Idle" (kein Level) | "Build" | "Test" | "Result"
 	self.enabled = false
 
-	self.snapFolder = nil
 	self.memberFolder = nil
+	self.level = nil -- Baubereich, Anker, Gelaende - kommt vom Server
+	self.origin = Vector3.zero
+	self.budgetLeft = 0
 
 	-- Zeigepunkt auf dem Bildschirm
 	self.pointer = Vector2.new(0, 0)
 	self.gamepadCursor = Vector2.new(0, 0)
+
+	-- Ziehen
+	self.dragging = false
+	self.dragStart = nil -- { x, y } in Levelkoordinaten
 	self.activeTouch = nil
-	self.touchStart = nil
-	self.touchStartTime = 0
 
 	-- Rueckmeldungen nach aussen (werden von init.client gesetzt)
-	self.onPlaceRequest = nil -- (kind, snapA, snapB)
+	self.onPlaceRequest = nil -- (material, ax, ay, bx, by)
 	self.onRemoveRequest = nil -- (memberId)
-	self.onSelectionChanged = nil -- (kind oder "Remove")
-	self.onFirstSnapChanged = nil -- (snapIndex oder nil)
+	self.onSelectionChanged = nil -- (material oder "Remove")
+	self.onDragChanged = nil -- (true/false) - fuer die Anleitung
 
 	self:createMarkers()
 	self:createGamepadCursor()
@@ -157,10 +158,10 @@ function BuildController:createMarkers()
 		return part
 	end
 
-	-- Ankerpunkt unter dem Zeiger
-	self.hoverMarker = marker("HoverMarker", Color3.fromRGB(255, 255, 255), 2.4)
-	-- Bereits gewaehlter erster Ankerpunkt
-	self.startMarker = marker("StartMarker", Color3.fromRGB(120, 220, 255), 2.6)
+	-- Rasterpunkt unter dem Zeiger
+	self.hoverMarker = marker("HoverMarker", Color3.fromRGB(255, 255, 255), 1.7)
+	-- Anfangspunkt des laufenden Zuges
+	self.startMarker = marker("StartMarker", Color3.fromRGB(120, 220, 255), 2.0)
 	-- Stelle, an der die Konstruktion nicht ausgesteift ist
 	self.weakMarker = marker("WeakSpotMarker", Color3.fromRGB(255, 90, 70), 3.2)
 
@@ -179,7 +180,7 @@ function BuildController:createMarkers()
 	highlight.Parent = workspace
 	self.removeHighlight = highlight
 
-	-- Vorschaulinie zwischen erstem und anvisiertem Ankerpunkt
+	-- Vorschaulinie waehrend des Ziehens
 	local preview = Instance.new("Part")
 	preview.Name = "PlacementPreview"
 	preview.Anchored = true
@@ -233,29 +234,36 @@ function BuildController:createGamepadCursor()
 end
 
 --------------------------------------------------------------------------------
--- Arena verbinden
+-- Level und Arena verbinden
 --------------------------------------------------------------------------------
 
 --[[
-	Sagt dem Controller, in welcher Arena gebaut wird. Die Ordner kommen vom
-	Server; hier merken wir uns nur, wo die Ankerpunkte und Bauteile liegen.
-]]
-function BuildController:setArena(arenaFolder: Instance?)
-	if arenaFolder then
-		self.snapFolder = arenaFolder:FindFirstChild("SnapPoints")
-		self.memberFolder = arenaFolder:FindFirstChild("Members")
-	else
-		self.snapFolder = nil
-		self.memberFolder = nil
-	end
+	Sagt dem Controller, wo gebaut wird und was dort erlaubt ist.
 
-	self:cancelSelection()
+	Der Client bekommt Baubereich, Anker und Gelaende, damit die Vorschau
+	sofort gruen oder rot sein kann - ohne auf eine Antwort vom Server zu
+	warten. Entschieden wird trotzdem nur auf dem Server; das hier ist
+	ausschliesslich Anzeige.
+]]
+function BuildController:setLevel(info, originY: number)
+	self.level = info
+	self.origin = Vector3.new(0, originY or 0, 0)
+	self:cancelDrag()
+end
+
+function BuildController:setArena(arenaFolder: Instance?)
+	self.memberFolder = if arenaFolder then arenaFolder:FindFirstChild("Bauteile") else nil
+	self:cancelDrag()
+end
+
+function BuildController:setBudgetLeft(value: number)
+	self.budgetLeft = value or 0
 end
 
 function BuildController:setEnabled(enabled: boolean)
 	self.enabled = enabled
 	if not enabled then
-		self:cancelSelection()
+		self:cancelDrag()
 		self:hideMarkers()
 	end
 	self.cursorGui.Enabled = enabled and Device.isGamepad()
@@ -319,50 +327,50 @@ function BuildController:updatePointer(dt: number)
 	end
 end
 
--- Der Sichtstrahl vom Zeigepunkt in die Welt.
-function BuildController:pointerRay(): Ray
-	return self.camera:ViewportPointToRay(self.pointer.X, self.pointer.Y)
-end
-
 --------------------------------------------------------------------------------
--- Treffer suchen
+-- Vom Bildschirm auf das Raster
 --------------------------------------------------------------------------------
 
-function BuildController:findSnapUnderPointer(): (number?, Vector3?)
-	if not self.snapFolder then
+--[[
+	Schneidet den Sichtstrahl mit der Bauebene und rundet auf das Raster.
+
+	Die Bauebene ist die senkrechte Ebene, in der die ganze Bruecke liegt.
+	Rueckgabe: x, y in LEVELKOORDINATEN (also ohne den Arena-Versatz), oder
+	nil, wenn der Strahl die Ebene nicht trifft.
+]]
+function BuildController:snappedPointUnderPointer(): (number?, number?)
+	if not self.level then
 		return nil, nil
 	end
 
-	local ray = self:pointerRay()
-	local origin = ray.Origin
+	local ray = self.camera:ViewportPointToRay(self.pointer.X, self.pointer.Y)
 	local direction = ray.Direction.Unit
-	local touch = Device.isTouch()
+	local planeZ = self.level.z or 0
 
-	local bestIndex, bestPosition = nil, nil
-	local bestScore = math.huge
-
-	for _, marker in self.snapFolder:GetChildren() do
-		local index = marker:GetAttribute("SnapIndex")
-		if not index then
-			continue
-		end
-
-		local toPoint = (marker :: BasePart).Position - origin
-		local along = toPoint:Dot(direction)
-		if along < 1 or along > 600 then
-			continue
-		end
-
-		-- Abstand des Ankerpunkts vom Sichtstrahl.
-		local offset = (toPoint - direction * along).Magnitude
-		if offset <= pickRadius(along, touch) and offset < bestScore then
-			bestScore = offset
-			bestIndex = index
-			bestPosition = (marker :: BasePart).Position
-		end
+	--[[
+		Blickt die Kamera fast parallel zur Ebene, gibt es keinen brauchbaren
+		Schnittpunkt. In der festen Seitenansicht kann das eigentlich nicht
+		vorkommen - aber ein Ergebnis von "unendlich weit weg" waere so
+		schaedlich, dass die Abfrage stehen bleibt.
+	]]
+	if math.abs(direction.Z) < 1e-4 then
+		return nil, nil
 	end
 
-	return bestIndex, bestPosition
+	local t = (planeZ - ray.Origin.Z) / direction.Z
+	if t < 0 then
+		return nil, nil -- Die Ebene liegt hinter der Kamera.
+	end
+
+	local hit = ray.Origin + direction * t
+	local x = Config.snapToGrid(hit.X)
+	local y = Config.snapToGrid(hit.Y - self.origin.Y)
+	return x, y
+end
+
+-- Levelkoordinate -> Weltkoordinate
+function BuildController:toWorld(x: number, y: number): Vector3
+	return self.origin + Vector3.new(x, y, self.level and self.level.z or 0)
 end
 
 --[[
@@ -374,7 +382,7 @@ function BuildController:findMemberUnderPointer(): (number?, Instance?)
 		return nil, nil
 	end
 
-	local ray = self:pointerRay()
+	local ray = self.camera:ViewportPointToRay(self.pointer.X, self.pointer.Y)
 	local origin = ray.Origin
 	local direction = ray.Direction.Unit
 	local touch = Device.isTouch()
@@ -409,6 +417,67 @@ function BuildController:findMemberUnderPointer(): (number?, Instance?)
 end
 
 --------------------------------------------------------------------------------
+-- Darf hier gebaut werden? (nur fuer die Vorschaufarbe)
+--------------------------------------------------------------------------------
+
+--[[
+	Dieselben Regeln wie in Structure:canPlace auf dem Server, aber ohne die
+	Bauteilliste - der Client kennt sie nicht vollstaendig.
+
+	Es geht hier NUR um die Farbe der Vorschau. Der Server prueft alles noch
+	einmal und entscheidet allein. Doppelt geprueft wird trotzdem, weil eine
+	Vorschau, die erst nach der Antwort vom Server rot wird, zu spaet kommt:
+	da hat man schon losgelassen.
+]]
+function BuildController:previewProblem(ax: number, ay: number, bx: number, by: number): string?
+	local level = self.level
+	if not level then
+		return "Kein Level"
+	end
+
+	local spec = Materials.get(self.selectedMaterial)
+	if not spec then
+		return "Unbekannter Baustoff"
+	end
+
+	local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+	if length < spec.minLength - 0.01 then
+		return string.format("zu kurz (min %d)", spec.minLength)
+	end
+	if length > spec.maxLength + 0.01 then
+		return string.format("zu lang (max %d)", spec.maxLength)
+	end
+
+	local area = level.buildArea
+	local function insideArea(x: number, y: number): boolean
+		-- Anker duerfen ausserhalb liegen: sie sind der Anschluss ans Ufer.
+		for _, anchor in level.anchors do
+			if math.abs(anchor.x - x) < 0.51 and math.abs(anchor.y - y) < 0.51 then
+				return true
+			end
+		end
+		return x >= area.minX - 0.01
+			and x <= area.maxX + 0.01
+			and y >= area.minY - 0.01
+			and y <= area.maxY + 0.01
+	end
+
+	if not insideArea(ax, ay) or not insideArea(bx, by) then
+		return "ausserhalb des Baubereichs"
+	end
+
+	if Terrain.segmentBlocked(level.terrain, ax, ay, bx, by) then
+		return "laeuft durch den Felsen"
+	end
+
+	if Materials.cost(self.selectedMaterial, length) > self.budgetLeft then
+		return "Budget reicht nicht"
+	end
+
+	return nil
+end
+
+--------------------------------------------------------------------------------
 -- Markierungen und Vorschau nachfuehren
 --------------------------------------------------------------------------------
 
@@ -421,7 +490,7 @@ function BuildController:update(dt: number)
 	end
 
 	if self.removeMode then
-		-- Im Abrissmodus wird nicht der Ankerpunkt, sondern das Bauteil
+		-- Im Abrissmodus wird nicht der Rasterpunkt, sondern das Bauteil
 		-- hervorgehoben, das beim naechsten Klick verschwindet.
 		self.hoverMarker.Transparency = 1
 		self.preview.Transparency = 1
@@ -433,16 +502,14 @@ function BuildController:update(dt: number)
 		return
 	end
 
-	--[[
-		Ausserhalb des Abrissmodus wird ein Bauteil nur dann markiert, wenn
-		gerade KEIN Ankerpunkt unter dem Zeiger liegt. Sonst leuchtete beim
-		normalen Bauen staendig etwas auf, obwohl man gar nichts abreissen
-		will - und der Ankerpunkt ist in dem Fall eindeutig das Gemeinte.
+	local x, y = self:snappedPointUnderPointer()
 
-		Die Markierung ist dann auch dezenter: sie sagt nur "ein Rechtsklick
-		wuerde das hier treffen".
+	--[[
+		Ausserhalb des Ziehens wird ein Bauteil dezent markiert: das sagt
+		"ein Rechtsklick wuerde das hier treffen". Waehrend des Ziehens
+		waere das nur Unruhe im Bild.
 	]]
-	if not self.firstSnap and not index then
+	if not self.dragging then
 		local _, model = self:findMemberUnderPointer()
 		self:setHighlightStyle(false)
 		self.removeHighlight.Adornee = model
@@ -450,117 +517,123 @@ function BuildController:update(dt: number)
 		self.removeHighlight.Adornee = nil
 	end
 
-	local index, position = self:findSnapUnderPointer()
-
-	if index and position then
-		self.hoverMarker.Position = position
+	if x and y then
+		self.hoverMarker.Position = self:toWorld(x, y)
 		self.hoverMarker.Transparency = 0.45
 	else
 		self.hoverMarker.Transparency = 1
 	end
 
-	-- Vorschaulinie zeichnen, sobald der erste Punkt gesetzt ist.
-	if self.firstSnap and self.firstSnapPosition then
-		self.startMarker.Position = self.firstSnapPosition
+	-- Vorschaulinie waehrend des Ziehens
+	if self.dragging and self.dragStart then
+		local start = self.dragStart
+		local startWorld = self:toWorld(start.x, start.y)
+		self.startMarker.Position = startWorld
 		self.startMarker.Transparency = 0.3
 
-		if position and index ~= self.firstSnap then
-			local spec = Config.PartTypes[self.selectedKind]
-			local delta = position - self.firstSnapPosition
+		if x and y and (x ~= start.x or y ~= start.y) then
+			local endWorld = self:toWorld(x, y)
+			local delta = endWorld - startWorld
 			local length = delta.Magnitude
-			local allowed = length >= spec.minLength and length <= spec.maxLength
-			if spec.verticalOnly and math.abs(delta.X) > 0.01 then
-				allowed = false
-			end
+			local problem = self:previewProblem(start.x, start.y, x, y)
 
 			-- Bei senkrechten Bauteilen darf der Hilfsvektor nicht (0,1,0) sein,
 			-- sonst liefert CFrame.lookAt kein brauchbares Ergebnis.
 			local up = if math.abs(delta.Unit.Y) > 0.999 then Vector3.new(0, 0, 1) else Vector3.new(0, 1, 0)
 
-			self.preview.Size = Vector3.new(0.45, 0.45, length)
-			self.preview.CFrame = CFrame.lookAt(self.firstSnapPosition + delta / 2, position, up)
-			self.preview.Color = if allowed then Color3.fromRGB(120, 235, 150) else Color3.fromRGB(235, 90, 80)
-			self.preview.Transparency = 0.25
+			self.preview.Size = Vector3.new(0.5, 0.5, length)
+			self.preview.CFrame = CFrame.lookAt(startWorld + delta / 2, endWorld, up)
+			self.preview.Color = if problem then Color3.fromRGB(235, 90, 80) else Color3.fromRGB(120, 235, 150)
+			self.preview.Transparency = 0.2
+			self.previewProblemText = problem
 		else
 			self.preview.Transparency = 1
+			self.previewProblemText = nil
 		end
 	else
 		self.startMarker.Transparency = 1
 		self.preview.Transparency = 1
+		self.previewProblemText = nil
 	end
 end
 
 --------------------------------------------------------------------------------
--- Auswahl und Aktionen
+-- Ziehen
 --------------------------------------------------------------------------------
 
-function BuildController:cancelSelection()
-	local had = self.firstSnap ~= nil
-	self.firstSnap = nil
-	self.firstSnapPosition = nil
-	self.startMarker.Transparency = 1
-	self.preview.Transparency = 1
-	if had and self.onFirstSnapChanged then
-		self.onFirstSnapChanged(nil)
+function BuildController:beginDrag()
+	if not self.enabled or self.phase ~= "Build" or self.removeMode then
+		return
+	end
+
+	local x, y = self:snappedPointUnderPointer()
+	if not x or not y then
+		return
+	end
+
+	self.dragging = true
+	self.dragStart = { x = x, y = y }
+	if self.onDragChanged then
+		self.onDragChanged(true)
 	end
 end
 
--- Ein "Auswaehlen" - egal von welchem Geraet.
-function BuildController:primaryAction()
-	if not self.enabled or self.phase ~= "Build" then
+function BuildController:endDrag()
+	if not self.dragging or not self.dragStart then
+		self:cancelDrag()
 		return
 	end
 
-	if self.removeMode then
-		local memberId = self:findMemberUnderPointer()
-		if memberId and self.onRemoveRequest then
-			self.onRemoveRequest(memberId)
-			self.removeHighlight.Adornee = nil
-		end
+	local start = self.dragStart
+	local x, y = self:snappedPointUnderPointer()
+	self:cancelDrag()
+
+	if not x or not y then
 		return
 	end
 
-	local index, position = self:findSnapUnderPointer()
-	if not index or not position then
-		return
-	end
-
-	if not self.firstSnap then
-		self.firstSnap = index
-		self.firstSnapPosition = position
-		if self.onFirstSnapChanged then
-			self.onFirstSnapChanged(index)
-		end
-		return
-	end
-
-	if index == self.firstSnap then
-		-- Denselben Punkt noch einmal gewaehlt: Auswahl verwerfen.
-		self:cancelSelection()
+	--[[
+		Ein sehr kurzer Zug ist kein Bauversuch, sondern ein Klick. Ohne diese
+		Schwelle entstuende bei jedem versehentlichen Klick ein winziges
+		Bauteil oder eine Fehlermeldung.
+	]]
+	local length = math.sqrt((x - start.x) ^ 2 + (y - start.y) ^ 2)
+	if length < Config.Build.minDragLength then
 		return
 	end
 
 	if self.onPlaceRequest then
-		self.onPlaceRequest(self.selectedKind, self.firstSnap, index)
+		self.onPlaceRequest(self.selectedMaterial, start.x, start.y, x, y)
 	end
-	self:cancelSelection()
 end
 
--- Ein "Abbrechen" bzw. "Entfernen" - egal von welchem Geraet.
-function BuildController:secondaryAction()
+function BuildController:cancelDrag()
+	local was = self.dragging
+	self.dragging = false
+	self.dragStart = nil
+	self.preview.Transparency = 1
+	self.startMarker.Transparency = 1
+	if was and self.onDragChanged then
+		self.onDragChanged(false)
+	end
+end
+
+-- Ein "Entfernen" - egal von welchem Geraet.
+function BuildController:removeUnderPointer()
 	if not self.enabled or self.phase ~= "Build" then
 		return
 	end
 
-	-- Steht eine Auswahl offen, wird sie zuerst abgebrochen.
-	if self.firstSnap then
-		self:cancelSelection()
+	-- Laeuft gerade ein Zug, wird der zuerst abgebrochen.
+	if self.dragging then
+		self:cancelDrag()
 		return
 	end
 
 	local memberId = self:findMemberUnderPointer()
 	if memberId and self.onRemoveRequest then
 		self.onRemoveRequest(memberId)
+		self.removeHighlight.Adornee = nil
 	end
 end
 
@@ -569,6 +642,17 @@ end
 --------------------------------------------------------------------------------
 
 function BuildController:connectInput()
+	--[[
+		Alle drei Geraete bedienen dasselbe Ziehen:
+		  Maus    linke Taste halten
+		  Touch   einen Finger aufsetzen und ziehen
+		  Gamepad A gedrueckt halten
+
+		Bei Touch zaehlt nur der ERSTE Finger. Kommt ein zweiter dazu, ist
+		das Kamerabedienung (siehe CameraController), und der laufende Zug
+		wird abgebrochen - sonst entstuende beim Zoomen aus Versehen ein
+		Bauteil.
+	]]
 	UserInputService.InputBegan:Connect(function(input, processedByGui)
 		if processedByGui or not self.enabled then
 			return
@@ -577,38 +661,51 @@ function BuildController:connectInput()
 		local inputType = input.UserInputType
 
 		if inputType == Enum.UserInputType.MouseButton1 then
-			self:primaryAction()
+			if self.removeMode then
+				self:removeUnderPointer()
+			else
+				self:beginDrag()
+			end
 		elseif inputType == Enum.UserInputType.MouseButton2 then
-			self:secondaryAction()
+			self:removeUnderPointer()
 		elseif inputType == Enum.UserInputType.Touch then
-			-- Erst beim Loslassen entscheiden, ob es ein Tippen war.
 			if self.activeTouch == nil then
 				self.activeTouch = input
-				self.touchStart = Vector2.new(input.Position.X, input.Position.Y)
-				self.touchStartTime = os.clock()
+				self.pointer = Vector2.new(input.Position.X, input.Position.Y)
+				if self.removeMode then
+					self:removeUnderPointer()
+				else
+					self:beginDrag()
+				end
 			else
-				-- Ein zweiter Finger: das ist Kamerabedienung, kein Bauen.
+				-- Zweiter Finger: das gehoert der Kamera.
 				self.activeTouch = nil
+				self:cancelDrag()
 			end
 		elseif inputType == Enum.UserInputType.Gamepad1 then
 			if input.KeyCode == Enum.KeyCode.ButtonA then
-				self:primaryAction()
+				if self.removeMode then
+					self:removeUnderPointer()
+				else
+					self:beginDrag()
+				end
 			elseif input.KeyCode == Enum.KeyCode.ButtonB then
-				self:secondaryAction()
+				self:removeUnderPointer()
 			elseif input.KeyCode == Enum.KeyCode.ButtonX then
 				self:toggleRemoveMode()
 			end
 		elseif inputType == Enum.UserInputType.Keyboard then
-			if input.KeyCode == Enum.KeyCode.One then
-				self:selectKind("Beam")
-			elseif input.KeyCode == Enum.KeyCode.Two then
-				self:selectKind("Cable")
-			elseif input.KeyCode == Enum.KeyCode.Three then
-				self:selectKind("Pillar")
-			elseif input.KeyCode == Enum.KeyCode.Four then
+			local index = table.find({
+				Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three,
+				Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six,
+				Enum.KeyCode.Seven,
+			}, input.KeyCode)
+			if index and Materials.order[index] then
+				self:selectMaterial(Materials.order[index])
+			elseif input.KeyCode == Enum.KeyCode.X then
 				self:toggleRemoveMode()
 			elseif input.KeyCode == Enum.KeyCode.Escape then
-				self:cancelSelection()
+				self:cancelDrag()
 			end
 		end
 	end)
@@ -621,29 +718,28 @@ function BuildController:connectInput()
 	end)
 
 	UserInputService.InputEnded:Connect(function(input, processedByGui)
-		if input.UserInputType ~= Enum.UserInputType.Touch then
-			return
-		end
-		if input ~= self.activeTouch then
-			return
-		end
+		local inputType = input.UserInputType
 
-		local startPosition = self.touchStart
-		self.activeTouch = nil
-		self.touchStart = nil
-
-		if processedByGui or not self.enabled or not startPosition then
-			return
-		end
-
-		local endPosition = Vector2.new(input.Position.X, input.Position.Y)
-		local moved = (endPosition - startPosition).Magnitude
-		local duration = os.clock() - self.touchStartTime
-
-		-- Nur ein kurzes, ruhiges Tippen zaehlt als Auswahl.
-		if duration <= TAP_MAX_SECONDS and moved <= TAP_MAX_PIXELS then
-			self.pointer = endPosition
-			self:primaryAction()
+		if inputType == Enum.UserInputType.MouseButton1 then
+			if self.dragging then
+				self:endDrag()
+			end
+		elseif inputType == Enum.UserInputType.Touch then
+			if input == self.activeTouch then
+				self.activeTouch = nil
+				self.pointer = Vector2.new(input.Position.X, input.Position.Y)
+				if self.dragging then
+					if processedByGui then
+						self:cancelDrag()
+					else
+						self:endDrag()
+					end
+				end
+			end
+		elseif inputType == Enum.UserInputType.Gamepad1 then
+			if input.KeyCode == Enum.KeyCode.ButtonA and self.dragging then
+				self:endDrag()
+			end
 		end
 	end)
 end
@@ -652,21 +748,26 @@ end
 -- Auswahl von aussen
 --------------------------------------------------------------------------------
 
-function BuildController:selectKind(kind: string)
-	if not Config.PartTypes[kind] then
+function BuildController:selectMaterial(key: string)
+	if not Materials.exists(key) then
 		return
 	end
-	self.selectedKind = kind
+	-- Baustoffe, die das Level gar nicht anbietet, gibt es hier nicht.
+	if self.level and self.level.materials and not table.find(self.level.materials, key) then
+		return
+	end
+
+	self.selectedMaterial = key
 	self.removeMode = false
-	self:cancelSelection()
+	self:cancelDrag()
 	if self.onSelectionChanged then
-		self.onSelectionChanged(kind)
+		self.onSelectionChanged(key)
 	end
 end
 
 function BuildController:selectRemoveMode()
 	self.removeMode = true
-	self:cancelSelection()
+	self:cancelDrag()
 	if self.onSelectionChanged then
 		self.onSelectionChanged("Remove")
 	end
@@ -674,7 +775,7 @@ end
 
 function BuildController:toggleRemoveMode()
 	if self.removeMode then
-		self:selectKind(self.selectedKind)
+		self:selectMaterial(self.selectedMaterial)
 	else
 		self:selectRemoveMode()
 	end
@@ -683,24 +784,29 @@ end
 function BuildController:setPhase(phase: string)
 	self.phase = phase
 	if phase ~= "Build" then
-		self:cancelSelection()
+		self:cancelDrag()
 	end
 end
 
--- Zeigt an, an welchem Ankerpunkt die Last nicht abgetragen werden kann.
-function BuildController:setUnstableNode(snapIndex: number?)
-	if not self.enabled or self.phase ~= "Build" or not snapIndex or not self.snapFolder then
+--[[
+	Zeigt an, an welchem Knoten die Last nicht abgetragen werden kann.
+	Der Schluessel hat die Form "gx:gy" - das sind Rasterschritte, keine Studs.
+]]
+function BuildController:setUnstableJoint(key: string?)
+	if not self.enabled or self.phase ~= "Build" or not key or not self.level then
 		self.weakMarker.Transparency = 1
 		return
 	end
 
-	local marker = self.snapFolder:FindFirstChild("Snap_" .. snapIndex)
-	if marker then
-		self.weakMarker.Position = (marker :: BasePart).Position
-		self.weakMarker.Transparency = 0.4
-	else
+	local gx, gy = string.match(key, "^(-?%d+):(-?%d+)$")
+	if not gx or not gy then
 		self.weakMarker.Transparency = 1
+		return
 	end
+
+	local grid = Config.Build.gridSize
+	self.weakMarker.Position = self:toWorld(tonumber(gx) * grid, tonumber(gy) * grid)
+	self.weakMarker.Transparency = 0.4
 end
 
 return BuildController

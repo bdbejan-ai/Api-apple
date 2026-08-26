@@ -184,6 +184,21 @@ function Device.actionText(action: string): string
 			Touch = "dein Finger",
 			Gamepad = "der Zeiger (linker Stick)",
 		},
+		--[[
+			Gebaut wird durch Ziehen. Auf jedem Geraet heisst das etwas
+			anderes, und genau deshalb steht es hier und nicht in der
+			Anleitung: dort waere sonst dreimal dieselbe Fallunterscheidung.
+		]]
+		dragStart = {
+			Desktop = "halte die linke Maustaste gedrueckt",
+			Touch = "lege einen Finger auf",
+			Gamepad = "halte A gedrueckt",
+		},
+		dragEnd = {
+			Desktop = "lass die Maustaste los",
+			Touch = "hebe den Finger",
+			Gamepad = "lass A los",
+		},
 	}
 
 	local entry = texts[action]

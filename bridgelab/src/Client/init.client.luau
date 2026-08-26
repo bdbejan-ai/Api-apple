@@ -174,7 +174,9 @@ end
 local function waitForArenaFolder(): Instance?
 	for _ = 1, 60 do
 		local folder = findArenaFolder()
-		if folder and folder:FindFirstChild("SnapPoints") then
+		-- "Bauteile" ist der Ordner, den der LevelBuilder zuletzt anlegt:
+		-- ist er da, ist die Arena vollstaendig uebertragen.
+		if folder and folder:FindFirstChild("Bauteile") then
 			return folder
 		end
 		task.wait(0.1)
@@ -224,16 +226,27 @@ local function enterLevel(state)
 			return
 		end
 		app.arenaFolder = folder
-		print(string.format(
-			"[BridgeLab] Arena '%s' geladen, %d Ankerpunkte.",
-			folder.Name,
-			#folder:WaitForChild("SnapPoints"):GetChildren()
-		))
+		print(string.format("[BridgeLab] Arena '%s' geladen.", folder.Name))
 
+		--[[
+			Der Controller braucht die Levelangaben, um die Vorschau selbst
+			pruefen zu koennen - sonst wuerde sie erst gruen oder rot, wenn
+			die Antwort vom Server da ist, und das ist nach dem Loslassen.
+		]]
+		controller:setLevel({
+			buildArea = state.buildArea,
+			anchors = state.anchors,
+			terrain = state.terrain,
+			materials = state.materials,
+			z = 0,
+		}, state.originY or 0)
 		controller:setArena(folder)
 		controller:setEnabled(true)
-		controller:selectKind("Beam")
-		hud:setSelected("Beam")
+
+		-- Mit dem ersten Baustoff anfangen, den dieses Level ueberhaupt anbietet.
+		local first = (state.materials and state.materials[1]) or "Road"
+		controller:selectMaterial(first)
+		hud:setSelected(first)
 
 		camera:setArena(state.originY or 0, state.bounds, state.deckY or 40)
 	end)
@@ -261,8 +274,8 @@ end
 -- Knoepfe des HUD
 --------------------------------------------------------------------------------
 
-hud.onSelectPart = function(kind)
-	controller:selectKind(kind)
+hud.onSelectMaterial = function(key)
+	controller:selectMaterial(key)
 	hud:setSelected(kind)
 	tutorial:notify("partSelected", kind)
 end
@@ -279,6 +292,10 @@ end
 
 hud.onSpeedChanged = function(speed)
 	remote.SetTestSpeed:FireServer(speed)
+end
+
+hud.onPhaseChanged = function(phase)
+	remote.SetPhase:FireServer(phase)
 end
 
 hud.onReset = function()
@@ -310,24 +327,25 @@ end
 -- Bau-Steuerung
 --------------------------------------------------------------------------------
 
-controller.onPlaceRequest = function(kind, snapA, snapB)
-	remote.PlaceMember:FireServer(kind, snapA, snapB)
+controller.onPlaceRequest = function(material, ax, ay, bx, by)
+	remote.PlaceMember:FireServer(material, ax, ay, bx, by)
 end
 
 controller.onRemoveRequest = function(memberId)
 	remote.RemoveMember:FireServer(memberId)
 end
 
-controller.onSelectionChanged = function(kind)
-	hud:setSelected(kind)
-	if kind ~= "Remove" then
-		tutorial:notify("partSelected", kind)
+controller.onSelectionChanged = function(key)
+	hud:setSelected(key)
+	if key ~= "Remove" then
+		tutorial:notify("materialSelected", key)
 	end
 end
 
-controller.onFirstSnapChanged = function(snapIndex)
-	if snapIndex then
-		tutorial:notify("firstSnapChosen", snapIndex)
+-- Die Anleitung will wissen, wann zum ersten Mal gezogen wird.
+controller.onDragChanged = function(active)
+	if active then
+		tutorial:notify("dragStarted")
 	end
 end
 
@@ -393,15 +411,23 @@ remote.StateChanged.OnClientEvent:Connect(function(state)
 
 	hud:update(state)
 	controller:setPhase(state.phase)
-	controller:setUnstableNode(if state.stable then nil else state.unstableNode)
+	controller:setUnstableJoint(if state.stable then nil else state.unstableJoint)
+	-- Damit die Vorschau rot wird, sobald das Budget nicht mehr reicht.
+	controller:setBudgetLeft((state.budgetTotal or 0) - (state.budgetUsed or 0))
 
 	----------------------------------------------------------------------------
 	-- Waehrend des Tests folgt die Kamera dem Fahrzeug
 	----------------------------------------------------------------------------
 	if state.phase == "Test" then
 		if app.arenaFolder then
-			local vehicleFolder = app.arenaFolder:FindFirstChild("Vehicle")
-			local vehicle = vehicleFolder and vehicleFolder:FindFirstChild("TestVehicle")
+			--[[
+				Die Fahrzeuge heissen "TestVehicle_1", "TestVehicle_2" und so
+				weiter. Die Kamera folgt dem ERSTEN - bei Gegenverkehr kaeme
+				sie sonst nicht hinterher, und in der Mitte, wo sich beide
+				begegnen, sind ohnehin beide im Bild.
+			]]
+			local vehicleFolder = app.arenaFolder:FindFirstChild("Fahrzeuge")
+			local vehicle = vehicleFolder and vehicleFolder:FindFirstChild("TestVehicle_1")
 			if vehicle and vehicle:IsA("BasePart") then
 				camera:follow(vehicle)
 			end

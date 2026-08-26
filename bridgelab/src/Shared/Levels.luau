@@ -729,6 +729,17 @@ function Levels.summaries()
 			hasHydraulics = table.find(level.materials, "Hydraulic") ~= nil,
 			hintCount = #level.hints,
 			freeHints = level.freeHints,
+
+			--[[
+				Das Gelaendeprofil kommt mit ins Menue. Es ist nur eine
+				Handvoll Punkte, und damit kann die Vorschaukarte die
+				ECHTE Form des Levels zeichnen statt eines Symbolbilds.
+				Genau daran erkennt man die Level im Menue wieder.
+			]]
+			terrain = level.terrain,
+			waterY = level.waterY,
+			anchors = level.anchors,
+			bounds = level.terrainBounds,
 		}
 	end
 	return out

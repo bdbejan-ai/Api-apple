@@ -1,15 +1,36 @@
 --[[
 	BuildHud
 	--------
-	Die Oberflaeche waehrend des Spiels. Sie besteht aus fuenf Teilen:
+	Die Oberflaeche waehrend des Spiels.
 
-	  1. Kopfzeile    Levelname, Budget, Knoepfe (Menue, Zuruecksetzen)
-	  2. Fussleiste   Bauteilauswahl, Abriss, Test starten
-	  3. Statuszeile  Warnungen ("Struktur nicht stabil")
-	  4. Testanzeige  Countdown, Zeit, hoechste Auslastung, Farblegende
-	  5. Ergebnis     Erfolg oder Misserfolg mit Begruendung
+	DAS LAYOUT IST IN ZONEN AUFGETEILT - UND ZWAR AUS EINEM GRUND
+	Vorher lagen die Fenster an festen Bildschirmpunkten: die Testanzeige
+	oben mittig, das Tipp-Fenster oben rechts, der Tacho ueber der
+	Fussleiste. Auf einem breiten Bildschirm ging das gut. Auf einem Handy
+	quer lagen Testanzeige und Tipp-Fenster uebereinander, und der Tacho
+	schob sich in die Fussleiste.
 
-	Dazu kommt das Tipp-Fenster, das sich rechts einblenden laesst.
+	Jetzt gibt es vier Zonen, die sich nicht ueberschneiden koennen:
+
+	    +--------------------------------------------------+
+	    |  KOPF   Level, Budget, Menue                     |
+	    +------+------------------------------+------------+
+	    | LEIS |                              |  SPALTE    |
+	    | TE   |                              |  rechts:   |
+	    | Bau- |        freie Sicht           |  Test ODER |
+	    | stof |        auf die Bruecke       |  Tipps     |
+	    | fe   |                              |            |
+	    +------+------------------------------+------------+
+	    |  FUSS   Phasen, Tempo, Test starten              |
+	    +--------------------------------------------------+
+
+	Die Baustoffe stehen jetzt LINKS UNTEREINANDER statt unten nebeneinander.
+	Mit drei Bauteilen passte eine Zeile noch; mit sieben Baustoffen waeren
+	es ueber 900 Pixel geworden - mehr, als ein Handy quer ueberhaupt hat.
+
+	In der rechten Spalte liegt immer nur EIN Fenster. Oeffnet man die
+	Tipps waehrend des Tests, tritt die Testanzeige nach unten zurueck,
+	statt sich zu ueberlagern (siehe layoutRightColumn).
 
 	Alle Groessen haengen an einem UIScale, den Device.uiScale() liefert.
 	Dadurch ist die Bedienung auf dem Handy automatisch groesser als am PC.
@@ -22,6 +43,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
+local Materials = require(Shared.Materials)
 local Levels = require(Shared.Levels)
 
 local Device = require(script.Parent.Device)
@@ -34,14 +56,16 @@ function BuildHud.new()
 	local self = setmetatable({}, BuildHud)
 
 	self.player = Players.LocalPlayer
-	self.partButtons = {}
-	self.selected = "Beam"
+	self.materialButtons = {}
+	self.phaseButtons = {}
+	self.selected = "Road"
+	self.phase = 0
 	self.state = nil
 	self.hintOpen = false
 	self.noticeToken = 0
 
 	-- Rueckmeldungen nach aussen
-	self.onSelectPart = nil
+	self.onSelectMaterial = nil
 	self.onRemoveMode = nil
 	self.onTest = nil
 	self.onReset = nil
@@ -51,6 +75,7 @@ function BuildHud.new()
 	self.onRetry = nil
 	self.onNextLevel = nil
 	self.onSpeedChanged = nil
+	self.onPhaseChanged = nil
 
 	--[[
 		Der linke Knopf im Ergebnisfenster hat zwei Bedeutungen: nach einem
@@ -100,6 +125,7 @@ function BuildHud:build()
 	self.scale = scale
 
 	self:buildTopBar()
+	self:buildMaterialRail()
 	self:buildBottomBar()
 	self:buildSpeedPanel()
 	self:buildStatus()
@@ -213,84 +239,109 @@ function BuildHud:buildTopBar()
 end
 
 --------------------------------------------------------------------------------
--- 2. Fussleiste mit der Bauteilauswahl
+-- 2. Baustoffleiste links
 --------------------------------------------------------------------------------
 
-function BuildHud:buildBottomBar()
-	local bar = Theme.panel(self.root, "BottomBar")
-	bar.Size = UDim2.new(1, -24, 0, 92)
-	bar.Position = UDim2.new(0, 12, 1, -102)
-	bar.BackgroundTransparency = 0.08
-	self.bottomBar = bar
+--[[
+	Ein Knopf je Baustoff, untereinander an der linken Kante.
 
-	local x = 14
+	Jeder Knopf zeigt drei Dinge, und jedes davon braucht man beim Bauen:
+	  * den Namen
+	  * den Preis JE STUD - beim freien Bauen kostet Laenge wirklich Geld
+	  * die Belastungsgrenzen, damit man Holz und Stahl vergleichen kann
 
-	-- Ein Knopf je Bauteiltyp
-	for _, key in Config.PartOrder do
-		local spec = Config.PartTypes[key]
+	Ein farbiger Streifen links am Knopf traegt die Farbe des Baustoffs.
+	Dieselbe Farbe hat das Bauteil in der Welt - so findet man wieder,
+	womit man gerade gebaut hat.
+]]
+function BuildHud:buildMaterialRail()
+	local rail = Theme.panel(self.root, "MaterialRail")
+	rail.BackgroundTransparency = 0.08
+	self.materialRail = rail
 
-		local button = Theme.button(bar, "Part_" .. key, {
-			size = UDim2.fromOffset(132, 64),
-			position = UDim2.fromOffset(x, 14),
+	local list = Instance.new("Frame")
+	list.Name = "List"
+	list.Size = UDim2.new(1, -16, 1, -16)
+	list.Position = UDim2.fromOffset(8, 8)
+	list.BackgroundTransparency = 1
+	list.Parent = rail
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Vertical
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 6)
+	layout.Parent = list
+	self.materialList = list
+
+	for order, key in Materials.order do
+		local spec = Materials.get(key)
+
+		local button = Theme.button(list, "Material_" .. key, {
+			size = UDim2.new(1, 0, 0, 56),
 			text = "",
 			color = Theme.colors.panelLight,
 		})
+		button.LayoutOrder = order
 		button.Selectable = true
 
-		Theme.label(button, "Icon", {
-			size = UDim2.fromOffset(30, 30),
-			position = UDim2.fromOffset(10, 8),
-			text = spec.icon,
-			textSize = 22,
-			bold = true,
-			color = spec.uiColor,
-			align = Enum.TextXAlignment.Center,
-		})
+		-- Farbstreifen in der Farbe des Baustoffs.
+		local stripe = Instance.new("Frame")
+		stripe.Name = "Stripe"
+		stripe.Size = UDim2.new(0, 4, 1, -12)
+		stripe.Position = UDim2.fromOffset(7, 6)
+		stripe.BackgroundColor3 = spec.uiColor
+		stripe.BorderSizePixel = 0
+		stripe.Parent = button
+		Theme.corner(stripe, 2)
 
 		Theme.label(button, "Name", {
-			size = UDim2.fromOffset(88, 20),
-			position = UDim2.fromOffset(42, 9),
+			size = UDim2.new(1, -22, 0, 18),
+			position = UDim2.fromOffset(18, 6),
 			text = spec.displayName,
-			textSize = 15,
+			textSize = 14,
 			bold = true,
 		})
 
 		Theme.label(button, "Cost", {
-			size = UDim2.fromOffset(88, 16),
-			position = UDim2.fromOffset(42, 28),
-			text = string.format("Kosten %d", spec.cost),
-			textSize = 12,
+			size = UDim2.new(1, -22, 0, 14),
+			position = UDim2.fromOffset(18, 23),
+			text = string.format("%d je Stud", spec.costPerStud),
+			textSize = 11,
 			color = Theme.colors.textDim,
 		})
 
 		Theme.label(button, "Limits", {
-			size = UDim2.fromOffset(112, 14),
-			position = UDim2.fromOffset(12, 46),
+			size = UDim2.new(1, -22, 0, 14),
+			position = UDim2.fromOffset(18, 37),
+			--[[
+				Bei Seilen steht ausdruecklich "kein Druck" statt einer Null.
+				Eine 0 liest sich wie ein vergessener Wert; "kein Druck" sagt,
+				dass das die Eigenschaft des Baustoffs ist.
+			]]
 			text = if spec.maxCompression > 0
-				then string.format("Zug %d N · Druck %d N", spec.maxTension, spec.maxCompression)
-				else string.format("Zug %d N · kein Druck", spec.maxTension),
+				then string.format("Zug %d · Druck %d", spec.maxTension, spec.maxCompression)
+				else string.format("Zug %d · kein Druck", spec.maxTension),
 			textSize = 10,
 			color = Theme.colors.textDim,
 		})
 
 		button.Activated:Connect(function()
-			if self.onSelectPart then
-				self.onSelectPart(key)
+			if self.onSelectMaterial then
+				self.onSelectMaterial(key)
 			end
 		end)
 
-		self.partButtons[key] = button
-		x += 140
+		self.materialButtons[key] = button
 	end
 
-	-- Abrissmodus
-	local removeButton = Theme.button(bar, "RemoveButton", {
-		size = UDim2.fromOffset(108, 64),
-		position = UDim2.fromOffset(x, 14),
+	-- Abrissmodus ganz unten, abgesetzt.
+	local removeButton = Theme.button(list, "RemoveButton", {
+		size = UDim2.new(1, 0, 0, 40),
 		text = "Abriss",
-		textSize = 15,
+		textSize = 14,
 		color = Theme.colors.panelLight,
 	})
+	removeButton.LayoutOrder = 100
 	removeButton.Selectable = true
 	removeButton.Activated:Connect(function()
 		if self.onRemoveMode then
@@ -298,11 +349,80 @@ function BuildHud:buildBottomBar()
 		end
 	end)
 	self.removeButton = removeButton
+end
 
-	-- Tipp-Knopf
+--[[
+	Baustoffe, die das Level gar nicht anbietet, werden ausgeblendet statt
+	nur ausgegraut. Ein gesperrter Knopf, den man trotzdem sieht, laedt zum
+	Draufdruecken ein und gibt dann eine Absage - das ist aergerlich, wenn
+	es das Level schlicht nicht vorsieht.
+]]
+function BuildHud:setAvailableMaterials(list)
+	for key, button in self.materialButtons do
+		button.Visible = list == nil or table.find(list, key) ~= nil
+	end
+end
+
+--------------------------------------------------------------------------------
+-- 3. Fussleiste: Phasen, Tempo, Test
+--------------------------------------------------------------------------------
+
+function BuildHud:buildBottomBar()
+	local bar = Theme.panel(self.root, "BottomBar")
+	bar.BackgroundTransparency = 0.08
+	self.bottomBar = bar
+
+	----------------------------------------------------------------------------
+	-- Hydraulikphasen links
+	----------------------------------------------------------------------------
+
+	--[[
+		Die Phasenknoepfe erscheinen nur in Levels mit Hydraulik. Phase 0
+		heisst "alles eingefahren"; jeder weitere Knopf faehrt die Zylinder
+		aus, die dieser Phase zugeordnet sind.
+	]]
+	local phaseBox = Instance.new("Frame")
+	phaseBox.Name = "Phases"
+	phaseBox.Size = UDim2.fromOffset(58 * (Config.Hydraulics.phaseCount + 1) + 70, 64)
+	phaseBox.Position = UDim2.fromOffset(14, 14)
+	phaseBox.BackgroundTransparency = 1
+	phaseBox.Visible = false
+	phaseBox.Parent = bar
+	self.phaseBox = phaseBox
+
+	Theme.label(phaseBox, "Caption", {
+		size = UDim2.fromOffset(64, 16),
+		position = UDim2.fromOffset(2, 2),
+		text = "Hydraulik",
+		textSize = 12,
+		bold = true,
+		color = Theme.colors.textDim,
+	})
+
+	for phase = 0, Config.Hydraulics.phaseCount do
+		local button = Theme.button(phaseBox, "Phase_" .. phase, {
+			size = UDim2.fromOffset(52, 38),
+			position = UDim2.fromOffset(phase * 58, 22),
+			text = if phase == 0 then "Ein" else tostring(phase),
+			textSize = 14,
+			color = Theme.colors.panelLight,
+		})
+		button.Selectable = true
+		button.Activated:Connect(function()
+			if self.onPhaseChanged then
+				self.onPhaseChanged(phase)
+			end
+		end)
+		self.phaseButtons[phase] = button
+	end
+
+	----------------------------------------------------------------------------
+	-- Knoepfe rechts
+	----------------------------------------------------------------------------
+
 	local hintButton = Theme.button(bar, "HintButton", {
-		size = UDim2.fromOffset(120, 64),
-		position = UDim2.new(1, -282, 0, 14),
+		size = UDim2.fromOffset(110, 64),
+		position = UDim2.new(1, -272, 0, 14),
 		text = "Tipp",
 		textSize = 15,
 		color = Theme.colors.panelLight,
@@ -313,7 +433,6 @@ function BuildHud:buildBottomBar()
 	end)
 	self.hintToggleButton = hintButton
 
-	-- Test starten
 	local testButton = Theme.button(bar, "TestButton", {
 		size = UDim2.fromOffset(150, 64),
 		position = UDim2.new(1, -152, 0, 14),
@@ -329,6 +448,27 @@ function BuildHud:buildBottomBar()
 		end
 	end)
 	self.testButton = testButton
+end
+
+-- Phasenknoepfe ein- und ausblenden und den aktiven hervorheben.
+function BuildHud:refreshPhases(state)
+	local show = state ~= nil and state.hasHydraulics == true
+	self.phaseBox.Visible = show
+	if not show then
+		return
+	end
+
+	local active = state.phaseIndex or 0
+	local running = state.phase == "Test"
+
+	for phase, button in self.phaseButtons do
+		local isActive = phase == active
+		button.BackgroundColor3 = if isActive then Theme.colors.accent else Theme.colors.panelLight
+		button.TextColor3 = if isActive then Color3.fromRGB(14, 20, 30) else Theme.colors.text
+		-- Geschaltet wird nur waehrend der Fahrt: im Baumodus steht alles fest.
+		button.AutoButtonColor = running
+		button.TextTransparency = if running then 0 else 0.45
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -850,6 +990,7 @@ end
 function BuildHud:setHintPanelOpen(open: boolean)
 	self.hintOpen = open
 	self.hintPanel.Visible = open
+	self:layoutRightColumn()
 	if open then
 		self:refreshHintPanel()
 		if Device.isGamepad() then
@@ -961,24 +1102,10 @@ function BuildHud:update(state)
 	end
 
 	----------------------------------------------------------------------------
-	-- Gesperrte Bauteile ausgrauen
+	-- Nur die Baustoffe zeigen, die dieses Level anbietet
 	----------------------------------------------------------------------------
-	for key, button in self.partButtons do
-		local allowed = true
-		if state.allowedParts then
-			allowed = table.find(state.allowedParts, key) ~= nil
-		end
-		button.Active = allowed
-		button.AutoButtonColor = allowed
-		button.Selectable = allowed
-		local nameLabel = button:FindFirstChild("Name")
-		if nameLabel and nameLabel:IsA("TextLabel") then
-			nameLabel.TextColor3 = if allowed then Theme.colors.text else Theme.colors.textDim
-		end
-		if not allowed then
-			button.BackgroundColor3 = Theme.colors.background
-		end
-	end
+	self:setAvailableMaterials(state.materials)
+	self:refreshPhases(state)
 
 	----------------------------------------------------------------------------
 	-- Phase: was ist gerade sichtbar?
@@ -1002,7 +1129,11 @@ function BuildHud:update(state)
 	self.clearButton.Visible = building
 	self.resetButton.Visible = state.phase ~= "Test"
 
+	local wasVisible = self.testPanel.Visible
 	self.testPanel.Visible = state.phase == "Test"
+	if self.testPanel.Visible ~= wasVisible then
+		self:layoutRightColumn()
+	end
 	if state.phase == "Test" then
 		self:updateTestPanel(state)
 	end
@@ -1105,17 +1236,17 @@ end
 -- Auswahl hervorheben
 --------------------------------------------------------------------------------
 
-function BuildHud:setSelected(kind: string)
-	self.selected = kind
+function BuildHud:setSelected(key: string)
+	self.selected = key
 
-	for key, button in self.partButtons do
-		local active = key == kind
+	for materialKey, button in self.materialButtons do
+		local active = materialKey == key
 		Theme.paint(button, if active then Theme.colors.accentDark else Theme.colors.panelLight)
 	end
 
 	Theme.paint(
 		self.removeButton,
-		if kind == "Remove" then Theme.colors.danger else Theme.colors.panelLight
+		if key == "Remove" then Theme.colors.danger else Theme.colors.panelLight
 	)
 end
 
@@ -1123,17 +1254,103 @@ end
 -- Groessen und Sichtbarkeit
 --------------------------------------------------------------------------------
 
+--[[
+	DIE ZONEN AUSRECHNEN
+
+	Alle Fenster bekommen ihren Platz an EINER Stelle zugewiesen. Das ist der
+	eigentliche Grund, warum sich nichts mehr ueberlagern kann: es gibt keine
+	zweite Stelle im Code, die ein Fenster woanders hinschiebt.
+
+	Gerechnet wird in unskalierten Pixeln. Der UIScale darueber vergroessert
+	anschliessend alles gemeinsam, deshalb muss hier nichts umgerechnet werden.
+]]
 function BuildHud:applyScale()
 	self.scale.Scale = Device.uiScale()
 
 	local inset = Device.edgeInset()
-	self.topBar.Position = UDim2.fromOffset(inset, inset - 4)
-	self.topBar.Size = UDim2.new(1, -inset * 2, 0, 58)
-	self.bottomBar.Position = UDim2.new(0, inset, 1, -(102 + inset - 12))
-	self.bottomBar.Size = UDim2.new(1, -inset * 2, 0, 92)
+	local topHeight = 58
+	local bottomHeight = 92
+	local gap = 10
 
-	-- Der Tacho sitzt direkt ueber der Fussleiste, rechts aussen.
-	self.speedPanel.Position = UDim2.new(1, -(296 + inset), 1, -(102 + inset - 12) - 86)
+	-- Die nutzbare Flaeche in unskalierten Pixeln.
+	local viewport = workspace.CurrentCamera.ViewportSize / math.max(self.scale.Scale, 0.01)
+
+	local contentTop = inset + topHeight + gap
+	local contentBottom = bottomHeight + inset + gap
+	local contentHeight = math.max(viewport.Y - contentTop - contentBottom, 120)
+
+	----------------------------------------------------------------------------
+	-- Kopf und Fuss ueber die volle Breite
+	----------------------------------------------------------------------------
+
+	self.topBar.Position = UDim2.fromOffset(inset, inset)
+	self.topBar.Size = UDim2.new(1, -inset * 2, 0, topHeight)
+
+	self.bottomBar.Position = UDim2.new(0, inset, 1, -(bottomHeight + inset))
+	self.bottomBar.Size = UDim2.new(1, -inset * 2, 0, bottomHeight)
+
+	----------------------------------------------------------------------------
+	-- Baustoffleiste links
+	----------------------------------------------------------------------------
+
+	--[[
+		Die Leiste ist so hoch wie noetig, aber nie hoeher als der freie
+		Bereich. Auf einem flachen Bildschirm wuerde sie sonst unten in die
+		Fussleiste hineinragen.
+	]]
+	local railWidth = 168
+	local railHeight = math.min(#Materials.order * 62 + 56, contentHeight)
+
+	self.materialRail.Position = UDim2.fromOffset(inset, contentTop)
+	self.materialRail.Size = UDim2.fromOffset(railWidth, railHeight)
+
+	----------------------------------------------------------------------------
+	-- Rechte Spalte
+	----------------------------------------------------------------------------
+
+	self.rightColumnX = inset
+	self.rightColumnTop = contentTop
+	self.rightColumnWidth = 336
+	self:layoutRightColumn()
+
+	----------------------------------------------------------------------------
+	-- Tacho: unten rechts, aber LINKS neben den Knoepfen der Fussleiste
+	----------------------------------------------------------------------------
+
+	self.speedPanel.Position = UDim2.new(1, -(296 + 272 + inset + gap), 1, -(bottomHeight + inset - 14))
+	self.speedPanel.Size = UDim2.fromOffset(296, 64)
+
+	----------------------------------------------------------------------------
+	-- Statuszeile mittig ueber der Fussleiste
+	----------------------------------------------------------------------------
+
+	self.statusPanel.Position = UDim2.new(0.5, -230, 1, -(bottomHeight + inset + gap + 34))
+end
+
+--[[
+	Testanzeige und Tipp-Fenster teilen sich die rechte Spalte.
+
+	Es liegt immer nur eines davon oben. Sind beide offen, rueckt die
+	Testanzeige unter das Tipp-Fenster - uebereinander liegen sie nie.
+]]
+function BuildHud:layoutRightColumn()
+	local x = self.rightColumnX or 12
+	local top = self.rightColumnTop or 80
+	local width = self.rightColumnWidth or 336
+	local gap = 10
+
+	local y = top
+
+	if self.hintPanel.Visible then
+		self.hintPanel.Position = UDim2.new(1, -(width + x), 0, y)
+		self.hintPanel.Size = UDim2.fromOffset(width, 268)
+		y += 268 + gap
+	end
+
+	if self.testPanel.Visible then
+		self.testPanel.Position = UDim2.new(1, -(width + x), 0, y)
+		self.testPanel.Size = UDim2.fromOffset(width, 118)
+	end
 end
 
 function BuildHud:show()

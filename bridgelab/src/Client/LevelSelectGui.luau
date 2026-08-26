@@ -220,92 +220,163 @@ local function createPreview(parent: Instance, summary): Frame
 	sky.Rotation = 90
 	sky.Parent = box
 
-	-- Wie breit ist die Luecke im Verhaeltnis? Von 40 bis 80 Studs.
-	local gapFraction = math.clamp(summary.gapWidth / 110, 0.24, 0.62)
-	local sideWidth = (1 - gapFraction) / 2
-
-	-- Wasser im Graben
-	local water = Instance.new("Frame")
-	water.Name = "Water"
-	water.Size = UDim2.new(gapFraction, 0, 0, 10)
-	water.Position = UDim2.new(sideWidth, 0, 1, -12)
-	water.BackgroundColor3 = Color3.fromRGB(56, 116, 152)
-	water.BorderSizePixel = 0
-	water.Parent = box
-
-	-- Plattformen links und rechts. Bei einer Rampe steht die rechte hoeher.
-	local rightLift = if (summary.slope or 0) ~= 0 then 16 else 0
-
-	for _, side in { 0, 1 } do
-		local lift = if side == 1 then rightLift else 0
-		local platform = Instance.new("Frame")
-		platform.Name = "Platform"
-		platform.Size = UDim2.new(sideWidth, 0, 0, 40 + lift)
-		platform.Position = UDim2.new(if side == 0 then 0 else 1 - sideWidth, 0, 1, -40 - lift)
-		platform.BackgroundColor3 = Color3.fromRGB(88, 92, 84)
-		platform.BorderSizePixel = 0
-		platform.Parent = box
-
-		local grass = Instance.new("Frame")
-		grass.Name = "Grass"
-		grass.Size = UDim2.new(1, 0, 0, 5)
-		grass.BackgroundColor3 = Color3.fromRGB(104, 138, 84)
-		grass.BorderSizePixel = 0
-		grass.Parent = platform
+	local profile = summary.terrain
+	local bounds = summary.bounds
+	if not profile or not bounds then
+		return box
 	end
+
+	----------------------------------------------------------------------------
+	-- Massstab
+	----------------------------------------------------------------------------
 
 	--[[
-		Steigt die Fahrbahn an, kippen wir die Linie einfach um den passenden
-		Winkel. GuiObject.Rotation dreht um die Mitte - genau richtig, denn
-		eine Rampe steigt ja um ihre Mitte herum an.
+		Das Level wird so in die Karte gelegt, dass es waagerecht ganz
+		hineinpasst. Senkrecht wird derselbe Massstab verwendet, aber
+		gedeckelt: eine tiefe Schlucht wuerde die Karte sonst so weit
+		zusammenstauchen, dass man von der Landschaft nichts mehr erkennt.
 	]]
-	local slopeAngle = 0
-	if (summary.slope or 0) ~= 0 then
-		-- Bildschirm-Y zeigt nach unten, deshalb das Minuszeichen.
-		slopeAngle = -math.deg(math.atan2(summary.slope, summary.gapWidth))
+	local levelWidth = math.max(bounds.maxX - bounds.minX, 1)
+	local levelHeight = math.max(bounds.maxY - bounds.minY, 1)
+
+	local scaleX = 1 / levelWidth
+	local scaleY = math.min(1 / levelHeight, scaleX * 1.6)
+
+	-- Wo liegt die Oberkante des Bildes in Levelkoordinaten?
+	local topY = bounds.maxY + 8
+
+	local function toBoxY(y: number): number
+		return (topY - y) * scaleY
 	end
 
-	-- Fahrbahnen: die unterste liegt auf Plattformhoehe, jede weitere darueber.
-	for index = 1, summary.deckCount do
-		local deck = Instance.new("Frame")
-		deck.Name = "Deck" .. index
-		deck.Size = UDim2.new(1, -8, 0, 3)
-		deck.Position = UDim2.new(0, 4, 1, -42 - (index - 1) * 18)
-		deck.Rotation = slopeAngle
-		deck.BackgroundColor3 = Color3.fromRGB(206, 210, 220)
-		deck.BorderSizePixel = 0
-		deck.Parent = box
+	----------------------------------------------------------------------------
+	-- Gelaende als Silhouette
+	----------------------------------------------------------------------------
 
-		-- Ein Fahrzeug als kleiner Klotz auf der Fahrbahn
-		local car = Instance.new("Frame")
-		car.Name = "Car"
-		car.Size = UDim2.fromOffset(11, 6)
-		car.Position = UDim2.new(if index % 2 == 1 then 0.16 else 0.62, 0, 1, -48 - (index - 1) * 18)
-		car.BackgroundColor3 = if index == 1
-			then Color3.fromRGB(198, 72, 58)
-			else Color3.fromRGB(232, 172, 62)
-		car.BorderSizePixel = 0
-		car.Parent = box
-		Theme.corner(car, 2)
+	--[[
+		Das Profil wird in senkrechte Streifen zerlegt. Jeder Streifen reicht
+		von der Gelaendehoehe an dieser Stelle bis zum unteren Bildrand.
+		Aus vierzig schmalen Streifen wird eine erstaunlich saubere Silhouette
+		- und die stimmt mit dem echten Level ueberein, weil sie aus denselben
+		Daten kommt wie die Welt selbst.
+	]]
+	local STRIPES = 44
+
+	local function heightAt(x: number): number
+		local best = profile[1].y
+		for i = 1, #profile - 1 do
+			local a, b = profile[i], profile[i + 1]
+			if math.abs(b.x - a.x) > 1e-6 then
+				local lo, hi = a, b
+				if lo.x > hi.x then
+					lo, hi = b, a
+				end
+				if x >= lo.x and x <= hi.x then
+					local y = lo.y + (hi.y - lo.y) * ((x - lo.x) / (hi.x - lo.x))
+					if y > best then
+						best = y
+					end
+				end
+			end
+		end
+		if x <= profile[1].x then
+			return profile[1].y
+		end
+		if x >= profile[#profile].x then
+			return profile[#profile].y
+		end
+		return best
 	end
 
-	-- Bei Gegenverkehr faehrt ein zweites Fahrzeug von rechts.
-	if summary.vehicleCount > 1 and summary.deckCount == 1 then
-		local car = Instance.new("Frame")
-		car.Name = "CarOncoming"
-		car.Size = UDim2.fromOffset(11, 6)
-		car.Position = UDim2.new(0.66, 0, 1, -48)
-		car.BackgroundColor3 = Color3.fromRGB(64, 118, 206)
-		car.BorderSizePixel = 0
-		car.Parent = box
-		Theme.corner(car, 2)
+	-- Wasser zuerst, damit das Gelaende davor liegt.
+	if summary.waterY then
+		local water = Instance.new("Frame")
+		water.Name = "Wasser"
+		water.Size = UDim2.new(1, 0, 1, 0)
+		water.Position = UDim2.fromScale(0, toBoxY(summary.waterY))
+		water.BackgroundColor3 = Color3.fromRGB(56, 116, 152)
+		water.BorderSizePixel = 0
+		water.ZIndex = 2
+		water.Parent = box
+	end
+
+	for i = 0, STRIPES - 1 do
+		local x = bounds.minX + levelWidth * ((i + 0.5) / STRIPES)
+		local top = toBoxY(heightAt(x))
+
+		local rock = Instance.new("Frame")
+		rock.Name = "Fels"
+		-- Etwas Ueberlappung, damit zwischen den Streifen keine Fugen stehen.
+		rock.Size = UDim2.new(1 / STRIPES + 0.004, 0, 1, 0)
+		rock.Position = UDim2.new(i / STRIPES, 0, top, 0)
+		rock.BackgroundColor3 = Color3.fromRGB(92, 90, 86)
+		rock.BorderSizePixel = 0
+		rock.ZIndex = 3
+		rock.Parent = box
+
+		local grass = Instance.new("Frame")
+		grass.Name = "Gras"
+		grass.Size = UDim2.new(1, 0, 0, 3)
+		grass.BackgroundColor3 = Color3.fromRGB(104, 138, 84)
+		grass.BorderSizePixel = 0
+		grass.ZIndex = 4
+		grass.Parent = rock
+	end
+
+	----------------------------------------------------------------------------
+	-- Anker als goldene Punkte
+	----------------------------------------------------------------------------
+
+	--[[
+		Die Anker sind die eigentliche Aufgabe eines Levels: je weniger und je
+		weiter auseinander, desto schwerer. Deshalb stehen sie auch schon auf
+		der Karte - man sieht der Vorschau damit an, worum es gehen wird.
+	]]
+	for _, anchor in summary.anchors do
+		local dot = Instance.new("Frame")
+		dot.Name = "Anker"
+		dot.Size = UDim2.fromOffset(4, 4)
+		dot.AnchorPoint = Vector2.new(0.5, 0.5)
+		dot.Position = UDim2.fromScale((anchor.x - bounds.minX) * scaleX, toBoxY(anchor.y))
+		dot.BackgroundColor3 = Color3.fromRGB(228, 178, 76)
+		dot.BorderSizePixel = 0
+		dot.ZIndex = 6
+		dot.Parent = box
+		Theme.corner(dot, 2)
+	end
+
+	----------------------------------------------------------------------------
+	-- Besondere Kennzeichen
+	----------------------------------------------------------------------------
+
+	local badge = nil
+	if summary.requiresJump then
+		badge = "Sprung"
+	elseif summary.hasBoat then
+		badge = "Schiff"
+	elseif summary.vehicleCount > 1 then
+		badge = tostring(summary.vehicleCount) .. " Fahrzeuge"
+	end
+
+	if badge then
+		local tag = Instance.new("TextLabel")
+		tag.Name = "Kennzeichen"
+		tag.Size = UDim2.new(1, -8, 0, 12)
+		tag.Position = UDim2.fromOffset(4, 4)
+		tag.BackgroundTransparency = 1
+		tag.Font = Enum.Font.GothamBold
+		tag.TextSize = 10
+		tag.TextColor3 = Color3.fromRGB(236, 226, 200)
+		tag.TextXAlignment = Enum.TextXAlignment.Right
+		tag.Text = badge
+		tag.ZIndex = 7
+		tag.Parent = box
 	end
 
 	return box
 end
 
---------------------------------------------------------------------------------
--- Eine Levelkarte
+
 --------------------------------------------------------------------------------
 
 -- Kleines beschriftetes Feld fuer Budget, Luecke und Besonderheiten.
@@ -417,18 +488,29 @@ function LevelSelectGui:createCard(summary)
 	local x = 142
 	chip(card, "Budget", string.format("Budget %d", summary.budget), x, Theme.colors.text)
 	x += 92
-	chip(card, "Gap", string.format("%d Studs", summary.gapWidth), x, Theme.colors.text)
+	chip(card, "Span", string.format("%d Studs", summary.span), x, Theme.colors.text)
 	x += 78
 
+	--[[
+		Die Zahl der Anker sagt mehr ueber die Schwierigkeit als jede andere
+		Angabe: mit zwei Ankern muss die ganze Spannweite frei getragen
+		werden, mit vieren gibt es Pfeiler oder Vorspruenge zum Abstuetzen.
+	]]
+	chip(card, "Anchors", string.format("%d Anker", summary.anchorCount), x, Theme.colors.text)
+	x += 76
+
 	-- Besonderheiten deutlich hervorheben
-	if (summary.slope or 0) ~= 0 then
-		chip(card, "Slope", string.format("+%d hoch", summary.slope), x, Theme.colors.warning)
-		x += 82
-	elseif summary.deckCount > 1 then
-		chip(card, "Decks", "2 Ebenen", x, Theme.colors.warning)
-		x += 76
+	if summary.requiresJump then
+		chip(card, "Jump", "Sprung", x, Theme.colors.warning)
+		x += 72
+	elseif summary.hasBoat then
+		chip(card, "Boat", "Schiff muss durch", x, Theme.colors.warning)
+		x += 116
+	elseif summary.hasHydraulics then
+		chip(card, "Hydraulics", "Hydraulik", x, Theme.colors.warning)
+		x += 84
 	elseif summary.vehicleCount > 1 then
-		chip(card, "Traffic", "Gegenverkehr", x, Theme.colors.warning)
+		chip(card, "Traffic", string.format("%d Fahrzeuge", summary.vehicleCount), x, Theme.colors.warning)
 		x += 100
 	end
 

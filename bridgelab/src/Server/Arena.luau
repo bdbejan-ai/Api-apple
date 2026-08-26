@@ -54,7 +54,8 @@ function Arena.new(player: Player, level, slotIndex: number, parentFolder: Insta
 
 	self.phase = "Build"
 	self.stable = true
-	self.unstableNode = nil
+	self.unstableJoint = nil
+	self.testPhase = 0
 	self.message = ""
 	self.result = nil
 	self.testProgress = nil
