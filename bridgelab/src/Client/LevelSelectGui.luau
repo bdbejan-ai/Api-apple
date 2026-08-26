@@ -204,7 +204,7 @@ local function createPreview(parent: Instance, summary): Frame
 	local box = Instance.new("Frame")
 	box.Name = "Preview"
 	box.Size = UDim2.fromOffset(116, 78)
-	box.Position = UDim2.fromOffset(14, 14)
+	box.Position = UDim2.fromOffset(16, 14)
 	box.BackgroundColor3 = Color3.fromRGB(24, 32, 46)
 	box.BorderSizePixel = 0
 	box.ClipsDescendants = true
@@ -422,16 +422,32 @@ function LevelSelectGui:createCard(summary)
 
 	local stroke = Theme.stroke(card)
 
+	--[[
+		Ein farbiger Streifen am linken Rand in der Farbe der Welt. Zwoelf
+		gleich aussehende Karten untereinander lasen sich wie eine Tabelle;
+		mit dem Streifen sieht man sofort, wo eine neue Welt anfaengt.
+	]]
+	local worldColor = Theme.worldColor(summary.world)
+
+	local band = Instance.new("Frame")
+	band.Name = "Weltstreifen"
+	band.Size = UDim2.new(0, 5, 1, -20)
+	band.Position = UDim2.fromOffset(4, 10)
+	band.BackgroundColor3 = worldColor
+	band.BorderSizePixel = 0
+	band.Parent = card
+	Theme.corner(band, 3)
+
 	createPreview(card, summary)
 
-	-- Nummer, klein ueber dem Namen
+	-- Welt und Nummer, klein ueber dem Namen
 	Theme.label(card, "Number", {
 		size = UDim2.new(1, -160, 0, 14),
 		position = UDim2.fromOffset(142, 16),
-		text = string.format("LEVEL %d", summary.order),
+		text = string.format("%s · LEVEL %d", string.upper(summary.world or ""), summary.order),
 		textSize = 11,
 		bold = true,
-		color = Theme.colors.accent,
+		color = worldColor,
 	})
 
 	Theme.label(card, "Name", {
