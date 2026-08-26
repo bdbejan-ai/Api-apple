@@ -19,6 +19,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
+local Blueprint = require(Shared.Blueprint)
 
 local LevelBuilder = require(script.Parent.LevelBuilder)
 local Structure = require(script.Parent.Structure)
@@ -57,7 +58,7 @@ function Arena.new(player: Player, level, slotIndex: number, parentFolder: Insta
 	self.unstableJoint = nil
 	self.testPhase = 0
 	self.needsLevelInfo = true
-	self.message = ""
+	self.message = nil
 	self.result = nil
 	self.testProgress = nil
 	self.unlockedHints = {}
@@ -116,6 +117,13 @@ function Arena:levelInfo()
 		terrain = self.level.terrain,
 		waterY = self.level.waterY,
 		z = self.level.z or 0,
+
+		--[[
+			Die Bauvorlage wird einmal beim Levelstart mitgeschickt. Sie
+			aendert sich nie, also gehoert sie zu den Leveldaten und nicht in
+			jeden Zustandsbericht.
+		]]
+		blueprint = Blueprint.forLevel(self.level),
 	}
 end
 
@@ -134,7 +142,7 @@ function Arena:buildState()
 	return {
 		levelInfo = info,
 		levelId = self.level.id,
-		levelName = self.level.displayName,
+		levelNameKey = self.level.nameKey,
 		difficulty = self.level.difficulty,
 
 		phase = self.phase,
@@ -223,7 +231,7 @@ end
 -- Rueckgabe: erfolgreich (boolean), Meldung fuer den Spieler (string)
 function Arena:placeMember(material: string, ax: number, ay: number, bx: number, by: number, phase: number?): (boolean, string)
 	if self.phase ~= "Build" then
-		return false, "Waehrend des Tests laesst sich nicht bauen."
+		return false, { key = "notice.noBuildDuringTest" }
 	end
 
 	local allowed, reason = self.structure:canPlace(material, ax, ay, bx, by)
@@ -232,7 +240,7 @@ function Arena:placeMember(material: string, ax: number, ay: number, bx: number,
 	end
 
 	local member = self.structure:place(material, ax, ay, bx, by, phase)
-	self.message = ""
+	self.message = nil
 	self:updateAnalysis()
 	self:notify()
 
@@ -242,22 +250,22 @@ function Arena:placeMember(material: string, ax: number, ay: number, bx: number,
 		durch. Ohne Hinweis waere voellig unklar, warum sich nichts aendert.
 	]]
 	if member and member.slack then
-		return true, "", "Dieses Seil haengt durch - an dieser Stelle muesste es druecken, und das kann ein Seil nicht."
+		return true, nil, { key = "notice.slackRope" }
 	end
 
-	return true, ""
+	return true, nil
 end
 
 function Arena:removeMember(memberId: number): (boolean, string)
 	if self.phase ~= "Build" then
-		return false, "Waehrend des Tests laesst sich nichts entfernen."
+		return false, { key = "notice.noRemoveDuringTest" }
 	end
 	if not self.structure:remove(memberId) then
-		return false, ""
+		return false, nil
 	end
 	self:updateAnalysis()
 	self:notify()
-	return true, ""
+	return true, nil
 end
 
 --[[
@@ -267,17 +275,17 @@ end
 ]]
 function Arena:startTest(speed: number, onComplete): (boolean, string)
 	if self.phase ~= "Build" then
-		return false, "Der Test laeuft schon."
+		return false, { key = "notice.testRunning" }
 	end
 	if #self.structure.members == 0 then
-		return false, "Erst bauen, dann testen."
+		return false, { key = "notice.buildFirst" }
 	end
 
 	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
 
 	self.phase = "Test"
 	self.result = nil
-	self.message = "Test laeuft ..."
+	self.message = { key = "hud.testRunning" }
 	self.testProgress = {
 		countdown = Config.Test.countdownSeconds,
 		elapsed = 0,
@@ -309,7 +317,7 @@ function Arena:startTest(speed: number, onComplete): (boolean, string)
 		end
 	end)
 
-	return true, ""
+	return true, nil
 end
 
 --[[
@@ -326,17 +334,17 @@ end
 ]]
 function Arena:setPhase(phase: number): (boolean, string)
 	if not self.testRun:isRunning() then
-		return false, "Die Hydraulik laesst sich nur waehrend des Tests schalten."
+		return false, { key = "notice.phaseOnlyInTest" }
 	end
 
 	local wanted = math.clamp(math.round(phase), 0, Config.Hydraulics.phaseCount)
 	if wanted == self.testPhase then
-		return false, ""
+		return false, nil
 	end
 
 	self.testPhase = wanted
 	self.testRun:setPhase(wanted)
-	return true, ""
+	return true, nil
 end
 
 function Arena:setTestSpeed(speed: number)
@@ -366,7 +374,7 @@ function Arena:reset()
 	self.phase = "Build"
 	self.result = nil
 	self.testProgress = nil
-	self.message = ""
+	self.message = nil
 	self.needsAnalysis = true
 	self:updateAnalysis()
 	self:notify()
@@ -381,7 +389,7 @@ function Arena:clearBuild()
 	self.phase = "Build"
 	self.result = nil
 	self.testProgress = nil
-	self.message = ""
+	self.message = nil
 	self.stable = true
 	self.unstableJoint = nil
 	self:notify()

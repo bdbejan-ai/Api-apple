@@ -67,6 +67,16 @@ function CameraController.new()
 	-- Wenn gesetzt, folgt die Kamera diesem Part (das Testfahrzeug).
 	self.followPart = nil
 
+	--[[
+		Die Ausgangsansicht des Levels: der Blick, mit dem es angefangen hat.
+		Nach dem Test gleitet die Kamera dorthin zurueck (siehe
+		returnToOverview) - sonst bliebe sie dort stehen, wo das Fahrzeug
+		liegengeblieben ist, und man saehe von seiner Bruecke nichts mehr.
+	]]
+	self.homeFocus = nil
+	self.homeDistance = nil
+	self.gliding = false
+
 	self:connectInput()
 
 	self.renderConnection = RunService.RenderStepped:Connect(function(dt)
@@ -137,6 +147,32 @@ function CameraController:setArena(originY: number, bounds, deckY: number)
 		self.maxDistance
 	)
 	self.followPart = nil
+
+	-- Diesen Blick merken, um nach dem Test dorthin zurueckzukehren.
+	self.homeFocus = self.focus
+	self.homeDistance = self.distance
+	self.gliding = false
+end
+
+--[[
+	Zurueck zur Ausgangsansicht des Levels.
+
+	Waehrend des Tests folgt die Kamera dem Fahrzeug und der Spieler zoomt oft
+	noch heran, um ein bestimmtes Bauteil zu beobachten. Ist der Test vorbei,
+	stand die Kamera bisher genau dort - also irgendwo halb in der Schlucht,
+	bei einem Auto, das nicht mehr da ist. Von der eigenen Bruecke, die man
+	als Naechstes verbessern will, sah man nichts.
+
+	Zurueckgeglitten wird weich statt gesprungen: ein harter Schnitt an dieser
+	Stelle ist unangenehm, und man verliert die Orientierung, welcher Teil der
+	Bruecke gerade wo war.
+]]
+function CameraController:returnToOverview()
+	if not self.homeFocus then
+		return
+	end
+	self.followPart = nil
+	self.gliding = true
 end
 
 -- Ansicht fuer das Hauptmenue: neutral, ohne Arena.
@@ -168,8 +204,10 @@ function CameraController:pan(deltaX: number, deltaY: number)
 	local worldPerPixel = (2 * self.distance * math.tan(halfFov)) / math.max(viewport.Y, 1)
 
 	self.focus += Vector3.new(-deltaX * worldPerPixel, deltaY * worldPerPixel, 0)
-	-- Von Hand geschoben heisst: nicht mehr automatisch folgen.
+	-- Von Hand geschoben heisst: nicht mehr automatisch folgen und nicht
+	-- mehr zurueckgleiten. Wer selbst hinschaut, will dort bleiben.
 	self.followPart = nil
+	self.gliding = false
 	self.hasPanned = true
 	self:clampFocus()
 end
@@ -178,6 +216,7 @@ function CameraController:zoom(amount: number)
 	-- Die Grenzen stellt setArena() je Level ein: beliebig nah heran,
 	-- aber nur so weit heraus, bis das Level das Bild ausfuellt.
 	self.distance = math.clamp(self.distance + amount, self.minDistance, self.maxDistance)
+	self.gliding = false
 	self.hasZoomed = true
 end
 
@@ -362,6 +401,24 @@ function CameraController:update(dt: number)
 		local strength = math.clamp(Config.Test.cameraFollow * dt * 4, 0, 1)
 		self.focus = self.focus:Lerp(target, strength)
 		self:clampFocus()
+	end
+
+	----------------------------------------------------------------------------
+	-- Nach dem Test zurueck zur Ausgangsansicht gleiten
+	----------------------------------------------------------------------------
+	if self.gliding and self.homeFocus then
+		local strength = math.clamp(dt * Config.Camera.returnSpeed, 0, 1)
+		self.focus = self.focus:Lerp(self.homeFocus, strength)
+		self.distance += (self.homeDistance - self.distance) * strength
+
+		-- Nah genug ist gut genug: sonst kriecht die Bewegung ewig weiter.
+		local closeEnough = (self.focus - self.homeFocus).Magnitude < 0.5
+			and math.abs(self.distance - self.homeDistance) < 0.5
+		if closeEnough then
+			self.focus = self.homeFocus
+			self.distance = self.homeDistance
+			self.gliding = false
+		end
 	end
 
 	----------------------------------------------------------------------------

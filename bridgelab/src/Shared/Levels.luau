@@ -72,28 +72,24 @@ local Levels = {}
 Levels.vehicleKinds = {
 	MiniCar = {
 		key = "MiniCar",
-		displayName = "Kleinwagen",
 		mass = 420,
 		size = { X = 6, Y = 3.2, Z = 4.4 },
 		color = { 226, 108, 92 },
 	},
 	Car = {
 		key = "Car",
-		displayName = "Auto",
 		mass = 900,
 		size = { X = 8, Y = 4, Z = 5 },
 		color = { 198, 72, 58 },
 	},
 	Van = {
 		key = "Van",
-		displayName = "Lieferwagen",
 		mass = 650,
 		size = { X = 7, Y = 3.6, Z = 4.6 },
 		color = { 232, 172, 62 },
 	},
 	Truck = {
 		key = "Truck",
-		displayName = "Lastwagen",
 		mass = 1600,
 		size = { X = 12, Y = 5, Z = 5 },
 		color = { 64, 118, 206 },
@@ -267,6 +263,29 @@ local function makeLevel(def)
 	-- Worauf die Kamera anfangs blickt.
 	level.focusY = (def.buildArea.minY + def.buildArea.maxY) / 2
 
+	----------------------------------------------------------------------------
+	-- Texte: nur Schluessel, keine Saetze
+	----------------------------------------------------------------------------
+
+	--[[
+		Namen, Untertitel und Tipps stehen NICHT hier, sondern in I18n.luau -
+		einmal auf Deutsch und einmal auf Englisch. Hier entstehen nur die
+		Schluessel, und zwar aus der Levelnummer.
+
+		Warum abgeleitet statt hingeschrieben: ein Schluessel, den man tippt,
+		kann sich vertippen und zeigt dann im Spiel seinen eigenen Namen an.
+		Abgeleitet kann das nicht passieren. Und in den Leveldaten steht nur
+		noch, WIE VIELE Tipps es gibt - die Saetze dazu stehen an genau einer
+		Stelle.
+	]]
+	level.nameKey = "level." .. def.id .. ".name"
+	level.subtitleKey = "level." .. def.id .. ".subtitle"
+
+	level.hints = {}
+	for index = 1, (def.hintCount or 0) do
+		level.hints[index] = string.format("level.%s.hint%d", def.id, index)
+	end
+
 	level.freeHints = def.freeHints or (if def.difficulty <= 3 then 1 else 0)
 
 	----------------------------------------------------------------------------
@@ -327,8 +346,6 @@ Levels.list = {
 	makeLevel({
 		id = "W1L1",
 		world = "Grundlagen",
-		displayName = "Der erste Graben",
-		subtitle = "Kurze Luecke, viel Budget. Lerne das Zeichnen.",
 		difficulty = 1,
 		budget = 800,
 		maxDropStuds = 14,
@@ -350,18 +367,12 @@ Levels.list = {
 		materials = BASIC,
 		vehicles = { { kind = "MiniCar", fromX = -50, toX = 50 } },
 
-		hints = {
-			"Eine gerade Fahrbahn traegt sich nicht selbst. Jeder Knoten, der nur zwei Bauteile in derselben Linie hat, kann keine senkrechte Last aufnehmen.",
-			"Ein Dreieck ist die einzige Form, die sich nicht verziehen laesst. Setze ueber die Fahrbahn einen Obergurt aus Holz und verbinde ihn mit Streben nach unten.",
-			"Loesung: Fahrbahn aus drei Strassenstuecken, darueber ein Dreieck aus Holz von Anker zu Anker mit zwei senkrechten Streben nach unten.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W1L2",
 		world = "Grundlagen",
-		displayName = "Dreiecke",
-		subtitle = "Zu weit fuer eine flache Fahrbahn.",
 		difficulty = 2,
 		budget = 1900,
 		maxDropStuds = 14,
@@ -383,18 +394,12 @@ Levels.list = {
 		materials = BASIC,
 		vehicles = { { kind = "MiniCar", fromX = -60, toX = 60 } },
 
-		hints = {
-			"Vierzig Studs sind zu weit fuer ein einzelnes Dreieck. Es braucht eine Kette davon - ein Fachwerk.",
-			"Bau die Fahrbahn in Feldern von 8 Studs. Ueber jedem Feldknoten eine senkrechte Strebe nach oben, oben ein durchgehender Gurt, dazwischen Diagonalen.",
-			"Reisst der Obergurt, lege ein ZWEITES Holz genau daneben - auf dieselben beiden Knoten. Beide teilen sich dann die Kraft.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W1L3",
 		world = "Grundlagen",
-		displayName = "Zwei Vorspruenge",
-		subtitle = "Der Grund ist unerreichbar. Nutze die Vorspruenge.",
 		difficulty = 3,
 		budget = 2900,
 		maxDropStuds = 16,
@@ -422,18 +427,12 @@ Levels.list = {
 		materials = BASIC,
 		vehicles = { { kind = "MiniCar", fromX = -60, toX = 60 } },
 
-		hints = {
-			"Zweiundfuenfzig Studs am Stueck sind zu weit fuer Holz. Sieh dir die beiden Felsvorspruenge unter der Fahrbahn an.",
-			"Auf jedem Vorsprung sitzt ein Anker. Von dort laesst sich ein Pfeiler nach oben bauen, der die Fahrbahn abstuetzt.",
-			"Ein Pfeiler aus einer einzelnen Stange knickt seitlich weg. Bau ihn als Dreieck: zwei Schenkel, die sich oben zur Fahrbahn hin oeffnen.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W1L4",
 		world = "Grundlagen",
-		displayName = "Sparzwang",
-		subtitle = "Dieselbe Luecke wie Level 2, halbes Budget.",
 		difficulty = 3,
 		budget = 640,
 		maxDropStuds = 14,
@@ -455,11 +454,7 @@ Levels.list = {
 		materials = BASIC,
 		vehicles = { { kind = "MiniCar", fromX = -60, toX = 60 } },
 
-		hints = {
-			"Der Graben ist derselbe wie im ersten Level - nur das Budget ist knapp. Es geht also nicht ums Koennen, sondern ums Sparen.",
-			"Holz kostet 5 je Stud, Strasse 8. Jedes Stueck Strasse, das du weglaesst, spart bares Geld - aber die Fahrbahn muss durchgehend sein.",
-			"Ein flacheres Fachwerk spart Material an den Streben, kostet aber mehr Kraft in den Gurten. Such den Punkt dazwischen - sechs Studs Bauhoehe reichen hier.",
-		},
+		hintCount = 3,
 	}),
 
 	--------------------------------------------------------------------------
@@ -469,8 +464,6 @@ Levels.list = {
 	makeLevel({
 		id = "W2L5",
 		world = "Werkstoffe",
-		displayName = "Weit gespannt",
-		subtitle = "Siebzig Studs am Stueck. Nur Stahl traegt das.",
 		difficulty = 3,
 		budget = 8200,
 		maxDropStuds = 16,
@@ -492,18 +485,12 @@ Levels.list = {
 		materials = ADVANCED,
 		vehicles = { { kind = "Van", fromX = -70, toX = 70 } },
 
-		hints = {
-			"Holz haelt 550 N, Stahl 1200. Bei dieser Spannweite entstehen in den Gurten weit ueber 550 N - Holz reisst dort sofort.",
-			"Die Kraft im Gurt ist ungefaehr Last mal Spannweite geteilt durch das Vierfache der Bauhoehe. Mehr Bauhoehe ist billiger als mehr Material.",
-			"Loesung: Fahrbahn aus Strasse mit Stahl daneben verstaerkt, Obergurt doppelt, beide Diagonalen je Feld, Bauhoehe etwa zehn Studs.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W2L6",
 		world = "Werkstoffe",
-		displayName = "Steile Kante",
-		subtitle = "Die andere Seite liegt zwanzig Studs hoeher.",
 		difficulty = 4,
 		budget = 4900,
 		maxDropStuds = 16,
@@ -525,18 +512,12 @@ Levels.list = {
 		materials = ADVANCED,
 		vehicles = { { kind = "Car", fromX = -60, toX = 60 } },
 
-		hints = {
-			"Die Fahrbahn muss ansteigen. Zu steil darf sie nicht werden - ueber etwa 33 Grad gilt ein Bauteil nicht mehr als befahrbar und das Fahrzeug faellt hindurch.",
-			"Zwanzig Studs Hoehenunterschied auf 44 Studs Weite sind knapp 25 Grad. Das geht gerade so, wenn die Steigung gleichmaessig ueber die ganze Luecke verteilt wird.",
-			"Das Tragwerk darf ruhig waagerecht bleiben, auch wenn die Fahrbahn steigt. Ein Fachwerk mit waagerechtem Obergurt und schraeger Fahrbahn ist voellig in Ordnung.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W2L7",
 		world = "Werkstoffe",
-		displayName = "Doppelte Last",
-		subtitle = "Zwei Lastwagen gleichzeitig, aus beiden Richtungen.",
 		difficulty = 4,
 		budget = 6000,
 		maxDropStuds = 16,
@@ -571,18 +552,12 @@ Levels.list = {
 			{ kind = "Car", fromX = 64, toX = -64, lane = 2.6 },
 		},
 
-		hints = {
-			"Zwei Autos zu je 900 N treffen sich in der Mitte. Dort liegen dann 1800 N auf wenigen Studs Fahrbahn.",
-			"Die Felsnadel mitten in der Schlucht traegt zwei Anker. Ein Pfeiler von dort halbiert die Spannweite - und viertelt damit fast die Gurtkraft.",
-			"Loesung: ein Fachwerk ueber die ganze Breite, dazu ein Pfeiler von der Felsnadel hinauf zur Fahrbahnmitte. Fahrbahn aus verstaerkter Strasse.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W2L8",
 		world = "Werkstoffe",
-		displayName = "Kreuz und quer",
-		subtitle = "Eine Diagonale je Feld reicht hier nicht mehr.",
 		difficulty = 4,
 		budget = 5200,
 		maxDropStuds = 18,
@@ -609,11 +584,7 @@ Levels.list = {
 		materials = ADVANCED,
 		vehicles = { { kind = "Car", fromX = -64, toX = 64 } },
 
-		hints = {
-			"Ein Fachwerk mit nur EINER Diagonale je Feld hat genau einen Weg, auf dem die Auflagerkraft vom Anker nach oben gelangt. Diese eine Diagonale traegt dann alles allein.",
-			"Setze in JEDES Feld beide Diagonalen - ein liegendes Kreuz. Dann teilen sich zwei Bauteile diese Kraft, und die groesste Einzelkraft halbiert sich.",
-			"Loesung: Fahrbahn aus Strasse mit Stahl daneben verstaerkt, doppelter Obergurt, beide Diagonalen je Feld, Bauhoehe acht Studs.",
-		},
+		hintCount = 3,
 	}),
 
 	--------------------------------------------------------------------------
@@ -623,8 +594,6 @@ Levels.list = {
 	makeLevel({
 		id = "W3L9",
 		world = "Bewegliches",
-		displayName = "Klappbruecke",
-		subtitle = "Ein Schiff muss durch. Die Bruecke muss aufgehen.",
 		difficulty = 5,
 		budget = 3000,
 		maxDropStuds = 16,
@@ -661,18 +630,12 @@ Levels.list = {
 			startDelay = 1.5, -- so lange wartet das Schiff nach dem Start
 		},
 
-		hints = {
-			"Das Schiff faehrt zuerst. Erst wenn es durch ist, darf die Bruecke wieder zu sein.",
-			"Ein Hydraulikzylinder faehrt in seiner Phase auf das Anderthalbfache seiner Baulaenge aus. Damit laesst sich ein Fahrbahnstueck hochklappen.",
-			"Baue die Fahrbahn in zwei Haelften, die sich in der Mitte treffen. Unter jede Haelfte einen Zylinder. Waehle vor dem Bauen unten die Phase - beide in Phase 1, dann heben sie gemeinsam.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W3L10",
 		world = "Bewegliches",
-		displayName = "Der Sprung",
-		subtitle = "Eine Rampe. Mehr bekommst du nicht.",
 		difficulty = 5,
 		budget = 1800,
 		maxDropStuds = 40,
@@ -700,18 +663,12 @@ Levels.list = {
 		]]
 		requiresJump = true,
 
-		hints = {
-			"Sieh dir die Bauzone an: sie endet weit vor der anderen Seite. Eine durchgehende Bruecke gibt es hier nicht.",
-			"Bau eine Rampe, die leicht ansteigt, und fahre schnell. Am Tacho lassen sich bis zu 14 Studs pro Sekunde einstellen.",
-			"Die Landeseite liegt acht Studs tiefer als der Start. Der Sprung ist also leichter, als er aussieht - aber die Rampe muss das Auto sauber abheben lassen.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W3L11",
 		world = "Bewegliches",
-		displayName = "Zwei Ebenen",
-		subtitle = "Unten ein Lastwagen, oben ein Lieferwagen.",
 		difficulty = 5,
 		budget = 4800,
 		maxDropStuds = 16,
@@ -739,18 +696,12 @@ Levels.list = {
 			{ kind = "Van", fromX = -60, toX = 60, lane = 0 },
 		},
 
-		hints = {
-			"Die beiden oberen Anker liegen 24 Studs ueber den unteren. Dort gehoert die zweite Fahrbahn hin.",
-			"Beide Ebenen zugleich zu tragen ist teuer. Guenstiger ist ein gemeinsames Fachwerk, dessen Obergurt zugleich die obere Fahrbahn ist.",
-			"Der Lieferwagen oben wiegt nur 650 N. Die obere Ebene darf deshalb deutlich leichter ausfallen als die untere.",
-		},
+		hintCount = 3,
 	}),
 
 	makeLevel({
 		id = "W3L12",
 		world = "Bewegliches",
-		displayName = "Die grosse Schlucht",
-		subtitle = "Hundert Studs. Alles, was du gelernt hast.",
 		difficulty = 5,
 		budget = 13000,
 		maxDropStuds = 20,
@@ -779,11 +730,7 @@ Levels.list = {
 		materials = ALL,
 		vehicles = { { kind = "Truck", fromX = -90, toX = 90 } },
 
-		hints = {
-			"Hundert Studs am Stueck traegt nichts. Die Felsnadel in der Mitte ist deine Rettung - von dort laesst sich ein Mittelpfeiler bauen.",
-			"Teile die Aufgabe: zwei Spannweiten von je fuenfzig Studs sind viel leichter als eine von hundert - die Gurtkraft faellt dabei auf ein Viertel.",
-			"Der Mittelpfeiler traegt beide Haelften. Baue ihn aus Stahl und stelle ihn breit auf beide Anker der Felsnadel, damit er nicht kippt.",
-		},
+		hintCount = 3,
 	}),
 }
 
@@ -809,8 +756,8 @@ function Levels.summaries()
 			id = level.id,
 			order = index,
 			world = level.world,
-			displayName = level.displayName,
-			subtitle = level.subtitle,
+			nameKey = level.nameKey,
+			subtitleKey = level.subtitleKey,
 			difficulty = level.difficulty,
 			budget = level.budget,
 			span = span,

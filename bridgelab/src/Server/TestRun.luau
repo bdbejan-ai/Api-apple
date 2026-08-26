@@ -506,7 +506,7 @@ function TestRun:checkForBreaks(result): boolean
 	for _, member in structure:activeMembers() do
 		local limit = Materials.limitFor(member.material, member.force)
 		if math.abs(member.force) > limit then
-			self.brokenMaterial = Materials.get(member.material).displayName
+			self.brokenMaterial = Materials.nameKey(member.material)
 			structure:breakMember(member)
 			broke = true
 		end
@@ -525,7 +525,7 @@ function TestRun:checkForBreaks(result): boolean
 			end
 		end
 		if worst then
-			self.brokenMaterial = Materials.get(worst.material).displayName
+			self.brokenMaterial = Materials.nameKey(worst.material)
 			structure:breakMember(worst)
 			broke = true
 		end
@@ -538,7 +538,7 @@ end
 -- Ein Simulationsschritt
 --------------------------------------------------------------------------------
 
-function TestRun:finish(success: boolean, reason: string)
+function TestRun:finish(success: boolean, reason)
 	local callback = self.onFinished
 	self:stop()
 	if callback then
@@ -608,7 +608,7 @@ function TestRun:step(dt: number)
 		-- der kurze Ruck beim Loesen der Verankerung sofort etwas.
 		if self.driveStartTime and os.clock() - self.driveStartTime > Config.Physics.breakGracePeriod then
 			if self:checkForBreaks(result) then
-				self:finish(false, string.format("Bauteil gebrochen: %s war ueberlastet.", self.brokenMaterial or "?"))
+				self:finish(false, { key = "result.broken", args = { self.brokenMaterial or "?" } })
 				return
 			end
 		end
@@ -654,7 +654,7 @@ function TestRun:step(dt: number)
 
 	-- 8. Steht die Bruecke dem Schiff im Weg?
 	if self:boatIsBlocked() then
-		self:finish(false, "Das Schiff kommt nicht durch - die Bruecke steht im Weg.")
+		self:finish(false, { key = "result.boatBlocked" })
 		return
 	end
 
@@ -683,7 +683,7 @@ function TestRun:step(dt: number)
 		allFinished = false
 
 		if position.Y < vehicle.floorY then
-			self:finish(false, string.format("Fahrzeug %d ist abgestuerzt.", spec.index))
+			self:finish(false, { key = "result.fell", args = { spec.index } })
 			return
 		end
 
@@ -696,7 +696,7 @@ function TestRun:step(dt: number)
 		]]
 		local airborne = math.abs(part.AssemblyLinearVelocity.Y) > 8
 		if not airborne and part.CFrame.UpVector:Dot(Vector3.yAxis) < 0.7 then
-			self:finish(false, string.format("Fahrzeug %d ist gekippt.", spec.index))
+			self:finish(false, { key = "result.tipped", args = { spec.index } })
 			return
 		end
 	end
@@ -706,17 +706,17 @@ function TestRun:step(dt: number)
 
 	if allFinished and not boatPending then
 		if self.boat then
-			self:finish(true, "Geschafft! Fahrzeug und Schiff sind durchgekommen.")
+			self:finish(true, { key = "result.withBoat" })
 		elseif #self.vehicles > 1 then
-			self:finish(true, "Geschafft! Alle Fahrzeuge sind angekommen.")
+			self:finish(true, { key = "result.allVehicles" })
 		else
-			self:finish(true, "Geschafft! Das Fahrzeug hat die andere Seite erreicht.")
+			self:finish(true, { key = "result.oneVehicle" })
 		end
 		return
 	end
 
 	if os.clock() - self.driveStartTime > self:currentTimeLimit() then
-		self:finish(false, "Zeitlimit ueberschritten.")
+		self:finish(false, { key = "result.timeout" })
 		return
 	end
 end

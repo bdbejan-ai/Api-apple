@@ -44,6 +44,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
 local Materials = require(Shared.Materials)
+local I18n = require(Shared.I18n)
 local Levels = require(Shared.Levels)
 
 local Device = require(script.Parent.Device)
@@ -78,6 +79,7 @@ function BuildHud.new()
 	self.onSpeedChanged = nil
 	self.onPhaseChanged = nil
 	self.onBuildPhaseChanged = nil
+	self.onBlueprint = nil
 
 	--[[
 		Der linke Knopf im Ergebnisfenster hat zwei Bedeutungen: nach einem
@@ -153,7 +155,7 @@ function BuildHud:buildTopBar()
 	self.levelLabel = Theme.label(bar, "LevelName", {
 		size = UDim2.fromOffset(320, 22),
 		position = UDim2.fromOffset(16, 8),
-		text = "Level",
+		text = "",
 		textSize = 17,
 		bold = true,
 	})
@@ -179,7 +181,7 @@ function BuildHud:buildTopBar()
 
 	self.budgetLabel = Theme.label(budgetBox, "Text", {
 		size = UDim2.new(1, 0, 0, 20),
-		text = "Budget 0 / 0",
+		text = I18n.t("hud.budget", 0, 0),
 		textSize = 15,
 		bold = true,
 		align = Enum.TextXAlignment.Center,
@@ -219,9 +221,9 @@ function BuildHud:buildTopBar()
 		return button
 	end
 
-	self.menuButton = topButton("MenuButton", "Menue", 86, 74)
-	self.resetButton = topButton("ResetButton", "Zuruecksetzen", 208, 116)
-	self.clearButton = topButton("ClearButton", "Abreissen", 302, 88)
+	self.menuButton = topButton("MenuButton", I18n.t("hud.menu"), 86, 74)
+	self.resetButton = topButton("ResetButton", I18n.t("hud.reset"), 208, 116)
+	self.clearButton = topButton("ClearButton", I18n.t("hud.clear"), 302, 88)
 
 	self.menuButton.Activated:Connect(function()
 		if self.onMenu then
@@ -373,7 +375,7 @@ function BuildHud:buildMaterialRail()
 		Theme.label(button, "Name", {
 			size = UDim2.new(1, -46, 0, 18),
 			position = UDim2.fromOffset(42, 6),
-			text = spec.displayName,
+			text = I18n.t(Materials.nameKey(key)),
 			textSize = 14,
 			bold = true,
 		})
@@ -381,7 +383,7 @@ function BuildHud:buildMaterialRail()
 		Theme.label(button, "Cost", {
 			size = UDim2.new(1, -46, 0, 14),
 			position = UDim2.fromOffset(42, 23),
-			text = string.format("%d je Stud", spec.costPerStud),
+			text = I18n.t("material.perStud", spec.costPerStud),
 			textSize = 11,
 			color = Theme.colors.textDim,
 		})
@@ -395,8 +397,8 @@ function BuildHud:buildMaterialRail()
 				dass das die Eigenschaft des Baustoffs ist.
 			]]
 			text = if spec.maxCompression > 0
-				then string.format("Zug %d · Druck %d", spec.maxTension, spec.maxCompression)
-				else string.format("Zug %d · kein Druck", spec.maxTension),
+				then I18n.t("material.limits", spec.maxTension, spec.maxCompression)
+				else I18n.t("material.limitsTensionOnly", spec.maxTension),
 			textSize = 10,
 			color = Theme.colors.textDim,
 		})
@@ -413,7 +415,7 @@ function BuildHud:buildMaterialRail()
 	-- Abrissmodus ganz unten, abgesetzt.
 	local removeButton = Theme.button(list, "RemoveButton", {
 		size = UDim2.new(1, 0, 0, 40),
-		text = "Abriss",
+		text = I18n.t("hud.remove"),
 		textSize = 14,
 		color = Theme.colors.panelLight,
 	})
@@ -478,7 +480,7 @@ function BuildHud:buildBottomBar()
 	self.phaseCaption = Theme.label(phaseBox, "Caption", {
 		size = UDim2.fromOffset(240, 16),
 		position = UDim2.fromOffset(2, 2),
-		text = "Hydraulik",
+		text = I18n.t("hud.phases"),
 		textSize = 12,
 		bold = true,
 		color = Theme.colors.textDim,
@@ -488,7 +490,7 @@ function BuildHud:buildBottomBar()
 		local button = Theme.button(phaseBox, "Phase_" .. phase, {
 			size = UDim2.fromOffset(52, 38),
 			position = UDim2.fromOffset(phase * 58, 22),
-			text = if phase == 0 then "Ein" else tostring(phase),
+			text = if phase == 0 then I18n.t("hud.phaseOff") else tostring(phase),
 			textSize = 14,
 			color = Theme.colors.panelLight,
 		})
@@ -510,10 +512,33 @@ function BuildHud:buildBottomBar()
 	-- Knoepfe rechts
 	----------------------------------------------------------------------------
 
+	--[[
+		VORLAGE - der Einstieg fuer alle, die noch nie eine Bruecke gebaut haben
+
+		Blendet eine blasse Zeichnung eines gewoehnlichen Fachwerks ein. Sie
+		baut nichts, sie zeigt nur die Form. Der Knopf steht bewusst links
+		neben TIPP: die Vorlage ist gratis und verraet nichts ueber DIESES
+		Level, waehrend ein Tipp Robux kosten kann.
+	]]
+	local blueprintButton = Theme.button(bar, "BlueprintButton", {
+		size = UDim2.fromOffset(110, 64),
+		position = UDim2.new(1, -388, 0, 14),
+		text = I18n.t("hud.blueprint"),
+		textSize = 15,
+		color = Theme.colors.panelLight,
+	})
+	blueprintButton.Selectable = true
+	blueprintButton.Activated:Connect(function()
+		if self.onBlueprint then
+			self.onBlueprint()
+		end
+	end)
+	self.blueprintButton = blueprintButton
+
 	local hintButton = Theme.button(bar, "HintButton", {
 		size = UDim2.fromOffset(110, 64),
 		position = UDim2.new(1, -272, 0, 14),
-		text = "Tipp",
+		text = I18n.t("hud.hint"),
 		textSize = 15,
 		color = Theme.colors.panelLight,
 	})
@@ -526,7 +551,7 @@ function BuildHud:buildBottomBar()
 	local testButton = Theme.button(bar, "TestButton", {
 		size = UDim2.fromOffset(150, 64),
 		position = UDim2.new(1, -152, 0, 14),
-		text = "Test starten",
+		text = I18n.t("hud.test"),
 		textSize = 17,
 		color = Theme.colors.success,
 		textColor = Color3.fromRGB(12, 32, 18),
@@ -552,8 +577,8 @@ function BuildHud:refreshPhases(state)
 	local active = if running then (state.phaseIndex or 0) else self.buildPhase
 
 	self.phaseCaption.Text = if running
-		then "Hydraulik - jetzt schalten"
-		else "Hydraulik - Phase fuer neue Zylinder"
+		then I18n.t("hud.phasesTest")
+		else I18n.t("hud.phasesBuild")
 
 	for phase, button in self.phaseButtons do
 		local isActive = phase == active
@@ -565,6 +590,15 @@ function BuildHud:refreshPhases(state)
 		button.AutoButtonColor = usable
 		button.TextTransparency = if usable then 0 else 0.5
 	end
+end
+
+-- Zeigt am Knopf, ob die Vorlage gerade eingeblendet ist.
+function BuildHud:setBlueprintActive(active: boolean, available: boolean)
+	self.blueprintButton.Visible = available
+	Theme.paint(
+		self.blueprintButton,
+		if active then Theme.colors.accentDark else Theme.colors.panelLight
+	)
 end
 
 -- Beim Bauen: welcher Phase der naechste Zylinder angehoeren soll.
@@ -602,7 +636,7 @@ function BuildHud:buildSpeedPanel()
 	Theme.label(panel, "Caption", {
 		size = UDim2.fromOffset(120, 18),
 		position = UDim2.fromOffset(14, 9),
-		text = "Tempo",
+		text = I18n.t("hud.speed"),
 		textSize = 13,
 		bold = true,
 		color = Theme.colors.textDim,
@@ -771,7 +805,7 @@ function BuildHud:refreshSpeedDisplay()
 
 	self.speedFill.Size = UDim2.fromScale(fraction, 1)
 	self.speedKnob.Position = UDim2.fromScale(fraction, 0.5)
-	self.speedValueLabel.Text = string.format("%.1f Studs/s", self.speed)
+	self.speedValueLabel.Text = I18n.t("hud.speedValue", self.speed)
 
 	--[[
 		Die Farbe sagt, worauf man sich einlaesst: gemuetlich, zuegig oder
@@ -840,7 +874,7 @@ function BuildHud:refreshStatus()
 
 	if not state.stable and state.memberCount > 0 then
 		self.statusPanel.Visible = true
-		self.statusLabel.Text = "Struktur nicht stabil - die rote Markierung zeigt die schwache Stelle"
+		self.statusLabel.Text = I18n.t("hud.unstable")
 		self.statusLabel.TextColor3 = Theme.colors.danger
 	else
 		self.statusPanel.Visible = false
@@ -862,7 +896,7 @@ function BuildHud:buildTestPanel()
 	self.testHeadline = Theme.label(panel, "Headline", {
 		size = UDim2.new(1, -20, 0, 24),
 		position = UDim2.fromOffset(10, 8),
-		text = "Belastungstest",
+		text = I18n.t("hud.testHeadline"),
 		textSize = 16,
 		bold = true,
 		align = Enum.TextXAlignment.Center,
@@ -881,7 +915,7 @@ function BuildHud:buildTestPanel()
 	Theme.label(panel, "LoadCaption", {
 		size = UDim2.fromOffset(160, 16),
 		position = UDim2.fromOffset(12, 54),
-		text = "Hoechste Auslastung",
+		text = I18n.t("hud.peakLoad"),
 		textSize = 12,
 		color = Theme.colors.textDim,
 	})
@@ -922,9 +956,9 @@ function BuildHud:buildTestPanel()
 	legend.Parent = panel
 
 	local entries = {
-		{ text = "locker", color = Config.UtilisationColors.low },
-		{ text = "wird eng", color = Config.UtilisationColors.mid },
-		{ text = "am Limit", color = Config.UtilisationColors.high },
+		{ text = I18n.t("hud.legendLow"), color = Config.UtilisationColors.low },
+		{ text = I18n.t("hud.legendMid"), color = Config.UtilisationColors.mid },
+		{ text = I18n.t("hud.legendHigh"), color = Config.UtilisationColors.high },
 	}
 	local legendX = 0
 	for _, entry in entries do
@@ -982,7 +1016,7 @@ function BuildHud:buildResultPanel()
 	local retry = Theme.button(panel, "Retry", {
 		size = UDim2.fromOffset(180, 42),
 		position = UDim2.fromOffset(24, 146),
-		text = "Weiter bauen",
+		text = I18n.t("result.retry"),
 		textSize = 15,
 		color = Theme.colors.accent,
 		textColor = Color3.fromRGB(8, 18, 34),
@@ -1000,7 +1034,7 @@ function BuildHud:buildResultPanel()
 	local toMenu = Theme.button(panel, "ToMenu", {
 		size = UDim2.fromOffset(180, 42),
 		position = UDim2.new(1, -204, 0, 146),
-		text = "Zur Levelauswahl",
+		text = I18n.t("hud.toLevelSelect"),
 		textSize = 15,
 		color = Theme.colors.panelLight,
 	})
@@ -1028,7 +1062,7 @@ function BuildHud:buildHintPanel()
 	Theme.label(panel, "Title", {
 		size = UDim2.new(1, -32, 0, 24),
 		position = UDim2.fromOffset(16, 12),
-		text = "Tipps",
+		text = I18n.t("hint.title"),
 		textSize = 18,
 		bold = true,
 	})
@@ -1076,7 +1110,7 @@ function BuildHud:buildHintPanel()
 	local reveal = Theme.button(panel, "Reveal", {
 		size = UDim2.new(1, -32, 0, 46),
 		position = UDim2.new(0, 16, 1, -62),
-		text = "Naechsten Tipp anzeigen",
+		text = I18n.t("hud.nextHint"),
 		textSize = 14,
 		color = Theme.colors.accent,
 		textColor = Color3.fromRGB(8, 18, 34),
@@ -1147,10 +1181,10 @@ function BuildHud:refreshHintPanel()
 	local used = #unlocked
 	local free = state.freeHints or 0
 
-	self.hintInfoLabel.Text = string.format("%d von %d aufgedeckt", used, total)
+	self.hintInfoLabel.Text = I18n.t("hud.hintsRevealed", used, total)
 
 	if used >= total then
-		self.hintRevealButton.Text = "Keine weiteren Tipps"
+		self.hintRevealButton.Text = I18n.t("hud.noMoreHints")
 		self.hintRevealButton.Active = false
 		Theme.paint(self.hintRevealButton, Theme.colors.panelLight, Theme.colors.textDim)
 		return
@@ -1160,10 +1194,10 @@ function BuildHud:refreshHintPanel()
 
 	local nextIndex = used + 1
 	if nextIndex <= free then
-		self.hintRevealButton.Text = "Naechsten Tipp anzeigen (gratis)"
+		self.hintRevealButton.Text = I18n.t("hud.nextHintFree")
 		Theme.paint(self.hintRevealButton, Theme.colors.accent, Color3.fromRGB(8, 18, 34))
 	else
-		self.hintRevealButton.Text = string.format("Tipp freischalten (%d Robux)", Config.Monetisation.hintPrice)
+		self.hintRevealButton.Text = I18n.t("hint.buy", Config.Monetisation.hintPrice)
 		Theme.paint(self.hintRevealButton, Theme.colors.robux, Color3.fromRGB(8, 26, 12))
 	end
 end
@@ -1188,15 +1222,17 @@ function BuildHud:update(state)
 	----------------------------------------------------------------------------
 	-- Kopfzeile
 	----------------------------------------------------------------------------
-	self.levelLabel.Text = state.levelName or "Level"
+	-- Der Server schickt den Schluessel, uebersetzt wird hier.
+	self.levelLabel.Text = I18n.t(state.levelNameKey or "")
 
 	local info = Config.difficultyInfo(state.difficulty or 1)
-	self.difficultyLabel.Text = string.format("%s  %s", Theme.stars(state.difficulty or 1, 5), info.label)
+	local level = state.difficulty or 1
+	self.difficultyLabel.Text = string.format("%s  %s", Theme.stars(level, 5), I18n.t("difficulty." .. level))
 	self.difficultyLabel.TextColor3 = info.color
 
 	local used = state.budgetUsed or 0
 	local total = math.max(state.budgetTotal or 1, 1)
-	self.budgetLabel.Text = string.format("Budget %d / %d", used, total)
+	self.budgetLabel.Text = I18n.t("hud.budget", used, total)
 
 	local fraction = math.clamp(used / total, 0, 1)
 	self.budgetFill.Size = UDim2.fromScale(fraction, 1)
@@ -1267,8 +1303,8 @@ function BuildHud:updateTestPanel(state)
 	end
 
 	if progress.countdown and progress.countdown > 0 then
-		self.testHeadline.Text = string.format("Test startet in %.0f ...", math.ceil(progress.countdown))
-		self.testTimeLabel.Text = "Die Bruecke traegt jetzt ihr eigenes Gewicht"
+		self.testHeadline.Text = I18n.t("hud.testStartsIn", math.ceil(progress.countdown))
+		self.testTimeLabel.Text = I18n.t("hud.ownWeight")
 	else
 		-- Bei mehreren Fahrzeugen zaehlen wir mit, wie viele schon drueben sind.
 		local count = progress.vehicleCount or 1
@@ -1279,7 +1315,7 @@ function BuildHud:updateTestPanel(state)
 				count
 			)
 		else
-			self.testHeadline.Text = "Belastungstest laeuft"
+			self.testHeadline.Text = I18n.t("hud.testRunningHeadline")
 		end
 
 		self.testTimeLabel.Text = string.format(
@@ -1298,27 +1334,27 @@ end
 
 function BuildHud:updateResultPanel(result)
 	if result.success then
-		self.resultTitle.Text = "Geschafft!"
+		self.resultTitle.Text = I18n.t("result.success")
 		self.resultTitle.TextColor3 = Theme.colors.success
 
 		-- Nach einem Erfolg direkt weiterspielen duerfen, statt erst ins Menue.
 		if self.nextLevelId then
 			self.resultPrimaryMode = "next"
-			self.retryButton.Text = "Naechstes Level"
+			self.retryButton.Text = I18n.t("result.nextLevel")
 			Theme.paint(self.retryButton, Theme.colors.success, Color3.fromRGB(10, 30, 16))
 		else
 			self.resultPrimaryMode = "retry"
-			self.retryButton.Text = "Noch einmal bauen"
+			self.retryButton.Text = I18n.t("hud.buildAgain")
 			Theme.paint(self.retryButton, Theme.colors.accent, Color3.fromRGB(8, 18, 34))
 		end
 	else
-		self.resultTitle.Text = "Nicht bestanden"
+		self.resultTitle.Text = I18n.t("hud.notPassed")
 		self.resultTitle.TextColor3 = Theme.colors.danger
 		self.resultPrimaryMode = "retry"
-		self.retryButton.Text = "Weiter bauen"
+		self.retryButton.Text = I18n.t("result.retry")
 		Theme.paint(self.retryButton, Theme.colors.accent, Color3.fromRGB(8, 18, 34))
 	end
-	self.resultReason.Text = result.reason or ""
+	self.resultReason.Text = I18n.message(result.reason)
 
 	if Device.isGamepad() then
 		GuiService.SelectedObject = self.retryButton
@@ -1433,7 +1469,7 @@ function BuildHud:applyScale()
 		Tacho und 272 fuer Tipp und Test zusammen - mehr, als das Geraet hat.
 		Der Tacho waere unter den Phasenknoepfen gelandet.
 	]]
-	local buttonsRight = 272
+	local buttonsRight = 388
 	local phaseCount = Config.Hydraulics.phaseCount + 1
 	local phaseWidth = if self.phaseBox.Visible then phaseCount * 58 + 12 else 0
 	local free = viewport.X - inset * 2 - phaseWidth - buttonsRight - gap * 2

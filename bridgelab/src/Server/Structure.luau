@@ -870,25 +870,32 @@ end
 
 --[[
 	Prueft, ob ein Bauteil gesetzt werden darf.
-	Gibt zurueck: erlaubt (boolean), Begruendung (string)
+
+	Gibt zurueck: erlaubt (boolean), Begruendung als MELDUNG (Tabelle oder nil)
+
+	Eine Meldung ist { key = "notice.tooLong", args = { ... } } - also ein
+	Schluessel und die einzusetzenden Werte, kein fertiger Satz. Der Server
+	kennt die Sprache des Spielers nicht und soll sie auch nicht kennen
+	muessen; uebersetzt wird erst beim Spieler (siehe I18n.luau). Dieselbe
+	Meldung erreicht so zwei Spieler in ihren jeweiligen Sprachen.
 
 	Diese Funktion ist die einzige Stelle, an der ueber Bauen entschieden wird.
 	Der Client prueft dasselbe noch einmal fuer die Vorschau, aber verlassen
 	tut sich der Server ausschliesslich auf diese Pruefung hier: was der
 	Client schickt, ist ein WUNSCH, keine Tatsache.
 ]]
-function Structure:canPlace(material: string, ax: number, ay: number, bx: number, by: number): (boolean, string)
+function Structure:canPlace(material: string, ax: number, ay: number, bx: number, by: number): (boolean, { key: string, args: { any }? }?)
 	local spec = Materials.get(material)
 	if not spec then
-		return false, "Unbekannter Baustoff."
+		return false, { key = "notice.unknownMaterial" }
 	end
 
 	if not self.level.allowsMaterial(material) then
-		return false, spec.displayName .. " ist in diesem Level gesperrt."
+		return false, { key = "notice.materialLocked", args = { Materials.nameKey(material) } }
 	end
 
 	if #self.members >= Config.Build.maxMembers then
-		return false, string.format("Mehr als %d Bauteile gehen nicht.", Config.Build.maxMembers)
+		return false, { key = "notice.tooManyMembers", args = { Config.Build.maxMembers } }
 	end
 
 	----------------------------------------------------------------------------
@@ -898,12 +905,12 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 	local grid = Config.Build.gridSize
 	for _, value in { ax, ay, bx, by } do
 		if math.abs(value - math.round(value / grid) * grid) > 0.01 then
-			return false, "Knoten muessen auf dem Raster liegen."
+			return false, { key = "notice.offGrid" }
 		end
 	end
 
 	if jointKey(ax, ay) == jointKey(bx, by) then
-		return false, "Anfang und Ende sind derselbe Punkt."
+		return false, { key = "notice.samePoint" }
 	end
 
 	----------------------------------------------------------------------------
@@ -912,10 +919,10 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 
 	local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
 	if length < spec.minLength - 0.01 then
-		return false, string.format("%s ist zu kurz (mindestens %d Studs).", spec.displayName, spec.minLength)
+		return false, { key = "notice.tooShort", args = { Materials.nameKey(material), spec.minLength } }
 	end
 	if length > spec.maxLength + 0.01 then
-		return false, string.format("%s ist zu lang (hoechstens %d Studs).", spec.displayName, spec.maxLength)
+		return false, { key = "notice.tooLong", args = { Materials.nameKey(material), spec.maxLength } }
 	end
 
 	----------------------------------------------------------------------------
@@ -939,7 +946,7 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 	end
 
 	if not insideArea(ax, ay) or not insideArea(bx, by) then
-		return false, "Ausserhalb des Baubereichs."
+		return false, { key = "notice.outsideArea" }
 	end
 
 	----------------------------------------------------------------------------
@@ -947,7 +954,7 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 	----------------------------------------------------------------------------
 
 	if Terrain.segmentBlocked(self.level.terrain, ax, ay, bx, by) then
-		return false, "Das Bauteil laeuft durch den Felsen."
+		return false, { key = "notice.throughRock" }
 	end
 
 	----------------------------------------------------------------------------
@@ -966,7 +973,7 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 		local sameEnds = (member.keyA == keyA and member.keyB == keyB)
 			or (member.keyA == keyB and member.keyB == keyA)
 		if sameEnds and member.material == material then
-			return false, "Hier liegt schon " .. spec.displayName .. "."
+			return false, { key = "notice.duplicate", args = { Materials.nameKey(material) } }
 		end
 	end
 
@@ -976,10 +983,10 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 
 	local cost = Materials.cost(material, length)
 	if self:usedBudget() + cost > self.level.budget then
-		return false, string.format("Das Budget reicht nicht (%d noetig, %d uebrig).", cost, self:remainingBudget())
+		return false, { key = "notice.noBudget", args = { cost, self:remainingBudget() } }
 	end
 
-	return true, ""
+	return true, nil
 end
 
 function Structure:place(material: string, ax: number, ay: number, bx: number, by: number, phase: number?)

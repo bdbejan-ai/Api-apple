@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
 local Levels = require(Shared.Levels)
+local I18n = require(Shared.I18n)
 
 local Device = require(script.Parent.Device)
 local Theme = require(script.Parent.Theme)
@@ -102,7 +103,7 @@ function LevelSelectGui:build()
 	local title = Theme.label(header, "Title", {
 		size = UDim2.new(1, -48, 0, 46),
 		position = UDim2.fromOffset(28, 22),
-		text = "BridgeLab",
+		text = I18n.t("app.title"),
 		textSize = 38,
 		bold = true,
 	})
@@ -119,7 +120,7 @@ function LevelSelectGui:build()
 	Theme.label(header, "Subtitle", {
 		size = UDim2.new(1, -48, 0, 22),
 		position = UDim2.fromOffset(30, 66),
-		text = "Baue eine Bruecke, die haelt. Waehle ein Level.",
+		text = I18n.t("app.subtitle"),
 		textSize = 15,
 		color = Theme.colors.textDim,
 	})
@@ -145,7 +146,7 @@ function LevelSelectGui:build()
 	local tutorialButton = Theme.button(header, "TutorialButton", {
 		size = UDim2.fromOffset(210, 38),
 		position = UDim2.new(1, -238, 0, 62),
-		text = "Anleitung ansehen",
+		text = I18n.t("menu.howTo"),
 		textSize = 14,
 		color = Theme.colors.panelLight,
 	})
@@ -444,7 +445,7 @@ function LevelSelectGui:createCard(summary)
 	Theme.label(card, "Number", {
 		size = UDim2.new(1, -160, 0, 14),
 		position = UDim2.fromOffset(142, 16),
-		text = string.format("%s · LEVEL %d", string.upper(summary.world or ""), summary.order),
+		text = I18n.t("menu.levelNumber", string.upper(I18n.t("world." .. (summary.world or ""))), summary.order),
 		textSize = 11,
 		bold = true,
 		color = worldColor,
@@ -453,7 +454,7 @@ function LevelSelectGui:createCard(summary)
 	Theme.label(card, "Name", {
 		size = UDim2.new(1, -160, 0, 26),
 		position = UDim2.fromOffset(142, 30),
-		text = summary.displayName,
+		text = I18n.t(summary.nameKey),
 		textSize = 20,
 		bold = true,
 	})
@@ -461,7 +462,7 @@ function LevelSelectGui:createCard(summary)
 	Theme.label(card, "Subtitle", {
 		size = UDim2.new(1, -166, 0, 32),
 		position = UDim2.fromOffset(142, 55),
-		text = summary.subtitle,
+		text = I18n.t(summary.subtitleKey),
 		textSize = 12,
 		color = Theme.colors.textDim,
 		wrapped = true,
@@ -490,7 +491,7 @@ function LevelSelectGui:createCard(summary)
 	Theme.label(card, "DifficultyText", {
 		size = UDim2.fromOffset(120, 16),
 		position = UDim2.new(1, -134, 0, 28),
-		text = info.label,
+		text = I18n.t("difficulty." .. math.clamp(summary.difficulty, 1, 5)),
 		textSize = 11,
 		bold = true,
 		color = info.color,
@@ -502,9 +503,9 @@ function LevelSelectGui:createCard(summary)
 	----------------------------------------------------------------------------
 
 	local x = 142
-	chip(card, "Budget", string.format("Budget %d", summary.budget), x, Theme.colors.text)
+	chip(card, "Budget", I18n.t("menu.budget", summary.budget), x, Theme.colors.text)
 	x += 92
-	chip(card, "Span", string.format("%d Studs", summary.span), x, Theme.colors.text)
+	chip(card, "Span", I18n.t("common.studs", summary.span), x, Theme.colors.text)
 	x += 78
 
 	--[[
@@ -512,28 +513,28 @@ function LevelSelectGui:createCard(summary)
 		Angabe: mit zwei Ankern muss die ganze Spannweite frei getragen
 		werden, mit vieren gibt es Pfeiler oder Vorspruenge zum Abstuetzen.
 	]]
-	chip(card, "Anchors", string.format("%d Anker", summary.anchorCount), x, Theme.colors.text)
+	chip(card, "Anchors", I18n.t("menu.anchors", summary.anchorCount), x, Theme.colors.text)
 	x += 76
 
 	-- Besonderheiten deutlich hervorheben
 	if summary.requiresJump then
-		chip(card, "Jump", "Sprung", x, Theme.colors.warning)
+		chip(card, "Jump", I18n.t("menu.badge.jump"), x, Theme.colors.warning)
 		x += 72
 	elseif summary.hasBoat then
-		chip(card, "Boat", "Schiff muss durch", x, Theme.colors.warning)
+		chip(card, "Boat", I18n.t("menu.badge.boatLong"), x, Theme.colors.warning)
 		x += 116
 	elseif summary.hasHydraulics then
-		chip(card, "Hydraulics", "Hydraulik", x, Theme.colors.warning)
+		chip(card, "Hydraulics", I18n.t("menu.badge.hydraulics"), x, Theme.colors.warning)
 		x += 84
 	elseif summary.vehicleCount > 1 then
-		chip(card, "Traffic", string.format("%d Fahrzeuge", summary.vehicleCount), x, Theme.colors.warning)
+		chip(card, "Traffic", I18n.t("menu.badge.vehicles", summary.vehicleCount), x, Theme.colors.warning)
 		x += 100
 	end
 
 	if summary.freeHints > 0 then
-		chip(card, "Hints", "1 Tipp gratis", x, Theme.colors.textDim)
+		chip(card, "Hints", I18n.t("menu.freeHint"), x, Theme.colors.textDim)
 	else
-		chip(card, "Hints", "Tipps ab Robux", x, Theme.colors.robux)
+		chip(card, "Hints", I18n.t("menu.paidHints"), x, Theme.colors.robux)
 	end
 
 	----------------------------------------------------------------------------
@@ -558,7 +559,7 @@ function LevelSelectGui:createCard(summary)
 
 	Theme.label(done, "Text", {
 		size = UDim2.fromScale(1, 1),
-		text = "✓ geschafft",
+		text = "✓ " .. I18n.t("menu.done"),
 		textSize = 13,
 		bold = true,
 		color = Color3.fromRGB(10, 34, 18),

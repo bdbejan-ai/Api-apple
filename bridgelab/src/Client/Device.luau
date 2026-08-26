@@ -17,6 +17,10 @@
 local GuiService = game:GetService("GuiService")
 local UserInputService = game:GetService("UserInputService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
+local I18n = require(Shared.I18n)
+
 local Device = {}
 
 -- Einfaches Signal, damit sich andere Skripte anmelden koennen.
@@ -149,63 +153,24 @@ end
 --[[
 	Gibt fuer eine Spielaktion den passenden Text zurueck.
 	Damit muss die Anleitung nicht selbst zwischen den Geraeten unterscheiden.
+
+	Die Saetze stehen in I18n.luau unter "action.<aktion>.<geraet>", also etwa
+	"action.pan.Touch". Hier steht nur noch, wie der Schluessel gebaut wird.
 ]]
 function Device.actionText(action: string): string
-	local kind = Device.kind
+	local key = string.format("action.%s.%s", action, Device.kind)
+	local text = I18n.t(key)
 
-	local texts = {
-		select = {
-			Desktop = "klicke mit der linken Maustaste",
-			Touch = "tippe kurz",
-			Gamepad = "druecke A",
-		},
-		cancel = {
-			Desktop = "klicke mit der rechten Maustaste",
-			Touch = "tippe auf den Abbrechen-Knopf",
-			Gamepad = "druecke B",
-		},
-		remove = {
-			Desktop = "klicke mit der rechten Maustaste auf ein Bauteil",
-			Touch = "waehle den Abriss-Knopf und tippe auf ein Bauteil",
-			Gamepad = "druecke X und waehle ein Bauteil",
-		},
-		pan = {
-			Desktop = "halte die rechte Maustaste gedrueckt und ziehe",
-			Touch = "ziehe mit ZWEI Fingern",
-			Gamepad = "bewege den rechten Stick",
-		},
-		zoom = {
-			Desktop = "drehe am Mausrad",
-			Touch = "ziehe zwei Finger auseinander oder zusammen",
-			Gamepad = "druecke die Schultertasten LT und RT",
-		},
-		pointer = {
-			Desktop = "der Mauszeiger",
-			Touch = "dein Finger",
-			Gamepad = "der Zeiger (linker Stick)",
-		},
-		--[[
-			Gebaut wird durch Ziehen. Auf jedem Geraet heisst das etwas
-			anderes, und genau deshalb steht es hier und nicht in der
-			Anleitung: dort waere sonst dreimal dieselbe Fallunterscheidung.
-		]]
-		dragStart = {
-			Desktop = "halte die linke Maustaste gedrueckt",
-			Touch = "lege einen Finger auf",
-			Gamepad = "halte A gedrueckt",
-		},
-		dragEnd = {
-			Desktop = "lass die Maustaste los",
-			Touch = "hebe den Finger",
-			Gamepad = "lass A los",
-		},
-	}
-
-	local entry = texts[action]
-	if not entry then
-		return ""
+	--[[
+		Kennt I18n den Schluessel nicht, gibt es ihn selbst zurueck. Fuer ein
+		unbekanntes Geraet greifen wir dann auf die Maus-Beschreibung zurueck -
+		die ist immerhin verstaendlich, waehrend "action.pan.Xbox" mitten im
+		Satz nur verwirren wuerde.
+	]]
+	if text == key then
+		return I18n.t(string.format("action.%s.Desktop", action))
 	end
-	return entry[kind] or entry.Desktop
+	return text
 end
 
 return Device

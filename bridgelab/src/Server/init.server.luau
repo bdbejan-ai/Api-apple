@@ -202,7 +202,7 @@ remote.SelectLevel.OnServerEvent:Connect(function(player, levelId)
 
 	local level = Levels.get(levelId)
 	if not level then
-		remote.Notice:FireClient(player, "Dieses Level gibt es nicht.")
+		remote.Notice:FireClient(player, { key = "notice.unknownLevel" })
 		return
 	end
 
@@ -211,7 +211,7 @@ remote.SelectLevel.OnServerEvent:Connect(function(player, levelId)
 
 	local slot = takeSlot(player)
 	if not slot then
-		remote.Notice:FireClient(player, "Gerade sind alle Bauplaetze belegt. Bitte kurz warten.")
+		remote.Notice:FireClient(player, { key = "notice.arenaFull" })
 		return
 	end
 
@@ -296,7 +296,7 @@ remote.PlaceMember.OnServerEvent:Connect(function(player, material, ax, ay, bx, 
 
 	local ok, reason, hint =
 		arena:placeMember(material, snap(ax), snap(ay), snap(bx), snap(by), wantedPhase)
-	if not ok and reason ~= "" then
+	if not ok and reason then
 		remote.Notice:FireClient(player, reason)
 	elseif ok and hint then
 		-- Gebaut ja, aber es bringt so nichts: kurz Bescheid sagen.
@@ -317,7 +317,7 @@ remote.RemoveMember.OnServerEvent:Connect(function(player, memberId)
 	end
 
 	local ok, reason = arena:removeMember(math.floor(memberId))
-	if not ok and reason ~= "" then
+	if not ok and reason then
 		remote.Notice:FireClient(player, reason)
 	end
 end)
@@ -344,7 +344,7 @@ remote.SetPhase.OnServerEvent:Connect(function(player, phase)
 	end
 
 	local ok, reason = arena:setPhase(phase)
-	if not ok and reason ~= "" then
+	if not ok and reason then
 		remote.Notice:FireClient(player, reason)
 	end
 end)
@@ -380,7 +380,7 @@ remote.StartTest.OnServerEvent:Connect(function(player, speed)
 		end)
 	end)
 
-	if not ok and reason ~= "" then
+	if not ok and reason then
 		remote.Notice:FireClient(player, reason)
 	end
 end)

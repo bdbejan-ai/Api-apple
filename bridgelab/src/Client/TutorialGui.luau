@@ -26,6 +26,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
+local I18n = require(Shared.I18n)
+
 local Device = require(script.Parent.Device)
 local Theme = require(script.Parent.Theme)
 
@@ -46,27 +50,26 @@ TutorialGui.__index = TutorialGui
 	  highlight  Name des Bedienelements, das hervorgehoben werden soll
 	  allowSkip  true = "Ueberspringen"-Knopf anzeigen
 ]]
+--[[
+	Die Texte stehen in I18n.luau, hier stehen nur die SCHLUESSEL. Dadurch
+	laesst sich die Anleitung uebersetzen, ohne diese Datei anzufassen - und
+	die Reihenfolge der Schritte bleibt auf einen Blick lesbar.
+
+	"args" ist eine Funktion, die die Werte fuer die Platzhalter liefert.
+	Sie wird erst beim Anzeigen aufgerufen, weil die Bedientexte vom GERAET
+	abhaengen und sich mitten im Spiel aendern koennen.
+]]
 local STEPS = {
 	{
-		title = "Willkommen bei BridgeLab",
-		text = function()
-			return "Du baust eine Bruecke ueber eine Luecke. Danach faehrt ein schweres "
-				.. "Fahrzeug darueber. Haelt die Bruecke, hast du gewonnen.\n\n"
-				.. "Diese Anleitung fuehrt dich einmal durch alles. Sie dauert etwa eine Minute."
-		end,
+		key = "tut.welcome",
 		mode = "button",
 		allowSkip = true,
 	},
 
 	{
-		title = "Die Ansicht bewegen",
-		text = function()
-			return "Du siehst die Bruecke von der Seite, wie ein Bild.\n\n"
-				.. "Zum Verschieben: "
-				.. Device.actionText("pan")
-				.. ".\nZum Vergroessern: "
-				.. Device.actionText("zoom")
-				.. ".\n\nProbier es einmal aus."
+		key = "tut.camera",
+		args = function()
+			return Device.actionText("pan"), Device.actionText("zoom")
 		end,
 		mode = "event",
 		event = "cameraMoved",
@@ -74,14 +77,7 @@ local STEPS = {
 	},
 
 	{
-		title = "Einen Baustoff auswaehlen",
-		text = function()
-			return "Links stehen deine Baustoffe.\n\n"
-				.. "Die STRASSE ist der wichtigste: nur auf ihr kann das Fahrzeug fahren. "
-				.. "Alles andere ist Tragwerk, das die Strasse haelt.\n\n"
-				.. "Anders als frueher kostet jedes Bauteil nach LAENGE - ein langer Balken "
-				.. "kostet mehr als ein kurzer.\n\nWaehle jetzt die Strasse aus."
-		end,
+		key = "tut.material",
 		mode = "event",
 		event = "materialSelected",
 		check = function(payload)
@@ -91,77 +87,50 @@ local STEPS = {
 	},
 
 	{
-		title = "Bauen heisst ziehen",
-		text = function()
-			return "Du baust frei auf einem Raster - nicht zwischen festen Punkten.\n\n"
-				.. "GOLDENE Kugeln sind Anker: nur dort gibt deine Bruecke Last an den Boden ab. "
-				.. "Alles dazwischen muss sie selbst tragen.\n\n"
-				.. Device.actionText("dragStart")
-				.. " an einem Anker und ziehe zur Seite. Die Vorschau folgt mit."
+		key = "tut.drag",
+		args = function()
+			return Device.actionText("dragStart")
 		end,
 		mode = "event",
 		event = "dragStarted",
 	},
 
 	{
-		title = "Loslassen setzt das Bauteil",
-		text = function()
-			return "Waehrend du ziehst, siehst du eine Vorschaulinie.\n\n"
-				.. "GRUEN heisst: so darf gebaut werden.\n"
-				.. "ROT heisst: zu lang, zu kurz, durch den Felsen, oder das Budget reicht nicht.\n\n"
-				.. "Lass los, wenn die Linie gruen ist - dann entsteht das Bauteil."
-		end,
+		key = "tut.place",
 		mode = "event",
 		event = "memberPlaced",
 	},
 
 	{
-		title = "Budget und Farben",
-		text = function()
-			return "Oben siehst du dein Budget. Jedes Bauteil kostet - ist das Budget leer, geht nichts mehr.\n\n"
-				.. "Die Bauteile faerben sich nach ihrer Belastung:\n"
-				.. "GRUEN = viel Reserve\nGELB = wird eng\nROT = kurz vor dem Bruch\n\n"
-				.. "Falsch gebaut? Mit "
-				.. Device.actionText("remove")
-				.. " kannst du es wieder entfernen. Das Geld bekommst du zurueck."
+		key = "tut.budget",
+		args = function()
+			return Device.actionText("remove")
 		end,
 		mode = "button",
 	},
 
 	{
-		title = "Wenn du nicht weiterkommst",
-		text = function()
-			return "In der Fussleiste gibt es den Knopf TIPP.\n\n"
-				.. "In den leichten Levels ist der erste Tipp gratis, jeder weitere kostet Robux.\n"
-				.. "In den schweren Levels kostet schon der erste Tipp Robux.\n\n"
-				.. "Du brauchst nie einen Tipp zu kaufen - jedes Level ist auch ohne loesbar."
-		end,
+		key = "tut.blueprint",
+		mode = "event",
+		event = "blueprintShown",
+		highlight = "BlueprintButton",
+		allowSkip = true,
+	},
+
+	{
+		key = "tut.hint",
 		mode = "button",
 		highlight = "HintButton",
 	},
 
 	{
-		title = "Das Tempo bestimmst du",
-		text = function()
-			return "In der Fussleiste sitzt der Tacho. Damit stellst du ein, wie schnell "
-				.. "das Fahrzeug faehrt - von 1 bis 14 Studs pro Sekunde.\n\n"
-				.. "LANGSAM ist zum Lernen besser: du siehst in Ruhe, welches Bauteil rot wird.\n"
-				.. "SCHNELL geht zackiger, das Fahrzeug schlaegt aber haerter auf.\n\n"
-				.. "Du darfst ihn auch mitten in der Fahrt noch verstellen. Zeit verlierst du "
-				.. "durch langsames Fahren nicht - das Zeitlimit passt sich an."
-		end,
+		key = "tut.speed",
 		mode = "button",
 		highlight = "SpeedPanel",
 	},
 
 	{
-		title = "Der Belastungstest",
-		text = function()
-			return "Wenn du fertig bist, druecke TEST STARTEN.\n\n"
-				.. "Ueber jedem Bauteil siehst du dann, wie stark es gerade belastet ist - "
-				.. "in Prozent und in Newton. Gruen heisst viel Reserve, rot heisst: es reisst gleich.\n\n"
-				.. "Starte jetzt einen Test. Es macht nichts, wenn die Bruecke noch nicht haelt."
-		end,
+		key = "tut.test",
 		mode = "event",
 		event = "testStarted",
 		highlight = "TestButton",
@@ -169,16 +138,7 @@ local STEPS = {
 	},
 
 	{
-		title = "Das war alles",
-		text = function()
-			return "Du kennst jetzt alles Wichtige. Drei Saetze helfen dir durch das ganze Spiel:\n\n"
-				.. "DREIECKE sind stabil, Vierecke kippen um. Das ist der wichtigste Satz "
-				.. "im ganzen Brueckenbau.\n\n"
-				.. "Bricht die STRASSE, lege ein zweites Bauteil daneben - genau auf dieselben "
-				.. "beiden Punkte. Beide teilen sich dann die Kraft.\n\n"
-				.. "Ist die Bruecke zu weit gespannt, baue sie HOEHER. Je hoeher das Fachwerk, "
-				.. "desto weniger Kraft steckt in seinen Gurten.\n\nViel Erfolg!"
-		end,
+		key = "tut.done",
 		mode = "button",
 	},
 }
@@ -304,7 +264,7 @@ function TutorialGui:build()
 	local nextButton = Theme.button(panel, "Next", {
 		size = UDim2.fromOffset(150, 40),
 		position = UDim2.new(1, -168, 1, -54),
-		text = "Weiter",
+		text = I18n.t("common.continue"),
 		textSize = 15,
 		color = Theme.colors.accent,
 		textColor = Color3.fromRGB(8, 18, 34),
@@ -318,7 +278,7 @@ function TutorialGui:build()
 	local skipButton = Theme.button(panel, "Skip", {
 		size = UDim2.fromOffset(140, 40),
 		position = UDim2.new(0, 18, 1, -54),
-		text = "Ueberspringen",
+		text = I18n.t("common.skip"),
 		textSize = 13,
 		color = Theme.colors.panelLight,
 		textColor = Theme.colors.textDim,
@@ -442,8 +402,17 @@ function TutorialGui:renderStep()
 	end
 
 	self.stepLabel.Text = string.format("Schritt %d von %d", self.stepIndex, #STEPS)
-	self.titleLabel.Text = step.title
-	self.textLabel.Text = step.text()
+	--[[
+		Uebersetzt wird erst hier, beim Anzeigen. Die Werte fuer die
+		Platzhalter liefert step.args - sie haengen vom Geraet ab und koennen
+		sich mitten im Spiel aendern, wenn jemand von Maus auf Touch wechselt.
+	]]
+	self.titleLabel.Text = I18n.t(step.key .. ".title")
+	if step.args then
+		self.textLabel.Text = I18n.t(step.key .. ".text", step.args())
+	else
+		self.textLabel.Text = I18n.t(step.key .. ".text")
+	end
 
 	self:setHighlight(step.highlight)
 
@@ -451,9 +420,9 @@ function TutorialGui:renderStep()
 		self.nextButton.Visible = true
 		self.waitLabel.Text = ""
 		if self.stepIndex >= #STEPS then
-			self.nextButton.Text = "Los geht's"
+			self.nextButton.Text = I18n.t("tut.start")
 		else
-			self.nextButton.Text = "Weiter"
+			self.nextButton.Text = I18n.t("common.continue")
 		end
 		if Device.isGamepad() then
 			GuiService.SelectedObject = self.nextButton
@@ -461,7 +430,7 @@ function TutorialGui:renderStep()
 	else
 		-- Auf eine echte Aktion warten: kein Weiter-Knopf.
 		self.nextButton.Visible = false
-		self.waitLabel.Text = "▸ Probiere es aus, dann geht es weiter"
+		self.waitLabel.Text = I18n.t("tut.tryIt")
 	end
 
 	self.skipButton.Visible = step.allowSkip == true or step.mode == "event"

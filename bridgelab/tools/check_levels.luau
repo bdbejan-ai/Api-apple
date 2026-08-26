@@ -19,6 +19,13 @@
 ]]
 
 local Levels = require("../src/Shared/Levels")
+--[[
+	I18n liefert die Levelnamen. Das Modul kommt bewusst ohne Roblox aus -
+	es enthaelt nur Zeichenketten -, deshalb laesst es sich hier einlesen und
+	die Ausgabe zeigt echte Namen statt blosser Nummern.
+]]
+local I18n = require("../src/Shared/I18n")
+I18n.setLanguage("de")
 local Terrain = require("../src/Shared/Terrain")
 local TrussSolver = require("../src/Shared/TrussSolver")
 
@@ -992,7 +999,7 @@ for _, level in Levels.list do
 
 	print(string.format(
 		"\n%s  %s\n   Budget %d   Spannweite %d   Anker %d   Fahrzeuge %d",
-		level.id, level.displayName, level.budget, span, #level.anchors, #level.vehicles
+		level.id, I18n.t(level.nameKey), level.budget, span, #level.anchors, #level.vehicles
 	))
 
 	--[[

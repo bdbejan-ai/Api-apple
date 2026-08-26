@@ -232,7 +232,10 @@ level_fields = set(re.findall(r"^\s*(\w+)\s*=", levels_text, re.M))
 level_fields |= set(re.findall(r"level\.(\w+)\s*=", levels_text))
 level_fields |= set(re.findall(r"function level\.(\w+)", levels_text))
 
-for path in list((SRC / "Server").rglob("*.luau")) + list((SRC / "Client").rglob("*.luau")):
+# Nur SERVER-Dateien: dort ist "level" wirklich ein Eintrag aus Levels.luau.
+# Der Client bekommt eine eigens zusammengestellte Tabelle mit anderen Feldern
+# (etwa der Bauvorlage), und die hier mitzupruefen gaebe nur Fehlalarm.
+for path in (SRC / "Server").rglob("*.luau"):
     text = path.read_text(encoding="utf-8")
     seen = set()
     for m in re.finditer(r"\b(?:self\.)?level\.(\w+)", text):
@@ -295,6 +298,81 @@ for m in re.finditer(r"^\t(\w+)\s*=", config_text, re.M):
     key = m.group(1)
     if key not in other:
         note(f'Config: "{key}" wird nirgends benutzt')
+
+# --- 8b: Sprachschluessel -----------------------------------------------------
+
+# Steht im Code ein Schluessel, den I18n nicht kennt, zeigt das Spiel den
+# Schluessel selbst an - also "hud.budget" statt "Budget 12 / 800". Das ist
+# Absicht (ein leeres Feld faellt niemandem auf), aber es soll natuerlich nie
+# vorkommen. Deshalb wird hier verglichen.
+i18n_text = (SRC / "Shared" / "I18n.luau").read_text(encoding="utf-8")
+
+defined = {}
+for m in re.finditer(r'^add\("([^"]+)",\s*\n?\s*"((?:[^"\\]|\\.)*)",\s*\n?\s*"((?:[^"\\]|\\.)*)"\)',
+                     i18n_text, re.M):
+    defined[m.group(1)] = (m.group(2), m.group(3))
+
+# Auch die einzeiligen Eintraege einsammeln.
+for m in re.finditer(r'^add\("([^"]+)"', i18n_text, re.M):
+    defined.setdefault(m.group(1), None)
+
+used = set()
+for path in SRC.rglob("*.luau"):
+    if path.name in ("I18n.luau", "TutorialGui.luau"):
+        continue
+    text = path.read_text(encoding="utf-8")
+    used |= set(re.findall(r'I18n\.t\("([^"]+)"', text))
+    used |= set(re.findall(r'key = "([a-z][\w.]*\.[\w.]+)"', text))
+
+# Schluessel, die zur Laufzeit zusammengesetzt werden ("world." .. name), enden
+# im Quelltext auf einem Punkt. Die lassen sich so nicht pruefen.
+used = {key for key in used if not key.endswith(".")}
+
+for key in sorted(used - set(defined)):
+    note(f'Sprachschluessel "{key}" wird benutzt, steht aber nicht in I18n.luau')
+
+# Die Anleitung haengt an ihren Schluessel ".title" und ".text" an.
+tutorial_text = (SRC / "Client" / "TutorialGui.luau").read_text(encoding="utf-8")
+for base in sorted(set(re.findall(r'key = "(tut\.\w+)"', tutorial_text))):
+    for suffix in ("title", "text"):
+        if f"{base}.{suffix}" not in defined:
+            note(f'Anleitung: "{base}.{suffix}" fehlt in I18n.luau')
+
+# Jede Welt, die in den Leveldaten vorkommt, braucht einen Namen.
+for world in sorted(set(re.findall(r'world = "([^"]+)"', levels_text))):
+    if f"world.{world}" not in defined:
+        note(f'Welt "{world}" hat keinen Namen in I18n.luau ("world.{world}")')
+
+# Ebenso die fuenf Schwierigkeitsgrade.
+for level in range(1, 6):
+    if f"difficulty.{level}" not in defined:
+        note(f'Schwierigkeitsgrad {level} fehlt in I18n.luau ("difficulty.{level}")')
+
+# Zusammengesetzte Schluessel ("difficulty." .. n) lassen sich nicht so pruefen.
+# Deshalb die bekannten Familien einzeln nachsehen.
+for level_id in re.findall(r'id = "(\w+)"', levels_text):
+    for suffix in ("name", "subtitle"):
+        key = f"level.{level_id}.{suffix}"
+        if key not in defined:
+            note(f'Level {level_id}: "{key}" fehlt in I18n.luau')
+
+# Zu jedem Level so viele Tipptexte wie hintCount.
+for m in re.finditer(r'id = "(\w+)"(.*?)hintCount = (\d+)', levels_text, re.S):
+    level_id, count = m.group(1), int(m.group(3))
+    for index in range(1, count + 1):
+        key = f"level.{level_id}.hint{index}"
+        if key not in defined:
+            note(f'Level {level_id}: Tipp {index} fehlt in I18n.luau ("{key}")')
+
+# Beide Sprachen muessen dieselben Platzhalter haben, sonst stehen die Werte
+# in einer Sprache an der falschen Stelle - oder es kracht beim Einsetzen.
+for key, pair in defined.items():
+    if not pair:
+        continue
+    de_slots = sorted(re.findall(r"%[-+ #0]*[\d.]*([a-zA-Z%])", pair[0]))
+    en_slots = sorted(re.findall(r"%[-+ #0]*[\d.]*([a-zA-Z%])", pair[1]))
+    if de_slots != en_slots:
+        note(f'Sprachschluessel "{key}": Platzhalter unterscheiden sich (de {de_slots}, en {en_slots})')
 
 # --- 9: unbekannte Namen (luau-analyze) ---------------------------------------
 

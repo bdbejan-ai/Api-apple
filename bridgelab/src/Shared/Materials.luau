@@ -51,8 +51,6 @@ Materials.list = {
 
 	Road = {
 		key = "Road",
-		displayName = "Strasse",
-		description = "Befahrbar. Die Fahrbahn muss durchgehend daraus bestehen.",
 		maxTension = 500,
 		maxCompression = 500,
 		costPerStud = 8,
@@ -74,8 +72,6 @@ Materials.list = {
 
 	ReinforcedRoad = {
 		key = "ReinforcedRoad",
-		displayName = "Verstaerkte Strasse",
-		description = "Befahrbar und doppelt so tragfaehig, aber fast doppelt so teuer.",
 		maxTension = 1000,
 		maxCompression = 1000,
 		costPerStud = 14,
@@ -101,8 +97,6 @@ Materials.list = {
 
 	Wood = {
 		key = "Wood",
-		displayName = "Holz",
-		description = "Billig und leicht. Der Grundbaustoff fuer Fachwerke.",
 		maxTension = 550,
 		maxCompression = 550,
 		costPerStud = 5,
@@ -124,8 +118,6 @@ Materials.list = {
 
 	Steel = {
 		key = "Steel",
-		displayName = "Stahl",
-		description = "Sehr tragfaehig und weit spannend. Das Rueckgrat grosser Bruecken.",
 		maxTension = 1200,
 		maxCompression = 1200,
 		costPerStud = 10,
@@ -151,8 +143,6 @@ Materials.list = {
 
 	Rope = {
 		key = "Rope",
-		displayName = "Seil",
-		description = "Kann nur ziehen, nie druecken. Sehr billig und sehr weit.",
 		maxTension = 300,
 		maxCompression = 0,
 		costPerStud = 2,
@@ -174,8 +164,6 @@ Materials.list = {
 
 	Cable = {
 		key = "Cable",
-		displayName = "Kabel",
-		description = "Stahlseil. Zieht fast dreimal so stark wie ein Seil.",
 		maxTension = 800,
 		maxCompression = 0,
 		costPerStud = 5,
@@ -201,8 +189,6 @@ Materials.list = {
 
 	Hydraulic = {
 		key = "Hydraulic",
-		displayName = "Hydraulik",
-		description = "Faehrt in seiner Phase aus und hebt dabei alles daran. Teuer.",
 		maxTension = 900,
 		maxCompression = 900,
 		costPerStud = 25,
@@ -237,6 +223,21 @@ Materials.order = {
 --------------------------------------------------------------------------------
 -- Zugriff
 --------------------------------------------------------------------------------
+
+--[[
+	Name und Beschreibung stehen nicht hier, sondern in I18n.luau - einmal
+	auf Deutsch und einmal auf Englisch. Hier entstehen nur die Schluessel.
+
+	Der Server braucht die Sprache des Spielers damit gar nicht zu kennen: er
+	schickt "material.Steel.name", und uebersetzt wird erst beim Spieler.
+]]
+function Materials.nameKey(key: string): string
+	return "material." .. key .. ".name"
+end
+
+function Materials.infoKey(key: string): string
+	return "material." .. key .. ".info"
+end
 
 function Materials.get(key: string)
 	return Materials.list[key]

@@ -110,6 +110,8 @@ function BuildController.new()
 
 	self.memberFolder = nil
 	self.level = nil -- Baubereich, Anker, Gelaende - kommt vom Server
+	self.blueprintParts = {} -- die eingeblendete Bauvorlage
+	self.blueprintVisible = false
 	self.origin = Vector3.zero
 	self.budgetLeft = 0
 
@@ -256,6 +258,8 @@ end
 	ausschliesslich Anzeige.
 ]]
 function BuildController:setLevel(info, originY: number)
+	self:clearBlueprint()
+	self.blueprintVisible = false
 	self.level = info
 	self.origin = Vector3.new(0, originY or 0, 0)
 	self:cancelDrag()
@@ -278,6 +282,8 @@ function BuildController:setEnabled(enabled: boolean)
 		-- Halbe Gesten nicht ueber den Levelwechsel hinweg mitschleppen.
 		self.activeTouch = nil
 		self.touchCount = 0
+		self:clearBlueprint()
+		self.blueprintVisible = false
 	end
 	self.cursorGui.Enabled = enabled and Device.isGamepad()
 end
@@ -304,6 +310,73 @@ function BuildController:hideMarkers()
 	self.preview.Transparency = 1
 	self.weakMarker.Transparency = 1
 	self.removeHighlight.Adornee = nil
+end
+
+--------------------------------------------------------------------------------
+-- Bauvorlage
+--------------------------------------------------------------------------------
+
+--[[
+	Blendet die Bauvorlage ein oder aus - eine blasse Zeichnung eines
+	gewoehnlichen Fachwerks, passend zu diesem Level (siehe Blueprint.luau).
+
+	Sie liegt nur da. Gebaut wird nichts davon von selbst: der Spieler zieht
+	jedes Bauteil weiterhin selbst, und die Vorlage zeigt ihm nur, wohin.
+
+	Die Teile sind bewusst duenn und halbdurchsichtig. Eine kraeftige Vorlage
+	waere von einer echten Bruecke kaum zu unterscheiden, und man wuesste
+	nicht mehr, was man schon gebaut hat.
+]]
+function BuildController:setBlueprintVisible(visible: boolean)
+	self:clearBlueprint()
+	self.blueprintVisible = visible
+
+	if not visible or not self.level or not self.level.blueprint then
+		return
+	end
+
+	for index, segment in self.level.blueprint do
+		local from = self:toWorld(segment.ax, segment.ay)
+		local to = self:toWorld(segment.bx, segment.by)
+		local delta = to - from
+		local length = delta.Magnitude
+		if length < 0.05 then
+			continue
+		end
+
+		local spec = Materials.get(segment.material)
+		local part = Instance.new("Part")
+		part.Name = "Vorlage_" .. index
+		part.Size = Vector3.new(0.35, 0.35, length)
+		-- Bei senkrechten Teilen taugt (0,1,0) nicht als Hilfsvektor.
+		local up = if math.abs(delta.Unit.Y) > 0.999 then Vector3.new(0, 0, 1) else Vector3.new(0, 1, 0)
+		part.CFrame = CFrame.lookAt(from + delta / 2, to, up)
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.Material = Enum.Material.Neon
+		part.Color = if spec then spec.uiColor else Color3.fromRGB(200, 210, 230)
+		part.Transparency = 0.62
+		part.Parent = workspace
+		table.insert(self.blueprintParts, part)
+	end
+end
+
+function BuildController:clearBlueprint()
+	for _, part in self.blueprintParts do
+		part:Destroy()
+	end
+	self.blueprintParts = {}
+end
+
+function BuildController:toggleBlueprint(): boolean
+	self:setBlueprintVisible(not self.blueprintVisible)
+	return self.blueprintVisible
+end
+
+function BuildController:hasBlueprint(): boolean
+	return self.level ~= nil and self.level.blueprint ~= nil
 end
 
 --------------------------------------------------------------------------------

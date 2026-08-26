@@ -23,6 +23,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local I18n = require(Shared.I18n)
 
 local Device = require(script.Device)
 local Theme = require(script.Theme)
@@ -33,6 +34,47 @@ local BuildHud = require(script.BuildHud)
 local TutorialGui = require(script.TutorialGui)
 
 local player = Players.LocalPlayer
+
+--------------------------------------------------------------------------------
+-- Sprache bestimmen
+--------------------------------------------------------------------------------
+
+--[[
+	Roblox sagt uns, welche Sprache der Spieler eingestellt hat - etwa "de-de"
+	oder "pt-br". Kennen wir sie, wird sie genommen; sonst Englisch, weil damit
+	die meisten wenigstens zurechtkommen.
+
+	Das passiert ganz am Anfang, VOR dem Aufbau der Fenster: die bauen ihre
+	Beschriftungen beim Erzeugen ein, und was einmal drinsteht, wird nicht
+	nachtraeglich uebersetzt.
+]]
+local function detectLanguage()
+	--[[
+		Zwei Quellen, weil sie nicht immer dasselbe sagen: LocaleId ist die
+		Spracheinstellung des KONTOS, RobloxLocaleId die der App. Die des
+		Kontos passt besser zu dem, was der Spieler lesen moechte.
+
+		Beides in pcall, weil beides je nach Roblox-Version fehlen kann - und
+		eine fehlende Sprachangabe darf das Spiel nicht am Starten hindern.
+	]]
+	local ok, locale = pcall(function()
+		return player.LocaleId
+	end)
+	if ok and type(locale) == "string" and locale ~= "" then
+		I18n.setLanguage(locale)
+		return
+	end
+
+	local okService, serviceLocale = pcall(function()
+		return game:GetService("LocalizationService").RobloxLocaleId
+	end)
+	if okService then
+		I18n.setLanguage(serviceLocale)
+	end
+end
+
+detectLanguage()
+print(string.format("[BridgeLab] Sprache: %s", I18n.language()))
 
 --------------------------------------------------------------------------------
 -- Notfallmeldung, falls der Server nicht antwortet
@@ -219,10 +261,7 @@ local function enterLevel(state)
 				hier.
 			]]
 			warn("[BridgeLab] Arena nicht gefunden. Ist Workspace.StreamingEnabled aus?")
-			hud:showNotice(
-				"Die Bauflaeche konnte nicht geladen werden. Pruefe Workspace.StreamingEnabled.",
-				Theme.colors.danger
-			)
+			hud:showNotice(I18n.t("error.noArena"), Theme.colors.danger)
 			return
 		end
 		app.arenaFolder = folder
@@ -244,6 +283,7 @@ local function enterLevel(state)
 			anchors = info.anchors,
 			terrain = info.terrain,
 			materials = state.materials,
+			blueprint = info.blueprint,
 			z = info.z or 0,
 		}, state.originY or 0)
 		controller:setArena(folder)
@@ -255,6 +295,8 @@ local function enterLevel(state)
 		hud:setSelected(first)
 
 		camera:setArena(state.originY or 0, state.bounds, state.deckY or 40)
+		-- Bei Levels ohne Vorlage (dem Sprunglevel) verschwindet der Knopf.
+		hud:setBlueprintActive(false, controller:hasBlueprint())
 	end)
 end
 
@@ -303,6 +345,18 @@ end
 
 hud.onSpeedChanged = function(speed)
 	remote.SetTestSpeed:FireServer(speed)
+end
+
+--[[
+	Vorlage ein- und ausblenden. Sie ist reine Anzeige auf dem Client - der
+	Server erfaehrt davon nichts, weil sich am Spielstand nichts aendert.
+]]
+hud.onBlueprint = function()
+	local visible = controller:toggleBlueprint()
+	hud:setBlueprintActive(visible, controller:hasBlueprint())
+	if visible then
+		tutorial:notify("blueprintShown")
+	end
 end
 
 hud.onPhaseChanged = function(phase)
@@ -466,6 +520,15 @@ remote.StateChanged.OnClientEvent:Connect(function(state)
 			end
 		end
 		tutorial:notify("testStarted")
+	elseif previous and previous.phase == "Test" then
+		--[[
+			Der Test ist gerade zu Ende gegangen - egal ob geschafft oder
+			nicht. Die Kamera stand zuletzt beim Fahrzeug, oft halb in der
+			Schlucht und herangezoomt. Von der eigenen Bruecke, die man als
+			Naechstes verbessern will, saehe man dort nichts.
+		]]
+		camera:follow(nil)
+		camera:returnToOverview()
 	else
 		camera:follow(nil)
 	end
@@ -491,8 +554,12 @@ remote.StateChanged.OnClientEvent:Connect(function(state)
 	end
 end)
 
-remote.Notice.OnClientEvent:Connect(function(text)
-	hud:showNotice(text)
+--[[
+	Der Server schickt keinen fertigen Satz, sondern einen Schluessel mit
+	Werten. Uebersetzt wird hier - beim Spieler, in dessen Sprache.
+]]
+remote.Notice.OnClientEvent:Connect(function(payload)
+	hud:showNotice(I18n.message(payload))
 end)
 
 --------------------------------------------------------------------------------
@@ -507,10 +574,7 @@ remote.HintResult.OnClientEvent:Connect(function(payload)
 				(Config.Monetisation.hintProductId). Damit sich das Spiel
 				trotzdem testen laesst, sagen wir das einfach.
 			]]
-			hud:showNotice(
-				"Der Tipp-Kauf ist noch nicht eingerichtet (siehe README).",
-				Theme.colors.warning
-			)
+			hud:showNotice(I18n.t("hint.notSetUp"), Theme.colors.warning)
 			return
 		end
 
@@ -520,7 +584,7 @@ remote.HintResult.OnClientEvent:Connect(function(payload)
 		end)
 		if not ok then
 			app.pendingHintPurchase = false
-			hud:showNotice("Der Kauf konnte nicht geoeffnet werden: " .. tostring(err), Theme.colors.danger)
+			hud:showNotice(I18n.t("error.purchaseFailed", tostring(err)), Theme.colors.danger)
 		end
 		return
 	end

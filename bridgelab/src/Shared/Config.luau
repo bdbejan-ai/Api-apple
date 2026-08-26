@@ -191,12 +191,13 @@ Config.UtilisationColors = {
 -- Schwierigkeitsgrade (nur Anzeige im Level-Menue)
 --------------------------------------------------------------------------------
 
+-- Der Text steht in I18n unter "difficulty.1" bis "difficulty.5".
 Config.Difficulty = {
-	[1] = { label = "Sehr leicht", color = Color3.fromRGB(90, 200, 120) },
-	[2] = { label = "Leicht", color = Color3.fromRGB(150, 205, 90) },
-	[3] = { label = "Mittel", color = Color3.fromRGB(238, 200, 80) },
-	[4] = { label = "Schwer", color = Color3.fromRGB(240, 145, 60) },
-	[5] = { label = "Sehr schwer", color = Color3.fromRGB(228, 80, 70) },
+	[1] = { color = Color3.fromRGB(90, 200, 120) },
+	[2] = { color = Color3.fromRGB(150, 205, 90) },
+	[3] = { color = Color3.fromRGB(238, 200, 80) },
+	[4] = { color = Color3.fromRGB(240, 145, 60) },
+	[5] = { color = Color3.fromRGB(228, 80, 70) },
 }
 
 --------------------------------------------------------------------------------
@@ -214,6 +215,14 @@ Config.Camera = {
 	minDistance = 12,
 	maxDistance = 320,
 	zoomOutMargin = 1.06,
+
+	--[[
+		Wie schnell die Kamera nach dem Test zur Ausgangsansicht zurueckgleitet.
+		Groesser = zackiger. Bei etwa 3 dauert es rund eine halbe Sekunde -
+		schnell genug, um nicht zu bremsen, langsam genug, dass man die
+		Bewegung noch verfolgen kann und weiss, wo man gelandet ist.
+	]]
+	returnSpeed = 3,
 
 	zoomStepMouse = 12,
 	zoomStepGamepad = 90,
