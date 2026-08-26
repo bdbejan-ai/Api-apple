@@ -121,6 +121,14 @@ function BuildController.new()
 	self.dragging = false
 	self.dragStart = nil -- { x, y } in Levelkoordinaten
 	self.activeTouch = nil
+	--[[
+		Wie viele Finger gerade auf dem Bildschirm liegen. Nur bei GENAU EINEM
+		wird gebaut; sobald ein zweiter dazukommt, gehoert die Geste der
+		Kamera. Ohne diese Zaehlung konnte ein dritter Finger mitten in einer
+		Zoom-Geste einen Bauvorgang starten - der zweite hatte den alten
+		Merker ja bereits geloescht.
+	]]
+	self.touchCount = 0
 
 	-- Rueckmeldungen nach aussen (werden von init.client gesetzt)
 	self.onPlaceRequest = nil -- (material, ax, ay, bx, by, phase)
@@ -267,6 +275,9 @@ function BuildController:setEnabled(enabled: boolean)
 	if not enabled then
 		self:cancelDrag()
 		self:hideMarkers()
+		-- Halbe Gesten nicht ueber den Levelwechsel hinweg mitschleppen.
+		self.activeTouch = nil
+		self.touchCount = 0
 	end
 	self.cursorGui.Enabled = enabled and Device.isGamepad()
 end
@@ -671,7 +682,9 @@ function BuildController:connectInput()
 		elseif inputType == Enum.UserInputType.MouseButton2 then
 			self:removeUnderPointer()
 		elseif inputType == Enum.UserInputType.Touch then
-			if self.activeTouch == nil then
+			self.touchCount += 1
+
+			if self.touchCount == 1 then
 				self.activeTouch = input
 				self.pointer = Vector2.new(input.Position.X, input.Position.Y)
 				if self.removeMode then
@@ -680,7 +693,7 @@ function BuildController:connectInput()
 					self:beginDrag()
 				end
 			else
-				-- Zweiter Finger: das gehoert der Kamera.
+				-- Zweiter oder weiterer Finger: die Geste gehoert der Kamera.
 				self.activeTouch = nil
 				self:cancelDrag()
 			end
@@ -727,6 +740,8 @@ function BuildController:connectInput()
 				self:endDrag()
 			end
 		elseif inputType == Enum.UserInputType.Touch then
+			self.touchCount = math.max(self.touchCount - 1, 0)
+
 			if input == self.activeTouch then
 				self.activeTouch = nil
 				self.pointer = Vector2.new(input.Position.X, input.Position.Y)
