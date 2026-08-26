@@ -422,8 +422,8 @@ function LevelSelectGui:createCard(summary)
 
 	-- Besonderheiten deutlich hervorheben
 	if (summary.slope or 0) ~= 0 then
-		chip(card, "Slope", string.format("Steigung %d", summary.slope), x, Theme.colors.warning)
-		x += 94
+		chip(card, "Slope", string.format("+%d hoch", summary.slope), x, Theme.colors.warning)
+		x += 82
 	elseif summary.deckCount > 1 then
 		chip(card, "Decks", "2 Ebenen", x, Theme.colors.warning)
 		x += 76
@@ -435,23 +435,37 @@ function LevelSelectGui:createCard(summary)
 	if summary.freeHints > 0 then
 		chip(card, "Hints", "1 Tipp gratis", x, Theme.colors.textDim)
 	else
-		chip(card, "Hints", "Tipps kostenpflichtig", x, Theme.colors.robux)
+		chip(card, "Hints", "Tipps ab Robux", x, Theme.colors.robux)
 	end
 
 	----------------------------------------------------------------------------
-	-- Haken oben rechts, wenn geschafft
+	-- Haken auf der Vorschau, wenn geschafft
 	----------------------------------------------------------------------------
 
-	local done = Theme.label(card, "Done", {
-		size = UDim2.fromOffset(130, 20),
-		position = UDim2.new(1, -144, 1, -32),
+	--[[
+		Der Haken sitzt ueber der Vorschau statt in der Zeile mit den Feldern.
+		Dort waere er bei langen Beschriftungen frueher oder spaeter im Weg -
+		die Karte ist auf schmalen Bildschirmen nicht sehr breit.
+	]]
+	local done = Instance.new("Frame")
+	done.Name = "Done"
+	done.Size = UDim2.fromOffset(116, 24)
+	done.Position = UDim2.fromOffset(14, 68)
+	done.BackgroundColor3 = Theme.colors.success
+	done.BorderSizePixel = 0
+	done.Visible = false
+	done.ZIndex = 3
+	done.Parent = card
+	Theme.corner(done, 6)
+
+	Theme.label(done, "Text", {
+		size = UDim2.fromScale(1, 1),
 		text = "✓ geschafft",
 		textSize = 13,
 		bold = true,
-		color = Theme.colors.success,
-		align = Enum.TextXAlignment.Right,
-	})
-	done.Visible = false
+		color = Color3.fromRGB(10, 34, 18),
+		align = Enum.TextXAlignment.Center,
+	}).ZIndex = 4
 
 	----------------------------------------------------------------------------
 	-- Verhalten
