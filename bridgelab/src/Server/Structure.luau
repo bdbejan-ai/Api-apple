@@ -527,6 +527,19 @@ function Structure:updateStressLabels(utilisationOf)
 			continue
 		end
 
+		--[[
+			Ein durchhaengendes Seil traegt nichts. Eine Prozentzahl waere da
+			irrefuehrend - "0%" liest sich wie "viel Reserve", gemeint ist aber
+			"steht nutzlos herum".
+		]]
+		if member.slack then
+			label.percent.Text = "schlaff"
+			label.percent.TextColor3 = Color3.fromRGB(150, 155, 170)
+			label.newtons.Text = "traegt nichts"
+			label.bar.Size = UDim2.fromScale(0, 1)
+			continue
+		end
+
 		local utilisation = utilisationOf(member)
 		local color = Config.utilisationColor(utilisation)
 

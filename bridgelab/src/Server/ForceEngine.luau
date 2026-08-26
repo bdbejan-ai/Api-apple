@@ -165,6 +165,15 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 	for index, member in members do
 		local newForce = result.forces[index] or 0
 		member.force = member.force * (1 - alpha) + newForce * alpha
+
+		--[[
+			Ein Seil kann nur ZIEHEN. Muesste es an dieser Stelle druecken,
+			nimmt der Rechner es aus der Rechnung heraus - es haengt dann
+			einfach durch und traegt nichts. Das merken wir uns am Bauteil,
+			damit der Spieler es auch sehen kann.
+		]]
+		member.slack = result.slack[index] == true
+
 		local utilisation = ForceEngine.utilisation(member)
 		if utilisation > maxUtilisation then
 			maxUtilisation = utilisation
@@ -228,7 +237,11 @@ function ForceEngine:applyColors(showLoad: boolean)
 		local utilisation = ForceEngine.utilisation(member)
 		local color
 
-		if showLoad then
+		if member.slack then
+			-- Durchhaengendes Seil: blass, damit man sofort sieht, dass es
+			-- gerade gar nichts tut.
+			color = spec.color:Lerp(Color3.fromRGB(40, 42, 48), 0.55)
+		elseif showLoad then
 			color = Config.utilisationColor(utilisation)
 		elseif utilisation > 0.6 then
 			local blend = math.clamp((utilisation - 0.6) / 0.4, 0, 1)

@@ -191,10 +191,20 @@ function Arena:placeMember(kind: string, a: number, b: number): (boolean, string
 		return false, reason
 	end
 
-	self.structure:place(kind, a, b)
+	local member = self.structure:place(kind, a, b)
 	self.message = ""
 	self:updateAnalysis()
 	self:notify()
+
+	--[[
+		Gleich nachsehen, ob das neue Seil ueberhaupt etwas tut. Seile koennen
+		nur ziehen; muesste eins an dieser Stelle druecken, haengt es einfach
+		durch. Ohne Hinweis waere voellig unklar, warum sich nichts aendert.
+	]]
+	if member and member.slack then
+		return true, "", "Dieses Seil haengt durch - an dieser Stelle muesste es druecken, und das kann ein Seil nicht."
+	end
+
 	return true, ""
 end
 

@@ -260,9 +260,12 @@ remote.PlaceMember.OnServerEvent:Connect(function(player, kind, snapA, snapB)
 		return
 	end
 
-	local ok, reason = arena:placeMember(kind, math.floor(snapA), math.floor(snapB))
+	local ok, reason, hint = arena:placeMember(kind, math.floor(snapA), math.floor(snapB))
 	if not ok and reason ~= "" then
 		remote.Notice:FireClient(player, reason)
+	elseif ok and hint then
+		-- Gebaut ja, aber es bringt so nichts: kurz Bescheid sagen.
+		remote.Notice:FireClient(player, hint)
 	end
 end)
 
