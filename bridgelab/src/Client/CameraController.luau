@@ -118,9 +118,21 @@ function CameraController:setArena(originY: number, bounds, deckY: number)
 		self.maxDistance = self.minDistance
 	end
 
-	-- Startansicht: die Bruecke fuellt etwa zwei Drittel des Bildes.
+	--[[
+		STARTANSICHT: DAS GANZE LEVEL
+
+		Vorher wurde auf 62 Prozent der Levelgroesse eingestellt, das Bild
+		zeigte also nur einen Ausschnitt. Das war noetig, solange die Grenzen
+		aus dem vollen Gelaendeprofil kamen und weit ueber die Bruecke
+		hinausreichten - haette man da alles gezeigt, waere die Bruecke ein
+		Strich gewesen.
+
+		Seit die Grenzen den Baubereich umfassen, ist das Gegenteil richtig:
+		als Erstes soll man die ganze Aufgabe sehen - beide Ufer, die Luecke
+		dazwischen und wo die Anker sitzen. Heranzoomen kann man danach.
+	]]
 	self.distance = math.clamp(
-		distanceToFit(levelWidth * 0.62, levelHeight * 0.62),
+		distanceToFit(levelWidth, levelHeight),
 		self.minDistance,
 		self.maxDistance
 	)

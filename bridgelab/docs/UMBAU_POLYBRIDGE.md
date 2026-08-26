@@ -5,8 +5,51 @@ nächsten großen Umbau. Es steht im Projekt, damit später nachvollziehbar ist,
 warum etwas so gebaut wurde — und damit du widersprechen kannst, bevor ich
 anfange.
 
-Stand: BridgeLab hat 7 Level, ein festes Ankerpunkt-Raster aus drei Reihen,
-drei Bauteiltypen und rund 9 200 Zeilen Code.
+Stand bei Beginn: BridgeLab hatte 7 Level, ein festes Ankerpunkt-Raster aus
+drei Reihen, drei Bauteiltypen und rund 9 200 Zeilen Code.
+
+---
+
+## Stand der Umsetzung
+
+**Der Umbau ist durchgeführt.** Was aus dem Plan geworden ist:
+
+| Aus dem Plan | Stand |
+|---|---|
+| Freies Bauen auf 2-Studs-Raster, Anker als einzige Auflager | umgesetzt |
+| Sieben Materialien, Kosten je Stud | umgesetzt |
+| Zwölf Level in drei Welten | umgesetzt, alle rechnerisch als lösbar geprüft |
+| Gelände als Linienzug statt zweier Plattformen | umgesetzt |
+| Belastungstest ohne Anzeigen-Chaos (höchstens acht Zahlen) | umgesetzt |
+| Hydraulik mit Phasen | umgesetzt, Phase wird beim Bauen gewählt |
+| Schiffsdurchfahrt | umgesetzt (Level „Klappbrücke") |
+| Sprunglevel | umgesetzt (Level „Der Sprung") |
+| Oberfläche in Zonen, nichts überlagert sich | umgesetzt |
+| Realistischere Bauteile (I-Profil, Bohlen, Durchhang, Knotenbleche) | umgesetzt |
+| Bauen durch Ziehen statt zweimal Klicken | umgesetzt |
+
+**Zwei Punkte sind anders ausgegangen als geplant:**
+
+1. **Bögen und Hängebrücken tragen in diesem Modell nicht.** Beide Bauformen
+   sind gebaut und werden vom Prüfskript mitgetestet, aber beide scheitern:
+   ein Bogen ist die richtige Form für eine gleichmäßig verteilte Last, ein
+   Fahrzeug ist eine Einzellast, die wandert. Das Level hieß im Plan noch
+   „Der Bogen" und heißt jetzt **„Kreuz und quer"** — es bringt den
+   Kreuzverband bei, die Technik, mit der es sich wirklich lösen lässt.
+   Ein Level nach einer Bauform zu benennen, die nicht funktioniert, hätte
+   den Spieler in die Irre geführt.
+
+2. **Die Materialwerte mussten neu ausbalanciert werden.** Holz stand bei
+   400 N und damit *unter* der Straße (500 N). Beim Fachwerk ist die Fahrbahn
+   der Untergurt und der Obergurt trägt genauso viel — ist der Tragbaustoff
+   schwächer als die Fahrbahn, reißt immer zuerst der Obergurt, und Holz war
+   für seinen eigentlichen Zweck unbrauchbar. Holz hält jetzt 550 N. Dazu kam
+   ein leichteres Fahrzeug für Welt 1 (Kleinwagen, 420 N), damit die
+   Schwierigkeit aus **Fahrzeug und Spannweite** kommt und nicht aus heimlich
+   angehobenen Grenzwerten.
+
+Die P3-Kür (Zeitlupen-Wiederholung, Sandkasten, Federn, eigener Level-Editor)
+ist bewusst **nicht** gebaut.
 
 ---
 
