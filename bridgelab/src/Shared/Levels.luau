@@ -207,12 +207,61 @@ local function makeLevel(def)
 	-- Ausmasse fuer die Kamera
 	----------------------------------------------------------------------------
 
+	--[[
+		WAS DIE KAMERA ZEIGEN SOLL - NICHT DAS GANZE GELAENDE
+
+		Die Kamera darf nur so weit herauszoomen, bis das Level das Bild
+		fuellt. Frueher stand hier die volle Breite des GELAENDEPROFILS - und
+		das reicht weit ueber die Bruecke hinaus: in der grossen Schlucht von
+		-130 bis +130, also 260 Studs, waehrend gebaut wird nur zwischen -60
+		und +60. Herausgezoomt waere die Bruecke ein Strich in der Mitte
+		gewesen, links und rechts nichts als leeres Plateau.
+
+		Massgeblich ist deshalb der Baubereich samt Ankern, dazu ein Rand als
+		Zugabe. Waagerecht wird auf das Gelaende begrenzt: darueber hinaus
+		gibt es nichts mehr zu sehen.
+	]]
 	local t = level.terrainBounds
+	local margin = 20
+
+	local minX, maxX = def.buildArea.minX, def.buildArea.maxX
+	local minY, maxY = def.buildArea.minY, def.buildArea.maxY
+
+	for _, anchor in def.anchors do
+		minX = math.min(minX, anchor.x)
+		maxX = math.max(maxX, anchor.x)
+		minY = math.min(minY, anchor.y)
+		maxY = math.max(maxY, anchor.y)
+	end
+
+	if def.waterY then
+		minY = math.min(minY, def.waterY)
+	end
+
+	--[[
+		Bei Sprunglevels muss auch die LANDESEITE ins Bild.
+
+		Sonst endet die Sicht dort, wo der Baubereich endet - und der endet
+		beim Sprung mitten in der Luft. Der Spieler soll aber genau das
+		abschaetzen koennen: wie weit ist es hinueber und wie tief liegt die
+		andere Seite. Bei allen anderen Levels bleibt die Fahrstrecke draussen,
+		sie fuehrt nur ueber flaches Plateau und wuerde das Bild unnoetig
+		weiten.
+	]]
+	if def.requiresJump then
+		-- Nur das ZIEL, nicht der Anlauf: der fuehrt ueber flaches Plateau
+		-- und wuerde das Bild ohne Gewinn weiter machen.
+		for _, vehicle in def.vehicles do
+			minX = math.min(minX, vehicle.toX)
+			maxX = math.max(maxX, vehicle.toX)
+		end
+	end
+
 	level.bounds = {
-		minX = t.minX,
-		maxX = t.maxX,
-		minY = math.min(t.minY, def.buildArea.minY) - 8,
-		maxY = math.max(t.maxY, def.buildArea.maxY) + 8,
+		minX = math.max(minX - margin, t.minX),
+		maxX = math.min(maxX + margin, t.maxX),
+		minY = minY - 12,
+		maxY = maxY + 12,
 	}
 
 	-- Worauf die Kamera anfangs blickt.
