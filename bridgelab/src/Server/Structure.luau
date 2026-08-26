@@ -220,6 +220,15 @@ function Structure:createMemberInstances(member)
 	local model = Instance.new("Model")
 	model.Name = spec.key .. "_" .. member.id
 	model:SetAttribute("MemberId", member.id)
+	--[[
+		Die beiden Endpunkte als Attribut mitgeben. Der Client braucht sie,
+		um beim Abreissen genau zu bestimmen, welches Bauteil unter dem
+		Zeiger liegt - dafuer rechnet er den Abstand zur Bauteilachse aus,
+		statt sich auf einen Strahl zu verlassen, der immer nur das
+		vorderste sichtbare Teil trifft.
+	]]
+	model:SetAttribute("PointA", posA)
+	model:SetAttribute("PointB", posB)
 	model.Parent = self.folders.members
 
 	member.visuals = {}
@@ -248,6 +257,21 @@ function Structure:createMemberInstances(member)
 	----------------------------------------------------------------------------
 
 	if member.kind == "Beam" then
+		--[[
+			IST DIESER BALKEN FAHRBAHN ODER TRAGWERK?
+
+			Nur flach liegende Balken sind befahrbar. Ein steiler Balken ist
+			eine Strebe - und eine Strebe darf das Fahrzeug NICHT ausbremsen.
+			Wuerde sie es tun, koennte man seine Bruecke nicht aussteifen,
+			ohne sich selbst den Weg zu verbauen.
+
+			Deshalb bekommen steile Balken keine Kollision: das Fahrzeug
+			faehrt einfach hindurch. Tragen tun sie trotzdem voll mit - fuer
+			die Kraefteberechnung macht das keinen Unterschied.
+		]]
+		local rise = math.abs(posB.Y - posA.Y) / math.max(length, 1e-4)
+		member.isRoadway = rise <= Config.Test.roadwayMaxRise
+
 		-- Oben eine Fahrbahndecke, darunter ein schmalerer Stahltraeger.
 		local deckThickness = 0.3
 		local girderThickness = spec.thickness - deckThickness
@@ -255,8 +279,13 @@ function Structure:createMemberInstances(member)
 		local deck = newPart("Deck", Vector3.new(spec.width, deckThickness, length), spec.accentColor, spec.accentMaterial)
 		-- Die Oberkante der Decke liegt genau auf der Ankerlinie, damit die
 		-- Fahrbahn buendig an die Plattformen anschliesst.
-		deck.CanCollide = true
-		deck.CanQuery = true
+		deck.CanCollide = member.isRoadway
+		deck.CanQuery = member.isRoadway
+		if not member.isRoadway then
+			-- Streben sind schmaler: so sieht man ihnen an, dass man auf
+			-- ihnen nicht faehrt.
+			deck.Size = Vector3.new(spec.width * 0.35, deckThickness, length)
+		end
 		addVisual(member, deck, "span", -deckThickness / 2)
 
 		local girder = newPart(
@@ -270,6 +299,9 @@ function Structure:createMemberInstances(member)
 		member.mainPart = girder
 		member.stressParts = { girder }
 	elseif member.kind == "Cable" then
+		-- Seile sind nie befahrbar und stehen dem Fahrzeug nie im Weg.
+		member.isRoadway = false
+
 		-- Duenner Strang mit einer Klemme an jedem Ende.
 		local rope = newPart("Strand", Vector3.new(spec.width, spec.thickness, length), spec.color, spec.material)
 		addVisual(member, rope, "span", 0)
@@ -282,10 +314,17 @@ function Structure:createMemberInstances(member)
 		member.mainPart = rope
 		member.stressParts = { rope }
 	else
-		-- Stuetze: Saeule mit Sockel unten und Kopfplatte oben.
+		--[[
+			Stuetze: Saeule mit Sockel unten und Kopfplatte oben.
+			Stuetzen sind nie befahrbar und blockieren das Fahrzeug auch
+			nicht - eine Stuetze, die von der Fahrbahn nach oben gebaut wird,
+			stuende sonst mitten im Weg.
+		]]
+		member.isRoadway = false
+
 		local column = newPart("Column", Vector3.new(spec.width, spec.thickness, length), spec.color, spec.material)
-		column.CanCollide = true
-		column.CanQuery = true
+		column.CanCollide = false
+		column.CanQuery = false
 		addVisual(member, column, "span", 0)
 
 		for endIndex = 1, 2 do

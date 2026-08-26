@@ -17,6 +17,7 @@
 
 local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
@@ -47,6 +48,11 @@ function BuildHud.new()
 	self.onMenu = nil
 	self.onHint = nil
 	self.onRetry = nil
+	self.onSpeedChanged = nil
+
+	-- Am Tacho eingestellte Fahrgeschwindigkeit.
+	self.speed = Config.Test.defaultSpeed
+	self.draggingSpeed = false
 
 	self:build()
 
@@ -84,6 +90,7 @@ function BuildHud:build()
 
 	self:buildTopBar()
 	self:buildBottomBar()
+	self:buildSpeedPanel()
 	self:buildStatus()
 	self:buildTestPanel()
 	self:buildHintPanel()
@@ -311,6 +318,193 @@ function BuildHud:buildBottomBar()
 		end
 	end)
 	self.testButton = testButton
+end
+
+--------------------------------------------------------------------------------
+-- Tacho: wie schnell faehrt das Fahrzeug?
+--------------------------------------------------------------------------------
+
+--[[
+	Ein Schieberegler von 1 bis 14 Studs pro Sekunde.
+
+	Er ist absichtlich IMMER sichtbar - vor dem Test und waehrend der Fahrt.
+	Langsam fahren heisst: man sieht in Ruhe zu, wo die Belastung hochgeht.
+	Schnell fahren heisst: es geht zackig voran, das Fahrzeug schlaegt aber
+	haerter auf und bringt die Bruecke staerker ins Schwingen.
+
+	Das Zeitlimit richtet sich nach der gewaehlten Geschwindigkeit. Langsam
+	fahren kann also nie dazu fuehren, dass die Zeit abläuft.
+]]
+function BuildHud:buildSpeedPanel()
+	local panel = Theme.panel(self.root, "SpeedPanel")
+	panel.Size = UDim2.fromOffset(296, 78)
+	panel.BackgroundTransparency = 0.08
+	self.speedPanel = panel
+
+	Theme.label(panel, "Caption", {
+		size = UDim2.fromOffset(120, 18),
+		position = UDim2.fromOffset(14, 9),
+		text = "Tempo",
+		textSize = 13,
+		bold = true,
+		color = Theme.colors.textDim,
+	})
+
+	self.speedValueLabel = Theme.label(panel, "Value", {
+		size = UDim2.fromOffset(150, 20),
+		position = UDim2.new(1, -164, 0, 8),
+		text = "",
+		textSize = 15,
+		bold = true,
+		align = Enum.TextXAlignment.Right,
+	})
+
+	-- Minus
+	local minus = Theme.button(panel, "Minus", {
+		size = UDim2.fromOffset(34, 30),
+		position = UDim2.fromOffset(14, 34),
+		text = "−",
+		textSize = 20,
+		color = Theme.colors.panelLight,
+	})
+	minus.Selectable = true
+	minus.Activated:Connect(function()
+		self:setSpeed(self.speed - Config.Test.speedStep * 5)
+		self:pushSpeed()
+	end)
+
+	-- Plus
+	local plus = Theme.button(panel, "Plus", {
+		size = UDim2.fromOffset(34, 30),
+		position = UDim2.new(1, -48, 0, 34),
+		text = "+",
+		textSize = 20,
+		color = Theme.colors.panelLight,
+	})
+	plus.Selectable = true
+	plus.Activated:Connect(function()
+		self:setSpeed(self.speed + Config.Test.speedStep * 5)
+		self:pushSpeed()
+	end)
+
+	----------------------------------------------------------------------------
+	-- Der Schieberegler selbst
+	----------------------------------------------------------------------------
+
+	-- Als TextButton, damit er Klicks und Finger sicher entgegennimmt.
+	local track = Instance.new("TextButton")
+	track.Name = "Track"
+	track.Size = UDim2.new(1, -110, 0, 12)
+	track.Position = UDim2.fromOffset(56, 43)
+	track.BackgroundColor3 = Theme.colors.panelLight
+	track.BorderSizePixel = 0
+	track.AutoButtonColor = false
+	track.Text = ""
+	track.Parent = panel
+	Theme.corner(track, 6)
+	self.speedTrack = track
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0.25, 1)
+	fill.BackgroundColor3 = Theme.colors.accent
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	Theme.corner(fill, 6)
+	self.speedFill = fill
+
+	local knob = Instance.new("Frame")
+	knob.Name = "Knob"
+	knob.Size = UDim2.fromOffset(20, 20)
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.fromScale(0.25, 0.5)
+	knob.BackgroundColor3 = Color3.fromRGB(244, 246, 250)
+	knob.BorderSizePixel = 0
+	knob.Parent = track
+	Theme.corner(knob, 10)
+	self.speedKnob = knob
+
+	----------------------------------------------------------------------------
+	-- Ziehen
+	----------------------------------------------------------------------------
+
+	local function setFromPosition(x: number)
+		local left = track.AbsolutePosition.X
+		local width = math.max(track.AbsoluteSize.X, 1)
+		local fraction = math.clamp((x - left) / width, 0, 1)
+		self:setSpeed(Config.Test.minSpeed + fraction * (Config.Test.maxSpeed - Config.Test.minSpeed))
+		self:pushSpeed()
+	end
+
+	track.InputBegan:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			self.draggingSpeed = true
+			setFromPosition(input.Position.X)
+		end
+	end)
+
+	-- Weitergezogen wird auch dann, wenn der Zeiger den Regler verlaesst.
+	UserInputService.InputChanged:Connect(function(input)
+		if not self.draggingSpeed then
+			return
+		end
+		if
+			input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			setFromPosition(input.Position.X)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			self.draggingSpeed = false
+		end
+	end)
+
+	self:refreshSpeedDisplay()
+end
+
+-- Wert uebernehmen und begrenzen. Der Server prueft ihn noch einmal.
+function BuildHud:setSpeed(speed: number)
+	self.speed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
+	self:refreshSpeedDisplay()
+end
+
+function BuildHud:pushSpeed()
+	if self.onSpeedChanged then
+		self.onSpeedChanged(self.speed)
+	end
+end
+
+function BuildHud:refreshSpeedDisplay()
+	local range = Config.Test.maxSpeed - Config.Test.minSpeed
+	local fraction = math.clamp((self.speed - Config.Test.minSpeed) / range, 0, 1)
+
+	self.speedFill.Size = UDim2.fromScale(fraction, 1)
+	self.speedKnob.Position = UDim2.fromScale(fraction, 0.5)
+	self.speedValueLabel.Text = string.format("%.1f Studs/s", self.speed)
+
+	--[[
+		Die Farbe sagt, worauf man sich einlaesst: gemuetlich, zuegig oder
+		schnell genug, dass das Aufsetzen wehtut.
+	]]
+	local color
+	if fraction < 0.34 then
+		color = Theme.colors.success
+	elseif fraction < 0.7 then
+		color = Theme.colors.accent
+	else
+		color = Theme.colors.warning
+	end
+	self.speedFill.BackgroundColor3 = color
+	self.speedValueLabel.TextColor3 = color
 end
 
 --------------------------------------------------------------------------------
@@ -742,7 +936,19 @@ function BuildHud:update(state)
 	----------------------------------------------------------------------------
 	-- Phase: was ist gerade sichtbar?
 	----------------------------------------------------------------------------
+	--[[
+		Das Tempo kommt vom Server (er hat das letzte Wort). Waehrend man den
+		Regler zieht, wird es NICHT ueberschrieben - sonst zappelte der Knopf
+		unter dem Finger.
+	]]
+	if state.testSpeed and not self.draggingSpeed then
+		self:setSpeed(state.testSpeed)
+	end
+
 	local building = state.phase == "Build"
+
+	-- Vor dem Test einstellen, waehrend des Tests nachregeln - beides erlaubt.
+	self.speedPanel.Visible = building or state.phase == "Test"
 
 	self.bottomBar.Visible = building
 	self.testButton.Active = building
@@ -779,11 +985,23 @@ function BuildHud:updateTestPanel(state)
 		self.testHeadline.Text = string.format("Test startet in %.0f ...", math.ceil(progress.countdown))
 		self.testTimeLabel.Text = "Die Bruecke traegt jetzt ihr eigenes Gewicht"
 	else
-		self.testHeadline.Text = "Belastungstest laeuft"
+		-- Bei mehreren Fahrzeugen zaehlen wir mit, wie viele schon drueben sind.
+		local count = progress.vehicleCount or 1
+		if count > 1 then
+			self.testHeadline.Text = string.format(
+				"Belastungstest - %d von %d angekommen",
+				progress.vehiclesDone or 0,
+				count
+			)
+		else
+			self.testHeadline.Text = "Belastungstest laeuft"
+		end
+
 		self.testTimeLabel.Text = string.format(
-			"%.1f s von hoechstens %d s",
+			"%.1f s von hoechstens %.0f s  ·  %.1f Studs/s",
 			progress.elapsed or 0,
-			state.timeLimit or 0
+			progress.timeLimit or 0,
+			progress.speed or 0
 		)
 	end
 
@@ -854,6 +1072,9 @@ function BuildHud:applyScale()
 	self.topBar.Size = UDim2.new(1, -inset * 2, 0, 58)
 	self.bottomBar.Position = UDim2.new(0, inset, 1, -(102 + inset - 12))
 	self.bottomBar.Size = UDim2.new(1, -inset * 2, 0, 92)
+
+	-- Der Tacho sitzt direkt ueber der Fussleiste, rechts aussen.
+	self.speedPanel.Position = UDim2.new(1, -(296 + inset), 1, -(102 + inset - 12) - 86)
 end
 
 function BuildHud:show()

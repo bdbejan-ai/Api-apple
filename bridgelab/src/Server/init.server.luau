@@ -288,7 +288,7 @@ end)
 -- Test und Zuruecksetzen
 --------------------------------------------------------------------------------
 
-remote.StartTest.OnServerEvent:Connect(function(player)
+remote.StartTest.OnServerEvent:Connect(function(player, speed)
 	local arena = arenas[player]
 	if not arena then
 		return
@@ -297,7 +297,13 @@ remote.StartTest.OnServerEvent:Connect(function(player)
 		return
 	end
 
-	local ok, reason = arena:startTest(function(success)
+	-- Die Geschwindigkeit kommt vom Client und wird deshalb geprueft.
+	-- Arena:startTest begrenzt sie zusaetzlich auf den erlaubten Bereich.
+	if type(speed) ~= "number" or speed ~= speed then
+		speed = Config.Test.defaultSpeed
+	end
+
+	local ok, reason = arena:startTest(speed, function(success)
 		if not success then
 			return
 		end
@@ -312,6 +318,25 @@ remote.StartTest.OnServerEvent:Connect(function(player)
 	if not ok and reason ~= "" then
 		remote.Notice:FireClient(player, reason)
 	end
+end)
+
+--[[
+	Tacho: der Spieler verstellt die Fahrgeschwindigkeit. Das darf er auch
+	mitten im Test - deshalb ist die Sperre hier sehr kurz, sonst haekelte
+	der Regler beim Ziehen.
+]]
+remote.SetTestSpeed.OnServerEvent:Connect(function(player, speed)
+	local arena = arenas[player]
+	if not arena then
+		return
+	end
+	if type(speed) ~= "number" or speed ~= speed then
+		return
+	end
+	if tooFast(player, "SetTestSpeed", 0.05) then
+		return
+	end
+	arena:setTestSpeed(speed)
 end)
 
 remote.ResetLevel.OnServerEvent:Connect(function(player, clearEverything)

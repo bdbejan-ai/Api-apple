@@ -1,8 +1,9 @@
 --[[
 	LevelBuilder
 	------------
-	Baut die unveraenderliche Umgebung eines Levels auf:
-	Plattformen, Schluchtwaende, Pylone, Ankerpunkte, Ziellinie.
+	Baut die unveraenderliche Umgebung eines Levels auf: Felsplattformen,
+	Schluchtgrund mit Fluss, Widerlager, Pylone, Bewuchs, Hintergrund und
+	die Ankerpunkte.
 
 	Alles entsteht im Code - nichts davon wird per Rojo als Instanz
 	synchronisiert. Vorteil: Levelmasse aendert man nur in Levels.luau.
@@ -11,6 +12,12 @@
 	Jeder Spieler hat seine eigene Arena. Damit sich die Arenen nicht ins
 	Gehege kommen, bekommt jede einen Versatz nach oben (origin). Alle
 	Positionen hier sind deshalb "Levelposition + origin".
+
+	MEHRERE FAHRBAHNEN
+	Ein Level kann mehrere Fahrbahnhoehen haben. Fuer jede entsteht auf
+	beiden Plattformen ein Strassenstueck; liegt sie hoeher als die unterste,
+	traegt sie zusaetzlich ein Widerlager - sonst haenge die Strasse in der
+	Luft und das Fahrzeug haette nichts, worauf es startet.
 ]]
 
 local Debris = game:GetService("Debris")
@@ -33,111 +40,174 @@ local function makePart(name: string, size: Vector3, position: Vector3, parent: 
 	return part
 end
 
+-- Deko beruehrt nichts und wird von keinem Strahl getroffen.
+local function makeDecor(name: string, size: Vector3, position: Vector3, parent: Instance): Part
+	local part = makePart(name, size, position, parent)
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	return part
+end
+
+-- Ein einfacher Baum: Stamm plus Krone.
+local function makeTree(position: Vector3, scale: number, parent: Instance)
+	local trunk = makeDecor("Trunk", Vector3.new(1.1 * scale, 5 * scale, 1.1 * scale), position + Vector3.new(0, 2.5 * scale, 0), parent)
+	trunk.Color = Color3.fromRGB(96, 72, 52)
+	trunk.Material = Enum.Material.Wood
+
+	local crown = makeDecor("Crown", Vector3.new(6 * scale, 6.5 * scale, 6 * scale), position + Vector3.new(0, 7 * scale, 0), parent)
+	crown.Shape = Enum.PartType.Ball
+	crown.Color = Color3.fromRGB(72, 118, 62)
+	crown.Material = Enum.Material.Grass
+end
+
+-- Ein Felsbrocken, leicht schraeg fuer ein natuerlicheres Bild.
+local function makeBoulder(position: Vector3, size: number, parent: Instance)
+	local rock = makeDecor("Boulder", Vector3.new(size, size * 0.8, size * 0.9), position, parent)
+	rock.CFrame = CFrame.new(position) * CFrame.Angles(math.rad(12), math.rad(size * 37), math.rad(8))
+	rock.Color = Color3.fromRGB(104, 100, 92)
+	rock.Material = Enum.Material.Rock
+end
+
 --------------------------------------------------------------------------------
 -- Aufbau
 --------------------------------------------------------------------------------
 
---[[
-	level  Leveldaten aus Levels.luau
-	origin Versatz dieser Arena (Vector3, meist nur Y)
-	parent Ordner, in dem die Arena entstehen soll
-
-	Rueckgabe: Tabelle mit allen Unterordnern.
-]]
 function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 	local root = Instance.new("Folder")
 	root.Name = "Level_" .. level.id
 	root.Parent = parent
 
-	local terrain = Instance.new("Folder")
-	terrain.Name = "Terrain"
-	terrain.Parent = root
+	local function newFolder(name: string): Folder
+		local folder = Instance.new("Folder")
+		folder.Name = name
+		folder.Parent = root
+		return folder
+	end
 
-	local snapFolder = Instance.new("Folder")
-	snapFolder.Name = "SnapPoints"
-	snapFolder.Parent = root
-
-	local nodesFolder = Instance.new("Folder")
-	nodesFolder.Name = "Nodes"
-	nodesFolder.Parent = root
-
-	local membersFolder = Instance.new("Folder")
-	membersFolder.Name = "Members"
-	membersFolder.Parent = root
-
-	local effectsFolder = Instance.new("Folder")
-	effectsFolder.Name = "Effects"
-	effectsFolder.Parent = root
-
-	local vehicleFolder = Instance.new("Folder")
-	vehicleFolder.Name = "Vehicle"
-	vehicleFolder.Parent = root
+	local terrain = newFolder("Terrain")
+	local decor = newFolder("Decor")
+	local snapFolder = newFolder("SnapPoints")
+	local nodesFolder = newFolder("Nodes")
+	local membersFolder = newFolder("Members")
+	local effectsFolder = newFolder("Effects")
+	local vehicleFolder = newFolder("Vehicle")
 
 	local z = level.z
+	local depth = level.platformDepth
+	local halfLength = level.platformLength / 2
+	local lowestDeckY = level.decks[1].y
 
 	----------------------------------------------------------------------------
 	-- Plattformen links und rechts
 	-- Aufbau von unten nach oben: Fels, darauf eine duenne Grasschicht.
 	----------------------------------------------------------------------------
 
-	local rockHeight = level.deckY - 2
-	local halfLength = level.platformLength / 2
+	local rockHeight = lowestDeckY - 2
 
 	for _, side in { -1, 1 } do
-		local centerX = if side < 0
-			then level.gapLeftX - halfLength
-			else level.gapRightX + halfLength
+		local centerX = if side < 0 then level.gapLeftX - halfLength else level.gapRightX + halfLength
 
 		local rock = makePart(
 			"PlatformRock",
-			Vector3.new(level.platformLength, rockHeight, level.platformDepth),
+			Vector3.new(level.platformLength, rockHeight, depth),
 			origin + Vector3.new(centerX, rockHeight / 2, z),
 			terrain
 		)
-		rock.Color = Color3.fromRGB(112, 106, 96)
+		rock.Color = Color3.fromRGB(116, 109, 98)
 		rock.Material = Enum.Material.Rock
 
 		local grass = makePart(
 			"PlatformTop",
-			Vector3.new(level.platformLength, 2, level.platformDepth),
+			Vector3.new(level.platformLength, 2, depth),
 			origin + Vector3.new(centerX, rockHeight + 1, z),
 			terrain
 		)
-		grass.Color = Color3.fromRGB(104, 132, 84)
+		grass.Color = Color3.fromRGB(108, 138, 86)
 		grass.Material = Enum.Material.Grass
 
-		-- Strassenbelag auf der Fahrspur, damit sichtbar ist, wo gefahren wird.
-		local road = makePart(
-			"PlatformRoad",
-			Vector3.new(level.platformLength, 0.3, 8),
-			origin + Vector3.new(centerX, level.deckY + 0.15, z),
-			terrain
-		)
-		road.Color = Color3.fromRGB(58, 60, 66)
-		road.Material = Enum.Material.Asphalt
-		road.CanCollide = false
-
-		-- Kantenmarkierung an der Abbruchkante.
+		-- Kantenmarkierung an der Abbruchkante
 		local edgeX = if side < 0 then level.gapLeftX - 0.4 else level.gapRightX + 0.4
-		local edge = makePart(
+		local edge = makeDecor(
 			"CliffEdge",
-			Vector3.new(0.8, 1.2, level.platformDepth),
-			origin + Vector3.new(edgeX, level.deckY - 0.6, z),
+			Vector3.new(0.8, 1.2, depth),
+			origin + Vector3.new(edgeX, lowestDeckY - 0.6, z),
 			terrain
 		)
-		edge.Color = Color3.fromRGB(226, 190, 90)
+		edge.Color = Color3.fromRGB(228, 194, 96)
 		edge.Material = Enum.Material.Concrete
-		edge.CanCollide = false
+
+		------------------------------------------------------------------------
+		-- Bewuchs auf der Plattform
+		------------------------------------------------------------------------
+		for i = 1, 3 do
+			local treeX = centerX - halfLength * 0.55 + (i - 1) * halfLength * 0.5
+			makeTree(origin + Vector3.new(treeX, lowestDeckY, z - depth * 0.32), 0.9 + i * 0.12, decor)
+			makeTree(origin + Vector3.new(treeX + 6, lowestDeckY, z + depth * 0.34), 0.8 + i * 0.1, decor)
+		end
 	end
 
 	----------------------------------------------------------------------------
-	-- Grund der Schlucht
+	-- Strassen und Widerlager je Fahrbahnhoehe
+	----------------------------------------------------------------------------
+
+	for index, deck in level.decks do
+		for _, side in { -1, 1 } do
+			local centerX = if side < 0 then level.gapLeftX - halfLength else level.gapRightX + halfLength
+
+			--[[
+				Liegt diese Fahrbahn hoeher als die unterste, braucht sie ein
+				Widerlager: einen Betonblock, der die Strasse traegt. Ohne ihn
+				schwebte die Fahrbahn und das Fahrzeug haette keinen Startplatz.
+			]]
+			if index > 1 then
+				local below = level.decks[index - 1].y
+				local height = deck.y - below
+				local block = makePart(
+					"Abutment",
+					Vector3.new(level.platformLength * 0.55, height, depth * 0.5),
+					origin + Vector3.new(
+						centerX + side * level.platformLength * 0.22,
+						below + height / 2,
+						z
+					),
+					terrain
+				)
+				block.Color = Color3.fromRGB(150, 145, 136)
+				block.Material = Enum.Material.Concrete
+			end
+
+			local road = makePart(
+				"Road",
+				Vector3.new(level.platformLength, 0.4, 8),
+				origin + Vector3.new(centerX, deck.y + 0.2, z),
+				terrain
+			)
+			road.Color = Color3.fromRGB(58, 60, 66)
+			road.Material = Enum.Material.Asphalt
+
+			-- Mittelstreifen, damit man die Fahrspur erkennt
+			for i = 0, 5 do
+				local stripe = makeDecor(
+					"Stripe",
+					Vector3.new(4, 0.05, 0.5),
+					origin + Vector3.new(centerX - halfLength + 6 + i * 9, deck.y + 0.42, z),
+					decor
+				)
+				stripe.Color = Color3.fromRGB(232, 232, 224)
+				stripe.Material = Enum.Material.SmoothPlastic
+			end
+		end
+	end
+
+	----------------------------------------------------------------------------
+	-- Schluchtgrund und Fluss
 	----------------------------------------------------------------------------
 
 	if level.groundY > 0 then
 		local floor = makePart(
 			"CanyonFloor",
-			Vector3.new(level.gapWidth, level.groundY, level.platformDepth),
+			Vector3.new(level.gapWidth + 6, level.groundY, depth),
 			origin + Vector3.new(0, level.groundY / 2, z),
 			terrain
 		)
@@ -145,76 +215,136 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 		floor.Material = Enum.Material.Slate
 	end
 
-	-- Duenne Bodenplatte, damit ein abstuerzendes Fahrzeug irgendwo liegen bleibt
-	-- und nicht endlos faellt.
+	-- Auffangboden, damit ein abstuerzendes Fahrzeug liegen bleibt
 	local catcher = makePart(
 		"CanyonBase",
-		Vector3.new(level.gapWidth + 4, 2, level.platformDepth),
+		Vector3.new(level.gapWidth + 8, 2, depth),
 		origin + Vector3.new(0, math.max(level.groundY, 1) - 1, z),
 		terrain
 	)
 	catcher.Color = Color3.fromRGB(78, 76, 70)
 	catcher.Material = Enum.Material.Slate
 
-	----------------------------------------------------------------------------
-	-- Pylone: sie tragen die beiden festen Ankerpunkte der oberen Reihe.
-	-- Sie stehen seitlich neben der Fahrspur, damit das Fahrzeug durchpasst.
-	----------------------------------------------------------------------------
-
-	local pylonHeight = level.upperY - level.deckY
-	local outerX = level.gapRightX + level.snapSpacing
-
-	for _, x in { -outerX, outerX } do
-		for _, offsetZ in { -5, 5 } do
-			local pylon = makePart(
-				"Pylon",
-				Vector3.new(2.2, pylonHeight, 2.2),
-				origin + Vector3.new(x, level.deckY + pylonHeight / 2, z + offsetZ),
-				terrain
-			)
-			pylon.Color = Color3.fromRGB(158, 152, 142)
-			pylon.Material = Enum.Material.Concrete
-			pylon.CanCollide = false
-		end
-
-		-- Querbalken oben, rein optisch.
-		local crossBeam = makePart(
-			"PylonTop",
-			Vector3.new(2.4, 1.2, 12),
-			origin + Vector3.new(x, level.upperY, z),
+	if level.river then
+		--[[
+			Der Fluss ist reine Optik: er kollidiert mit nichts und wird von
+			keinem Strahl getroffen. Auf die Physik oder die Kraefteberechnung
+			hat er keinerlei Einfluss - Stuetzen duerfen mitten hindurch.
+		]]
+		local riverDepth = 3.5
+		local bed = makePart(
+			"RiverBed",
+			Vector3.new(level.gapWidth + 6, riverDepth, depth * 0.55),
+			origin + Vector3.new(0, level.groundY - riverDepth / 2 + 0.5, z),
 			terrain
 		)
-		crossBeam.Color = Color3.fromRGB(140, 134, 124)
-		crossBeam.Material = Enum.Material.Concrete
-		crossBeam.CanCollide = false
+		bed.Color = Color3.fromRGB(74, 78, 72)
+		bed.Material = Enum.Material.Sand
+
+		local water = makeDecor(
+			"River",
+			Vector3.new(level.gapWidth + 6, 2.6, depth * 0.55),
+			origin + Vector3.new(0, level.riverY - 1.3, z),
+			decor
+		)
+		water.Color = Color3.fromRGB(58, 122, 158)
+		water.Material = Enum.Material.Glass
+		water.Transparency = 0.35
+		water.Reflectance = 0.28
+
+		-- Kiesbaenke am Ufer
+		for _, side in { -1, 1 } do
+			local bank = makeDecor(
+				"Bank",
+				Vector3.new(level.gapWidth + 6, 1.4, depth * 0.14),
+				origin + Vector3.new(0, level.groundY + 0.2, z + side * depth * 0.32),
+				decor
+			)
+			bank.Color = Color3.fromRGB(150, 142, 124)
+			bank.Material = Enum.Material.Sand
+		end
+
+		-- Ein paar Steine im Wasser
+		for i = 1, 4 do
+			local x = -level.gapWidth / 2 + i * (level.gapWidth / 5)
+			makeBoulder(origin + Vector3.new(x, level.groundY + 0.8, z + (if i % 2 == 0 then 6 else -7)), 2 + i % 3, decor)
+		end
 	end
 
 	----------------------------------------------------------------------------
-	-- Start- und Zielmarkierung
+	-- Pylone: sie tragen die beiden festen Ankerpunkte der oberen Reihe
 	----------------------------------------------------------------------------
 
-	local start = makePart(
-		"StartMarker",
-		Vector3.new(1.2, 0.4, 8),
-		origin + Vector3.new(level.vehicle.startX, level.deckY + 0.35, z),
-		terrain
-	)
-	start.Color = Color3.fromRGB(235, 235, 235)
-	start.Material = Enum.Material.Neon
-	start.CanCollide = false
-	start.CanQuery = false
+	local topDeckY = level.topDeckY
+	local pylonHeight = level.upperY - topDeckY
+	local outerX = level.gapRightX + level.snapSpacing
 
-	local finish = makePart(
-		"FinishZone",
-		Vector3.new(1.6, 9, level.platformDepth * 0.5),
-		origin + Vector3.new(level.vehicle.finishX, level.deckY + 4.5, z),
-		terrain
-	)
-	finish.Color = Color3.fromRGB(74, 208, 118)
-	finish.Material = Enum.Material.Neon
-	finish.Transparency = 0.55
-	finish.CanCollide = false
-	finish.CanQuery = false
+	if pylonHeight > 0 then
+		for _, x in { -outerX, outerX } do
+			for _, offsetZ in { -5, 5 } do
+				local pylon = makeDecor(
+					"Pylon",
+					Vector3.new(2.2, pylonHeight, 2.2),
+					origin + Vector3.new(x, topDeckY + pylonHeight / 2, z + offsetZ),
+					terrain
+				)
+				pylon.Color = Color3.fromRGB(162, 156, 146)
+				pylon.Material = Enum.Material.Concrete
+			end
+
+			local crossBeam = makeDecor(
+				"PylonTop",
+				Vector3.new(2.4, 1.2, 12),
+				origin + Vector3.new(x, level.upperY, z),
+				terrain
+			)
+			crossBeam.Color = Color3.fromRGB(142, 136, 126)
+			crossBeam.Material = Enum.Material.Concrete
+		end
+	end
+
+	----------------------------------------------------------------------------
+	-- Start- und Zielmarkierung je Fahrzeug
+	----------------------------------------------------------------------------
+
+	for _, vehicle in level.vehicles do
+		local start = makeDecor(
+			"StartMarker",
+			Vector3.new(1.2, 0.4, 8),
+			origin + Vector3.new(vehicle.startX, vehicle.deckY + 0.45, z),
+			decor
+		)
+		start.Color = Color3.fromRGB(235, 235, 235)
+		start.Material = Enum.Material.Neon
+
+		local finish = makeDecor(
+			"FinishZone",
+			Vector3.new(1.6, 9, 12),
+			origin + Vector3.new(vehicle.finishX, vehicle.deckY + 4.5, z),
+			decor
+		)
+		finish.Color = Color3.fromRGB(74, 208, 118)
+		finish.Material = Enum.Material.Neon
+		finish.Transparency = 0.55
+	end
+
+	----------------------------------------------------------------------------
+	-- Hintergrund: ein paar Huegel weit hinten geben Tiefe
+	----------------------------------------------------------------------------
+
+	for i = 1, 6 do
+		local hillX = level.bounds.minX + (i - 0.5) * (level.bounds.maxX - level.bounds.minX) / 6
+		local height = 34 + (i % 3) * 20
+		local hill = makeDecor(
+			"Hill",
+			Vector3.new(70 + (i % 4) * 26, height, 30),
+			origin + Vector3.new(hillX + (i % 2) * 14, height / 2 - 6, z - 130 - (i % 3) * 26),
+			decor
+		)
+		-- Weiter hinten heisst blasser: das erzeugt Tiefenwirkung.
+		hill.Color = Color3.fromRGB(104 + i * 4, 122 + i * 3, 116 + i * 5)
+		hill.Material = Enum.Material.Grass
+	end
 
 	----------------------------------------------------------------------------
 	-- Ankerpunkte sichtbar machen
@@ -244,6 +374,7 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 	return {
 		root = root,
 		terrain = terrain,
+		decor = decor,
 		snapPoints = snapFolder,
 		nodes = nodesFolder,
 		members = membersFolder,

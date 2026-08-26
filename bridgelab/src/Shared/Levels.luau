@@ -16,17 +16,32 @@
 
 	        deck   #---o---o---o---o---o---o---o---o---o---#        Fahrbahnhoehe
 	              |###|                Luecke               |###|   (hier faehrt das Fahrzeug)
-	              |###|                                     |###|
+	              |###|          ~~~~~ Fluss ~~~~~          |###|
 	        ground |##| #   #   #   #   #   #   #   #   #  #|###|   Grund der Schlucht
 	              +--------------------------------------------+
 
 	  #  = fester Ankerpunkt (unbeweglich, am Boden verankert)
 	  o  = freier Ankerpunkt (kann sich unter Last bewegen)
 
-	DIE DREI REIHEN
-	  "deck"    Hoehe der Fahrbahn     -> hier faehrt das Testfahrzeug
-	  "upper"   darueber               -> fuer Tuerme, Boegen, Abspannungen
-	  "ground"  am Grund der Schlucht  -> Fusspunkte fuer Stuetzen
+	DIE REIHEN
+	  "deck1", "deck2", ...  Fahrbahnhoehen  -> hier faehrt ein Testfahrzeug
+	  "upper"                ganz oben       -> fuer Tuerme und Abspannungen
+	  "ground"               Schluchtgrund   -> Fusspunkte fuer Stuetzen
+
+	MEHRERE FAHRBAHNEN, MEHRERE FAHRZEUGE
+	Ein Level kann mehr als eine Fahrbahn haben (Feld "decks") und mehr als
+	ein Testfahrzeug (Feld "vehicles"). Jedes Fahrzeug faehrt auf einer
+	bestimmten Fahrbahn und in eine bestimmte Richtung. Bestanden ist der
+	Test erst, wenn ALLE Fahrzeuge ihr Ziel erreicht haben. Damit lassen
+	sich Gegenverkehr und Doppelstockbruecken bauen.
+
+	ZWEI FALLEN, DIE EIN LEVEL UNLOESBAR MACHEN
+	  * upperY darf hoechstens 10 Studs (Balkenlaenge) ueber der obersten
+	    Fahrbahn liegen, sonst kommt man mit keinem Balken hin.
+	  * deckY - groundY darf hoechstens 40 Studs (Stuetzenlaenge) betragen,
+	    sonst erreicht keine Stuetze den Grund - und dann laesst sich die
+	    senkrechte Last nirgendwo abtragen.
+	  Pruefen laesst sich das mit tools/check_levels.luau.
 ]]
 
 local Levels = {}
@@ -35,10 +50,6 @@ local Levels = {}
 -- Bauplan eines Levels aus den Eckdaten erzeugen
 --------------------------------------------------------------------------------
 
---[[
-	Erwartet eine Tabelle mit den Eckdaten und ergaenzt daraus alles Uebrige,
-	vor allem die Liste der Ankerpunkte.
-]]
 local function makeLevel(def)
 	local level = def
 
@@ -52,18 +63,32 @@ local function makeLevel(def)
 	level.platformLength = def.platformLength or 60
 	level.platformDepth = def.platformDepth or 40
 
+	----------------------------------------------------------------------------
+	-- Fahrbahnen
+	----------------------------------------------------------------------------
+
+	-- Ein Level ohne ausdrueckliche Angabe hat genau eine Fahrbahn.
+	level.decks = def.decks or { { y = def.deckY } }
+	for index, deck in level.decks do
+		deck.index = index
+		deck.row = "deck" .. index
+	end
+
+	-- Die unterste Fahrbahn ist die Hauptfahrbahn (Kamera, Plattformhoehe).
+	level.deckY = level.decks[1].y
+	level.topDeckY = level.decks[#level.decks].y
+
+	----------------------------------------------------------------------------
+	-- Ankerpunkte erzeugen
+	----------------------------------------------------------------------------
+
 	--[[
 		Wie weit das Raster in die festen Plattformen hineinreicht.
 		Ein Stueck Ueberlappung ist noetig, damit die Fahrbahn ueberhaupt
 		irgendwo fest verankert werden kann.
 	]]
 	local overlap = level.snapSpacing
-	local deckHalf = level.gapRightX + overlap
-	local upperHalf = level.gapRightX + overlap
-
-	----------------------------------------------------------------------------
-	-- Ankerpunkte erzeugen
-	----------------------------------------------------------------------------
+	local half = level.gapRightX + overlap
 
 	level.snapPoints = {}
 
@@ -77,15 +102,17 @@ local function makeLevel(def)
 		}
 	end
 
-	-- Fahrbahnreihe. Alles ab dem Rand der Luecke steht auf festem Boden.
-	for x = -deckHalf, deckHalf, level.snapSpacing do
-		addSnapPoint("deck", x, level.deckY, math.abs(x) >= level.gapRightX)
+	-- Je Fahrbahn eine Reihe. Alles ab dem Rand der Luecke steht auf festem Boden.
+	for _, deck in level.decks do
+		for x = -half, half, level.snapSpacing do
+			addSnapPoint(deck.row, x, deck.y, math.abs(x) >= level.gapRightX)
+		end
 	end
 
 	-- Obere Reihe. Nur die beiden aeussersten Punkte sind fest - sie sitzen
 	-- auf den Pylonen, die auf den Plattformen stehen.
-	for x = -upperHalf, upperHalf, level.snapSpacing do
-		addSnapPoint("upper", x, level.upperY, math.abs(x) >= upperHalf - 0.01)
+	for x = -half, half, level.snapSpacing do
+		addSnapPoint("upper", x, level.upperY, math.abs(x) >= half - 0.01)
 	end
 
 	-- Bodenreihe im Schluchtgrund. Alle Punkte sind fest.
@@ -94,11 +121,33 @@ local function makeLevel(def)
 	end
 
 	----------------------------------------------------------------------------
-	-- Fahrzeug: Start und Ziel ergeben sich aus der Plattformlaenge
+	-- Testfahrzeuge
 	----------------------------------------------------------------------------
 
-	level.vehicle.startX = level.gapLeftX - 14
-	level.vehicle.finishX = level.gapRightX + 14
+	-- Ohne Angabe faehrt genau ein Fahrzeug auf der ersten Fahrbahn nach rechts.
+	local plan = def.vehicles or { { deck = 1, direction = 1 } }
+	level.vehicles = {}
+
+	for index, entry in plan do
+		local deck = level.decks[entry.deck or 1]
+		local direction = entry.direction or 1
+		local outsideLeft = level.gapLeftX - 14
+		local outsideRight = level.gapRightX + 14
+
+		level.vehicles[index] = {
+			index = index,
+			deckIndex = deck.index,
+			deckRow = deck.row,
+			deckY = deck.y,
+			direction = direction,
+			-- Nach rechts: links starten. Nach links: rechts starten.
+			startX = if direction > 0 then outsideLeft else outsideRight,
+			finishX = if direction > 0 then outsideRight else outsideLeft,
+			mass = entry.mass or def.vehicle.mass,
+			size = def.vehicle.size,
+			color = entry.color,
+		}
+	end
 
 	----------------------------------------------------------------------------
 	-- Abgeleitete Angaben
@@ -107,9 +156,15 @@ local function makeLevel(def)
 	-- Erlaubte Bauteile: nil bedeutet "alle".
 	level.allowedParts = def.allowedParts
 
-	-- Wie viele Tipps in diesem Level gratis sind.
-	-- Faustregel im Spiel: leichte Level (Schwierigkeit 1-3) haben einen
-	-- Gratis-Tipp, schwere Level (4-5) kosten schon beim ersten Tipp.
+	-- Fluss im Schluchtgrund? Rein optisch, aendert nichts an der Physik.
+	level.river = def.river ~= false and def.groundY >= 4
+	level.riverY = def.groundY + 2.5
+
+	--[[
+		Wie viele Tipps in diesem Level gratis sind.
+		Faustregel im Spiel: leichte Level (Schwierigkeit 1-3) haben einen
+		Gratis-Tipp, schwere Level (4-5) kosten schon beim ersten Tipp.
+	]]
 	level.freeHints = def.freeHints or (if def.difficulty <= 3 then 1 else 0)
 
 	-- Erlaubt ein Bauteil? Praktisch fuer Server UND Oberflaeche.
@@ -124,12 +179,12 @@ local function makeLevel(def)
 		return level.snapPoints[id]
 	end
 
-	-- Waagerechte Mitte und Ausdehnung - die Kamera braucht das.
+	-- Ausmasse des Levels - die Kamera begrenzt danach ihren Zoom.
 	level.bounds = {
 		minX = level.gapLeftX - level.platformLength,
 		maxX = level.gapRightX + level.platformLength,
-		minY = 0,
-		maxY = level.upperY + 10,
+		minY = math.max(level.groundY - 12, 0),
+		maxY = level.upperY + 12,
 	}
 
 	return level
@@ -140,10 +195,10 @@ end
 --------------------------------------------------------------------------------
 
 --[[
-	ANNAHME zur Fahrgeschwindigkeit: Alle Level fahren mit 3.2 Studs pro
-	Sekunde. Das ist bewusst langsam (frueher waren es 8), damit man beim
-	Test in Ruhe verfolgen kann, welches Bauteil sich wie stark belastet.
-	Die Zeitlimits sind entsprechend grosszuegig gesetzt.
+	ANNAHME zur Fahrgeschwindigkeit: Sie steht NICHT mehr im Level. Der
+	Spieler stellt sie im Test selbst am Tacho ein (1 bis 14 Studs pro
+	Sekunde). Das Zeitlimit richtet sich automatisch nach der gewaehlten
+	Geschwindigkeit, damit langsames Fahren nie bestraft wird.
 ]]
 
 Levels.list = {
@@ -154,7 +209,6 @@ Levels.list = {
 		difficulty = 1,
 
 		budget = 200,
-		timeLimit = 60,
 		maxDropStuds = 10,
 
 		gapWidth = 40,
@@ -162,7 +216,7 @@ Levels.list = {
 		upperY = 48,
 		groundY = 20,
 
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6), speed = 3.2 },
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
 
 		hints = {
 			"Eine gerade Fahrbahn traegt sich nicht selbst. Jeder Fahrbahnknoten, der frei in der Luft haengt, braucht Abstuetzung von unten - sonst kann die Last nirgendwo hin.",
@@ -178,7 +232,6 @@ Levels.list = {
 		difficulty = 2,
 
 		budget = 240,
-		timeLimit = 70,
 		maxDropStuds = 10,
 
 		gapWidth = 48,
@@ -186,7 +239,7 @@ Levels.list = {
 		upperY = 52,
 		groundY = 12,
 
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6), speed = 3.2 },
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
 
 		hints = {
 			"Bis zum Grund sind es 32 Studs. Eine Stuetze schafft hoechstens 40 - es reicht also gerade, aber die Stuetzen werden schwer und ziehen mit ihrem Eigengewicht an der Fahrbahn.",
@@ -202,7 +255,6 @@ Levels.list = {
 		difficulty = 3,
 
 		budget = 135,
-		timeLimit = 60,
 		maxDropStuds = 10,
 
 		gapWidth = 40,
@@ -210,7 +262,7 @@ Levels.list = {
 		upperY = 48,
 		groundY = 18,
 
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6), speed = 3.2 },
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
 
 		hints = {
 			"135 Einheiten sind knapp bemessen. Jeder ueberfluessige Balken kostet 10 - plane die ganze Bruecke, bevor du das erste Teil setzt.",
@@ -221,49 +273,74 @@ Levels.list = {
 
 	makeLevel({
 		id = "Level4",
-		displayName = "Weite Spannung",
-		subtitle = "64 Studs Luecke. Ab hier kostet jeder Tipp Robux.",
+		displayName = "Gegenverkehr",
+		subtitle = "Zwei Fahrzeuge, aus beiden Richtungen gleichzeitig.",
 		difficulty = 4,
 
-		budget = 260,
-		timeLimit = 90,
-		maxDropStuds = 12,
-
-		gapWidth = 64,
-		deckY = 44,
-		upperY = 52,
-		groundY = 20,
-
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6), speed = 3.2 },
-
-		hints = {
-			"64 Studs sind viel, aber das Prinzip bleibt genau dasselbe: eine durchgehende Fahrbahn aus Balken, darunter Stuetzen bis zum Grund.",
-			"Acht Balken zu je 8 Studs ergeben die Fahrbahn (80). Darunter passen sieben Stuetzen (105).",
-			"Achte im Test auf die Zahlen ueber den Stuetzen. Sie halten 800 N. Steht das Fahrzeug genau ueber einer, wird es eng - eine zweite Stuetze gleich daneben teilt die Last auf.",
-		},
-	}),
-
-	makeLevel({
-		id = "Level5",
-		displayName = "Hohe Pfeiler",
-		subtitle = "38 Studs bis zum Grund - fast die Grenze einer Stuetze.",
-		difficulty = 4,
-
-		budget = 230,
-		timeLimit = 70,
+		-- Geprueft: die guenstigste tragende Loesung kostet 285.
+		budget = 360,
 		maxDropStuds = 12,
 
 		gapWidth = 48,
 		deckY = 44,
 		upperY = 52,
-		groundY = 6,
+		groundY = 16,
 
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6), speed = 3.2 },
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
+
+		--[[
+			Zwei Fahrzeuge fahren aufeinander zu. In der Mitte begegnen sie
+			sich - dort liegen dann 2000 N auf wenigen Studs Fahrbahn.
+		]]
+		vehicles = {
+			{ deck = 1, direction = 1, color = Color3.fromRGB(198, 72, 58) },
+			{ deck = 1, direction = -1, color = Color3.fromRGB(64, 118, 206) },
+		},
 
 		hints = {
-			"Eine Stuetze reicht hoechstens 40 Studs weit. Hier sind es 38 - es geht also, aber knapp.",
-			"Lange Stuetzen sind schwer: 3 Masse je Stud, also ueber 100 N Eigengewicht pro Stueck. Dieses Gewicht haengt zusaetzlich an deiner Fahrbahn. Je weniger Stuetzen, desto leichter die Bruecke.",
-			"Loesung: sechs Balken zu 8 Studs (60) und fuenf lange Stuetzen (75) ergeben 135 von 230.",
+			"Beide Fahrzeuge treffen sich genau in der Mitte. Dort liegt dann die doppelte Last - 2000 N auf wenigen Studs.",
+			"Eine Stuetze haelt 800 N. In der Mitte brauchst du deshalb enger stehende Stuetzen als am Rand: dort lieber alle 4 statt alle 8 Studs.",
+			"Loesung: Fahrbahn aus zwoelf Balken zu 4 Studs (120) und elf Stuetzen im 4er-Abstand (165) - zusammen 285 von 360. Die weiten 8er-Spannweiten aus den ersten Leveln reichen hier nicht mehr.",
+		},
+	}),
+
+	makeLevel({
+		id = "Level5",
+		displayName = "Doppeldecker",
+		subtitle = "Zwei Fahrbahnen uebereinander - und beide muessen halten.",
+		difficulty = 5,
+
+		-- Geprueft: die guenstigste tragende Loesung kostet 370.
+		budget = 480,
+		maxDropStuds = 12,
+
+		gapWidth = 32,
+		upperY = 64,
+		groundY = 20,
+
+		--[[
+			Zwei Fahrbahnen im Abstand von 16 Studs. Ein Balken schafft nur
+			10 Studs - zwischen den Ebenen kommst du also ausschliesslich mit
+			STUETZEN hoch. Genau darin liegt die Aufgabe.
+		]]
+		decks = {
+			{ y = 40 },
+			{ y = 56 },
+		},
+
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
+
+		vehicles = {
+			{ deck = 1, direction = 1, color = Color3.fromRGB(198, 72, 58) },
+			-- Oben faehrt ein leichterer Lieferwagen. Sonst waere die Last auf
+			-- den unteren Stuetzen kaum noch zu tragen.
+			{ deck = 2, direction = 1, mass = 600, color = Color3.fromRGB(232, 172, 62) },
+		},
+
+		hints = {
+			"Baue zuerst die UNTERE Fahrbahn ganz normal fertig, mit Stuetzen bis zum Grund. Die obere Ebene setzt darauf auf.",
+			"Zwischen den beiden Fahrbahnen liegen 16 Studs. Ein Balken schafft nur 10 - du kommst also nur mit Stuetzen nach oben. Die duerfen auf der unteren Fahrbahn stehen.",
+			"Loesung: beide Fahrbahnen im 4er-Raster - je acht Balken (80) und sieben Stuetzen (105) pro Ebene, zusammen 370 von 480. Was oben faehrt, drueckt durch die Stuetzen auf die untere Fahrbahn und von dort weiter zum Grund: der untere Weg traegt also beides.",
 		},
 	}),
 
@@ -274,7 +351,6 @@ Levels.list = {
 		difficulty = 5,
 
 		budget = 320,
-		timeLimit = 110,
 		maxDropStuds = 14,
 
 		gapWidth = 80,
@@ -282,12 +358,12 @@ Levels.list = {
 		upperY = 54,
 		groundY = 22,
 
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6), speed = 3.2 },
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
 
 		hints = {
 			"80 Studs. Baue zuerst die komplette Fahrbahn von einer Seite zur anderen, und erst danach die Stuetzen. So siehst du sofort, wie viel Budget dir bleibt.",
 			"Zehn Balken zu je 8 Studs sind 100 Einheiten. Neun Stuetzen kosten 135. Zusammen 235 von 320.",
-			"Die restlichen 85 Einheiten sind deine Reserve. Starte einen Test und sieh zu, wo die Anzeige ueber 80 Prozent klettert - genau dort setzt du eine zusaetzliche Stuetze.",
+			"Die restlichen 85 Einheiten sind deine Reserve. Fahre langsam und sieh zu, wo die Anzeige ueber 80 Prozent klettert - genau dort setzt du eine zusaetzliche Stuetze.",
 		},
 	}),
 }
@@ -318,6 +394,8 @@ function Levels.summaries()
 			difficulty = level.difficulty,
 			budget = level.budget,
 			gapWidth = level.gapWidth,
+			deckCount = #level.decks,
+			vehicleCount = #level.vehicles,
 			hintCount = #level.hints,
 			freeHints = level.freeHints,
 		}

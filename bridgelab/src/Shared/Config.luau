@@ -187,11 +187,26 @@ Config.Physics = {
 
 Config.Test = {
 	--[[
-		Der Test laeuft bewusst LANGSAM ab, damit man in Ruhe zusehen kann,
-		welches Bauteil sich wie stark belastet. Die Fahrgeschwindigkeit steht
-		in jedem Level einzeln (Feld "speed" beim Fahrzeug) und ist bereits
-		auf diesen langsamen Wert eingestellt.
+		Die Fahrgeschwindigkeit stellt der Spieler selbst ein - am Tacho
+		unten in der Oberflaeche, auch noch waehrend der Fahrt.
+		Langsam heisst: man sieht genau zu, welches Bauteil wie stark
+		belastet wird. Schnell heisst: es geht zackig, aber das Fahrzeug
+		schlaegt haerter auf und bringt die Bruecke staerker ins Schwingen.
 	]]
+	minSpeed = 1,
+	maxSpeed = 14,
+	defaultSpeed = 3.2,
+	speedStep = 0.2,
+
+	--[[
+		Ab wann gilt ein Balken als BEFAHRBAR?
+		Nur flach liegende Balken sind Fahrbahn. Alles Steilere ist Tragwerk
+		und wird fuer das Fahrzeug durchlaessig gemacht - sonst wuerde eine
+		senkrechte Strebe das Auto einfach ausbremsen.
+		Der Wert ist |Hoehenunterschied| geteilt durch die Laenge:
+		0.5 entspricht etwa 30 Grad Steigung.
+	]]
+	roadwayMaxRise = 0.5,
 
 	-- Kurze Pause vor dem Losfahren, damit man die Ausgangslage sieht.
 	countdownSeconds = 2,
@@ -236,8 +251,21 @@ Config.Difficulty = {
 Config.Camera = {
 	-- Abstand der Kamera zur Bruecken-Ebene in Studs.
 	defaultDistance = 110,
-	minDistance = 45,
-	maxDistance = 220,
+
+	--[[
+		Heranzoomen darf man so weit man will - bis dicht an ein einzelnes
+		Bauteil heran.
+		Herauszoomen dagegen nur so weit, bis das Level das Bild ausfuellt.
+		Weiter waere sinnlos: man saehe nur noch leere Umgebung. Die obere
+		Grenze berechnet die Kamera fuer jedes Level selbst aus dessen
+		Ausmassen (siehe CameraController:setArena); die Zahl hier ist nur
+		die Notbremse, falls keine Levelmasse vorliegen.
+	]]
+	minDistance = 12,
+	maxDistance = 260,
+
+	-- Wie viel Rand ueber die Levelgrenzen hinaus beim weitesten Zoom.
+	zoomOutMargin = 1.06,
 
 	-- Wie schnell das Mausrad bzw. die Trigger zoomen.
 	zoomStepMouse = 12,
@@ -292,6 +320,7 @@ Config.RemoteNames = {
 	"PlaceMember", -- Bauteil setzen
 	"RemoveMember", -- Bauteil entfernen
 	"StartTest", -- Belastungstest starten
+	"SetTestSpeed", -- Tacho: Fahrgeschwindigkeit aendern
 	"ResetLevel", -- Konstruktion zuruecksetzen
 	"RequestHint", -- naechsten Tipp anfordern
 	"TutorialFinished", -- Anleitung wurde durchgespielt

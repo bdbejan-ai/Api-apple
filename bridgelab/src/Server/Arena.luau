@@ -60,6 +60,9 @@ function Arena.new(player: Player, level, slotIndex: number, parentFolder: Insta
 	self.testProgress = nil
 	self.unlockedHints = {}
 
+	-- Vom Spieler am Tacho eingestellte Fahrgeschwindigkeit.
+	self.testSpeed = Config.Test.defaultSpeed
+
 	self.buildSolveAccumulator = 0
 
 	-- Wird von aussen gesetzt: "der Zustand hat sich geaendert, bitte senden".
@@ -99,8 +102,10 @@ function Arena:buildState()
 		result = self.result,
 		testProgress = self.testProgress,
 
-		timeLimit = self.level.timeLimit,
 		allowedParts = self.level.allowedParts,
+		testSpeed = self.testSpeed,
+		vehicleCount = #self.level.vehicles,
+		deckCount = #self.level.decks,
 		unlockedHints = self.unlockedHints,
 		hintTotal = #self.level.hints,
 		freeHints = self.level.freeHints,
@@ -194,7 +199,7 @@ end
 	onComplete(success, reason) wird aufgerufen, wenn der Test vorbei ist -
 	das Hauptskript nutzt das, um den Levelfortschritt zu speichern.
 ]]
-function Arena:startTest(onComplete): (boolean, string)
+function Arena:startTest(speed: number, onComplete): (boolean, string)
 	if self.phase ~= "Build" then
 		return false, "Der Test laeuft schon."
 	end
@@ -202,13 +207,22 @@ function Arena:startTest(onComplete): (boolean, string)
 		return false, "Erst bauen, dann testen."
 	end
 
+	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
+
 	self.phase = "Test"
 	self.result = nil
 	self.message = "Test laeuft ..."
-	self.testProgress = { countdown = Config.Test.countdownSeconds, elapsed = 0, maxUtilisation = 0 }
+	self.testProgress = {
+		countdown = Config.Test.countdownSeconds,
+		elapsed = 0,
+		maxUtilisation = 0,
+		speed = self.testSpeed,
+		vehiclesDone = 0,
+		vehicleCount = #self.level.vehicles,
+	}
 	self:notify()
 
-	self.testRun:start(function(progress)
+	self.testRun:start(self.testSpeed, function(progress)
 		-- Fortschritt waehrend der Fahrt (Countdown, Zeit, hoechste Auslastung)
 		self.testProgress = progress
 		self:notify()
@@ -225,6 +239,19 @@ function Arena:startTest(onComplete): (boolean, string)
 	end)
 
 	return true, ""
+end
+
+--[[
+	Geschwindigkeit am Tacho veraendern. Erlaubt ist das jederzeit - auch
+	mitten in der Fahrt. Der Server begrenzt den Wert selbst, damit ein
+	veraenderter Client kein unsinniges Tempo durchsetzen kann.
+]]
+function Arena:setTestSpeed(speed: number)
+	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
+	if self.testRun:isRunning() then
+		self.testRun:setSpeed(self.testSpeed)
+	end
+	self:notify()
 end
 
 -- Konstruktion in den Ausgangszustand bringen. Der Bauplan bleibt erhalten.

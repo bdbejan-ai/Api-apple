@@ -53,6 +53,47 @@ end
 local TAP_MAX_SECONDS = 0.4
 local TAP_MAX_PIXELS = 18
 
+--[[
+	Kuerzester Abstand zwischen einem Strahl und einer Strecke.
+
+	Gebraucht wird das beim Abreissen: welches Bauteil liegt unter dem
+	Zeiger? Ein Raycast waere ungenau, weil er immer nur das vorderste
+	sichtbare Teil trifft - bei duennen Seilen und sich kreuzenden Streben
+	trifft man damit staendig das Falsche. Der echte Abstand zur Bauteil-
+	ACHSE ist dagegen eindeutig.
+
+	Strahl:  P(s) = origin + s * direction   (s >= 0, direction normiert)
+	Strecke: Q(t) = a + t * (b - a)          (t zwischen 0 und 1)
+	Gesucht ist das kleinste |P - Q|.
+]]
+local function rayToSegmentDistance(origin: Vector3, direction: Vector3, a: Vector3, b: Vector3): (number, number)
+	local ab = b - a
+	local w0 = origin - a
+
+	local bDot = direction:Dot(ab)
+	local c = ab:Dot(ab)
+	local dd = direction:Dot(w0)
+	local e = ab:Dot(w0)
+
+	local denom = c - bDot * bDot
+
+	local t
+	if math.abs(denom) < 1e-6 then
+		-- Strahl und Strecke sind fast parallel: Anfang der Strecke nehmen.
+		t = 0
+	else
+		t = (e - bDot * dd) / denom
+	end
+	t = math.clamp(t, 0, 1)
+
+	-- Passenden Punkt auf dem Strahl dazu suchen; hinter die Kamera darf er nicht.
+	local s = math.max(bDot * t - dd, 0)
+
+	local onRay = origin + direction * s
+	local onSegment = a + ab * t
+	return (onRay - onSegment).Magnitude, s
+end
+
 --------------------------------------------------------------------------------
 
 function BuildController.new()
@@ -122,6 +163,21 @@ function BuildController:createMarkers()
 	self.startMarker = marker("StartMarker", Color3.fromRGB(120, 220, 255), 2.6)
 	-- Stelle, an der die Konstruktion nicht ausgesteift ist
 	self.weakMarker = marker("WeakSpotMarker", Color3.fromRGB(255, 90, 70), 3.2)
+
+	--[[
+		Hervorhebung des Bauteils, das beim naechsten Klick verschwindet.
+		Ohne sie raet man beim Abreissen - gerade wenn sich Streben kreuzen.
+	]]
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "RemoveHighlight"
+	highlight.FillColor = Color3.fromRGB(235, 80, 70)
+	highlight.FillTransparency = 0.55
+	highlight.OutlineColor = Color3.fromRGB(255, 150, 140)
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = nil
+	highlight.Parent = workspace
+	self.removeHighlight = highlight
 
 	-- Vorschaulinie zwischen erstem und anvisiertem Ankerpunkt
 	local preview = Instance.new("Part")
@@ -193,10 +249,6 @@ function BuildController:setArena(arenaFolder: Instance?)
 		self.memberFolder = nil
 	end
 
-	self.raycastParams = RaycastParams.new()
-	self.raycastParams.FilterType = Enum.RaycastFilterType.Include
-	self.raycastParams.FilterDescendantsInstances = if self.memberFolder then { self.memberFolder } else {}
-
 	self:cancelSelection()
 end
 
@@ -214,6 +266,7 @@ function BuildController:hideMarkers()
 	self.startMarker.Transparency = 1
 	self.preview.Transparency = 1
 	self.weakMarker.Transparency = 1
+	self.removeHighlight.Adornee = nil
 end
 
 --------------------------------------------------------------------------------
@@ -296,16 +349,47 @@ function BuildController:findSnapUnderPointer(): (number?, Vector3?)
 	return bestIndex, bestPosition
 end
 
-function BuildController:findMemberUnderPointer(): number?
+--[[
+	Sucht das Bauteil, dessen Achse dem Zeigestrahl am naechsten liegt.
+	Rueckgabe: Nummer des Bauteils und sein Model (fuer die Hervorhebung).
+]]
+function BuildController:findMemberUnderPointer(): (number?, Instance?)
 	if not self.memberFolder then
-		return nil
+		return nil, nil
 	end
+
 	local ray = self:pointerRay()
-	local hit = workspace:Raycast(ray.Origin, ray.Direction.Unit * 600, self.raycastParams)
-	if hit and hit.Instance then
-		return hit.Instance:GetAttribute("MemberId")
+	local origin = ray.Origin
+	local direction = ray.Direction.Unit
+	local touch = Device.isTouch()
+
+	local bestId, bestModel = nil, nil
+	local bestDistance = math.huge
+
+	for _, model in self.memberFolder:GetChildren() do
+		local id = model:GetAttribute("MemberId")
+		local pointA = model:GetAttribute("PointA")
+		local pointB = model:GetAttribute("PointB")
+		if not id or typeof(pointA) ~= "Vector3" or typeof(pointB) ~= "Vector3" then
+			continue
+		end
+
+		local distance, along = rayToSegmentDistance(origin, direction, pointA, pointB)
+		if along < 1 or along > 600 then
+			continue
+		end
+
+		-- Der Fangbereich waechst mit der Entfernung mit, damit weit entfernte
+		-- Bauteile nicht unmoeglich zu treffen sind.
+		local tolerance = math.clamp(along * (if touch then 0.035 else 0.022), if touch then 2 else 1.2, if touch then 7 else 5)
+		if distance <= tolerance and distance < bestDistance then
+			bestDistance = distance
+			bestId = id
+			bestModel = model
+		end
 	end
-	return nil
+
+	return bestId, bestModel
 end
 
 --------------------------------------------------------------------------------
@@ -321,11 +405,27 @@ function BuildController:update(dt: number)
 	end
 
 	if self.removeMode then
-		-- Im Abrissmodus wird kein Ankerpunkt hervorgehoben.
+		-- Im Abrissmodus wird nicht der Ankerpunkt, sondern das Bauteil
+		-- hervorgehoben, das beim naechsten Klick verschwindet.
 		self.hoverMarker.Transparency = 1
 		self.preview.Transparency = 1
 		self.startMarker.Transparency = 1
+
+		local _, model = self:findMemberUnderPointer()
+		self.removeHighlight.Adornee = model
 		return
+	end
+
+	--[[
+		Auch ausserhalb des Abrissmodus wird das Bauteil unter dem Zeiger
+		markiert, solange keine Auswahl offen ist - denn ein Rechtsklick
+		reisst es dann ab.
+	]]
+	if not self.firstSnap then
+		local _, model = self:findMemberUnderPointer()
+		self.removeHighlight.Adornee = model
+	else
+		self.removeHighlight.Adornee = nil
 	end
 
 	local index, position = self:findSnapUnderPointer()
@@ -393,6 +493,7 @@ function BuildController:primaryAction()
 		local memberId = self:findMemberUnderPointer()
 		if memberId and self.onRemoveRequest then
 			self.onRemoveRequest(memberId)
+			self.removeHighlight.Adornee = nil
 		end
 		return
 	end

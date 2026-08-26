@@ -2,7 +2,8 @@
 
 Ein Physik-Baurätsel für Roblox: Du baust aus Balken, Seilen und Stützen eine
 Brücke über eine Schlucht. Danach fährt ein 1000 Einheiten schweres Fahrzeug
-darüber. Hält die Konstruktion, hast du gewonnen.
+darüber — in späteren Leveln auch zwei gleichzeitig. Hält die Konstruktion,
+hast du gewonnen.
 
 Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umbenennen)).
 
@@ -26,12 +27,15 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 
 | | |
 |---|---|
-| **Level-Auswahl** | Sechs Level mit angezeigtem Schwierigkeitsgrad (1–5 Punkte), Budget, Lückenbreite und Haken für geschaffte Level |
+| **Level-Auswahl** | Sechs Level mit Vorschaubild, Schwierigkeitsgrad (1–5), Budget, Lückenbreite und Haken für geschaffte Level |
 | **Interaktive Anleitung** | Startet beim allerersten Spielstart automatisch. Neun Schritte, in denen man wirklich selbst baut. Texte passen sich dem Eingabegerät an |
-| **Seitenansicht** | Keine Spielfigur. Die Kamera schaut waagerecht auf die Brücke, wie ein Brettspiel von der Seite |
-| **Belastungsanzeige** | Über jedem Bauteil steht während des Tests, wie stark es belastet ist — in Prozent und in Newton, dazu ein Farbbalken |
-| **Langsamer Test** | Das Fahrzeug fährt mit 3,2 Studs/s (statt vorher 8), mit Countdown davor. Man kann in Ruhe zusehen |
-| **Tipps** | Drei Tipps pro Level. In Level 1–3 ist der erste gratis, in Level 4–6 kostet schon der erste Robux |
+| **Seitenansicht** | Keine Spielfigur. Beliebig nah heranzoomen; herauszoomen nur so weit, bis das Level das Bild füllt |
+| **Tacho** | Schieberegler von 1 bis 14 Studs/s. Einstellbar vor dem Test **und mitten in der Fahrt**. Das Zeitlimit passt sich mit an |
+| **Belastungsanzeige** | Über jedem Bauteil steht während des Tests die Auslastung in Prozent und in Newton, dazu ein Farbbalken |
+| **Genaues Abreißen** | Das Bauteil unter dem Zeiger wird rot hervorgehoben, bevor man klickt — auch bei dünnen Seilen und sich kreuzenden Streben |
+| **Gegenverkehr** | Level 4: zwei Fahrzeuge fahren aufeinander zu. In der Mitte liegen 2000 N auf wenigen Studs |
+| **Doppeldecker** | Level 5: zwei Fahrbahnen übereinander, auf jeder ein Fahrzeug. Nur Stützen überbrücken die 16 Studs dazwischen |
+| **Tipps** | Drei pro Level. In Level 1–3 ist der erste gratis, ab Level 4 kostet schon der erste Robux |
 | **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp-Gutscheine werden dauerhaft gespeichert |
 | **Mehrspieler** | Jeder Spieler bekommt seine eigene Arena und kann ein eigenes Level spielen |
 
@@ -149,9 +153,10 @@ der PlayerGui und wird immer übertragen, die Brücke fehlt komplett.
 **Prüfen:** Explorer → **Workspace** anklicken → im Fenster **Properties** die
 Zeile **StreamingEnabled** suchen. Der Haken muss **weg** sein.
 
-Der Server schaltet das beim Start selbst ab, und in `default.project.json`
-steht es ebenfalls. Setzt du den Haken in Studio von Hand wieder, ist das Spiel
-allerdings wieder blind.
+Abgeschaltet wird die Einstellung über `default.project.json` — sie kommt also
+beim Synchronisieren mit. Der Server kann sie **nicht** selbst abschalten:
+Roblox erlaubt das Setzen nur im Bearbeitungsmodus. Er prüft sie beim Start und
+schreibt eine Warnung in den Output, wenn der Haken doch gesetzt ist.
 
 ### Im Output steht „Arena nicht gefunden"
 
@@ -224,6 +229,7 @@ sofort an.
 | Zeiger bewegen | Maus | Finger | linker Stick |
 | Bauteil 1/2/3 | Tasten `1` `2` `3` | Knöpfe unten | Knöpfe unten |
 | Abrissmodus | Taste `4` | Knopf „Abriss" | **X** |
+| Tempo einstellen | Regler ziehen oder −/+ | Regler ziehen oder −/+ | Regler mit dem Zeiger |
 
 **Warum bei Touch zwei Finger für die Kamera?** Ein Finger wird zum Bauen
 gebraucht. Würde ein Finger auch die Kamera schieben, könnte das Spiel nie
@@ -299,6 +305,33 @@ Beide sind mir beim Bauen selbst passiert — deshalb stehen sie hier:
 > Modell ebenfalls nicht: Ein gerader Obergurt aus gelenkig gelagerten Stäben
 > kann senkrechte Lasten nicht abtragen.
 
+### Mehrere Fahrbahnen und mehrere Fahrzeuge
+
+Ein Level kann mehr als eine Fahrbahnhöhe haben und mehr als ein Testfahrzeug.
+Bestanden ist der Test erst, wenn **alle** Fahrzeuge angekommen sind.
+
+```lua
+-- Zwei Ebenen übereinander (Level 5)
+decks = { { y = 40 }, { y = 56 } },
+vehicles = {
+    { deck = 1, direction = 1 },
+    { deck = 2, direction = 1, mass = 600 },
+},
+
+-- Gegenverkehr auf einer Ebene (Level 4)
+vehicles = {
+    { deck = 1, direction = 1 },
+    { deck = 1, direction = -1 },
+},
+```
+
+`direction = 1` fährt nach rechts, `-1` nach links. `mass` ist optional und
+überschreibt das Gewicht aus `vehicle.mass`.
+
+> Zwischen zwei Fahrbahnen kommt man nur mit **Stützen** hoch, sobald der
+> Abstand größer als 10 Studs ist — die maximale Balkenlänge. Genau das macht
+> den Doppeldecker zur eigenen Aufgabe.
+
 ### Level prüfen, bevor du sie spielst
 
 Im Ordner `tools/` liegt ein Prüfskript. Es baut mehrere Standard-Brückenformen,
@@ -361,38 +394,59 @@ Lösung gewählt. Hier die vollständige Liste:
    lesen kann. Die Zeitlimits sind entsprechend großzügig.
 6. **Bauteile brechen erst nach 0,6 s Schonfrist**, sonst zerstört der Ruck
    beim Lösen der Verankerung sofort etwas.
+7. **Nur flach liegende Balken sind Fahrbahn.** Steigt ein Balken stärker als
+   etwa 30 Grad, gilt er als Strebe: das Fahrzeug fährt hindurch, statt
+   dagegenzustoßen. Sonst könnte man seine Brücke nicht aussteifen, ohne sich
+   selbst den Weg zu verbauen. Getragen wird trotzdem voll mit — für die
+   Kräfteberechnung ändert sich nichts. Der Schwellwert steht in
+   `Config.Test.roadwayMaxRise`.
+8. **Stützen und Seile blockieren nie.** Eine Stütze, die von der Fahrbahn
+   nach oben gebaut wird, stünde sonst mitten im Weg.
 
 ### Spielaufbau
 
-7. **Eine eigene Arena pro Spieler**, senkrecht gestapelt im Abstand von 500
+9. **Eine eigene Arena pro Spieler**, senkrecht gestapelt im Abstand von 500
    Studs. Nötig, weil jeder ein eigenes Level wählen darf.
-8. **Keine Spielerfigur.** `CharacterAutoLoads` ist aus, die Kamera ist fest
+10. **Keine Spielerfigur.** `CharacterAutoLoads` ist aus, die Kamera ist fest
    auf Seitenansicht gestellt.
-9. **Der Bauplan überlebt den Test.** Bricht etwas, bleibt der Plan erhalten —
+11. **Der Bauplan überlebt den Test.** Bricht etwas, bleibt der Plan erhalten —
    „Zurücksetzen" stellt alles wieder her, ohne dass man neu bauen muss.
-10. **Höchstens 16 Spieler gleichzeitig** in eigenen Arenen (`Config.Arena`).
+12. **Höchstens 16 Spieler gleichzeitig** in eigenen Arenen (`Config.Arena`).
+
+### Tempo und Kamera
+
+13. **Der Spieler bestimmt die Fahrgeschwindigkeit**, nicht das Level. Das
+    Zeitlimit rechnet sich aus Strecke und Tempo (`Strecke / Tempo × 2 + 15 s`),
+    damit langsames Fahren nie bestraft wird.
+14. **Herauszoomen ist begrenzt**, und zwar für jedes Level einzeln auf genau
+    die Entfernung, bei der es das Bild füllt. Weiter wäre nur leere Umgebung.
+    Heranzoomen bleibt unbegrenzt.
+15. **Abreißen trifft die Bauteil-Achse, nicht die Oberfläche.** Statt eines
+    Strahls wird der kürzeste Abstand zwischen Zeigestrahl und Bauteilachse
+    gerechnet. Ein Strahl trifft immer nur das vorderste sichtbare Teil — bei
+    dünnen Seilen greift man damit ständig daneben.
 
 ### Tipps und Robux
 
-11. **Drei Tipps pro Level**, von allgemein zu konkret. Der dritte nennt die
+16. **Drei Tipps pro Level**, von allgemein zu konkret. Der dritte nennt die
     Lösung mit Stückzahlen.
-12. **Gratis-Regel an den Schwierigkeitsgrad gekoppelt:** Stufe 1–3 bekommt
+17. **Gratis-Regel an den Schwierigkeitsgrad gekoppelt:** Stufe 1–3 bekommt
     einen Gratis-Tipp, Stufe 4–5 keinen. Das setzt deine Vorgabe („bei den
     Anfangsleveln der erste gratis, bei den späteren nicht") in eine Regel um,
     die auch für neue Level automatisch gilt.
-13. **Ein einziges Robux-Produkt** für alle Tipps statt eines pro Level.
-14. **Jedes Level ist ohne Tipps lösbar.** Das steht auch so in der Anleitung.
+18. **Ein einziges Robux-Produkt** für alle Tipps statt eines pro Level.
+19. **Jedes Level ist ohne Tipps lösbar.** Das steht auch so in der Anleitung.
 
 ### Oberfläche
 
-15. **Ein gemeinsamer „Zeigepunkt"** für alle drei Eingabearten. Deshalb gibt
+20. **Ein gemeinsamer „Zeigepunkt"** für alle drei Eingabearten. Deshalb gibt
     es die Trefferlogik nur einmal.
-16. **Zwei Finger für die Kamera** auf Touch (Begründung oben).
-17. **Die Anleitung startet automatisch beim ersten Mal in Level 1** und ist
+21. **Zwei Finger für die Kamera** auf Touch (Begründung oben).
+22. **Die Anleitung startet automatisch beim ersten Mal in Level 1** und ist
     danach über das Menü wieder erreichbar.
-18. **Belastungszahlen als BillboardGui am Bauteil** — die überträgt Roblox von
+23. **Belastungszahlen als BillboardGui am Bauteil** — die überträgt Roblox von
     selbst zum Client, dafür braucht es kein eigenes RemoteEvent.
-19. **Deutsche Texte ohne Umlaute im Spiel** (`ue` statt `ü`). Roblox-Schriften
+24. **Deutsche Texte ohne Umlaute im Spiel** (`ue` statt `ü`). Roblox-Schriften
     stellen Umlaute nicht überall zuverlässig dar. In dieser README stehen
     Umlaute normal.
 
@@ -418,5 +472,8 @@ Ehrlich gesagt, was noch fehlt oder wacklig ist:
   Linie gezeichnet. Echtes Durchhängen bräuchte mehrere Teilstücke pro Seil.
 - **`allowedParts` ist eingebaut, aber ungenutzt.** Man kann damit einzelne
   Bauteile pro Level sperren. Ich habe es nicht verwendet, weil jedes Level
-  ohne Stützen unlösbar wäre.
+  ohne Stützen unlösbar wäre — siehe den Kasten unter „Eigene Level bauen".
+- **Der Fluss ist reine Optik.** Er kollidiert mit nichts; Stützen dürfen
+  mitten hindurch. Echtes Wasser mit Auftrieb würde die Kräfteberechnung
+  verfälschen.
 - **Keine Bestenliste, keine Sterne-Wertung, kein Level-Editor.**

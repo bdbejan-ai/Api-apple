@@ -46,6 +46,14 @@ function CameraController.new()
 	self.focus = Vector3.new(0, 40, 0)
 	self.distance = Config.Camera.defaultDistance
 
+	--[[
+		Zoomgrenzen. Heranzoomen darf man beliebig weit; das Herauszoomen
+		begrenzt setArena() auf genau die Entfernung, bei der das Level das
+		Bild ausfuellt - weiter waere nur noch leere Umgebung zu sehen.
+	]]
+	self.minDistance = Config.Camera.minDistance
+	self.maxDistance = Config.Camera.maxDistance
+
 	-- Grenzen, ueber die nicht hinausgeschoben werden darf.
 	self.bounds = nil
 	self.originY = 0
@@ -84,15 +92,38 @@ function CameraController:setArena(originY: number, bounds, deckY: number)
 	local centerX = (bounds.minX + bounds.maxX) / 2
 	self.focus = Vector3.new(centerX, originY + deckY, 0)
 
-	-- Zoom so waehlen, dass die sichtbare Breite ungefaehr der Levelbreite
-	-- entspricht. Der Zusammenhang folgt aus dem Oeffnungswinkel der Kamera.
+	--[[
+		Aus dem Oeffnungswinkel laesst sich ausrechnen, wie weit die Kamera
+		weg sein muss, damit eine bestimmte Breite bzw. Hoehe genau ins Bild
+		passt. Beides wird gebraucht: bei einem breiten Level begrenzt die
+		Breite, bei einem hohen die Hoehe.
+	]]
 	local viewport = self.camera.ViewportSize
 	local aspect = math.max(viewport.X / math.max(viewport.Y, 1), 0.5)
-	local levelWidth = (bounds.maxX - bounds.minX) * 0.65
 	local halfFov = math.rad(Config.Camera.fieldOfView / 2)
-	local needed = (levelWidth / 2) / (math.tan(halfFov) * aspect)
 
-	self.distance = math.clamp(needed, Config.Camera.minDistance, Config.Camera.maxDistance)
+	local function distanceToFit(width: number, height: number): number
+		local forWidth = (width / 2) / (math.tan(halfFov) * aspect)
+		local forHeight = (height / 2) / math.tan(halfFov)
+		return math.max(forWidth, forHeight)
+	end
+
+	local levelWidth = bounds.maxX - bounds.minX
+	local levelHeight = bounds.maxY - bounds.minY
+
+	-- Weiteste erlaubte Sicht: das ganze Level plus ein kleiner Rand.
+	self.maxDistance = distanceToFit(levelWidth, levelHeight) * Config.Camera.zoomOutMargin
+	self.minDistance = Config.Camera.minDistance
+	if self.maxDistance < self.minDistance then
+		self.maxDistance = self.minDistance
+	end
+
+	-- Startansicht: die Bruecke fuellt etwa zwei Drittel des Bildes.
+	self.distance = math.clamp(
+		distanceToFit(levelWidth * 0.62, levelHeight * 0.62),
+		self.minDistance,
+		self.maxDistance
+	)
 	self.followPart = nil
 end
 
@@ -102,6 +133,14 @@ function CameraController:setMenuView()
 	self.followPart = nil
 	self.focus = Vector3.new(0, 40, 0)
 	self.distance = Config.Camera.defaultDistance
+
+	--[[
+		Zoomgrenzen. Heranzoomen darf man beliebig weit; das Herauszoomen
+		begrenzt setArena() auf genau die Entfernung, bei der das Level das
+		Bild ausfuellt - weiter waere nur noch leere Umgebung zu sehen.
+	]]
+	self.minDistance = Config.Camera.minDistance
+	self.maxDistance = Config.Camera.maxDistance
 end
 
 -- Waehrend des Tests der Kamera sagen, welchem Part sie folgen soll.
@@ -127,11 +166,9 @@ function CameraController:pan(deltaX: number, deltaY: number)
 end
 
 function CameraController:zoom(amount: number)
-	self.distance = math.clamp(
-		self.distance + amount,
-		Config.Camera.minDistance,
-		Config.Camera.maxDistance
-	)
+	-- Die Grenzen stellt setArena() je Level ein: beliebig nah heran,
+	-- aber nur so weit heraus, bis das Level das Bild ausfuellt.
+	self.distance = math.clamp(self.distance + amount, self.minDistance, self.maxDistance)
 	self.hasZoomed = true
 end
 

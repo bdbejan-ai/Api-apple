@@ -1,29 +1,56 @@
 --!nocheck
--- Prueft ausserhalb von Roblox, ob die Level loesbar sind.
--- Baut mehrere Standard-Brueckenformen, laesst das Fahrzeug darueberfahren
--- und meldet Kosten und hoechste Auslastung.
+--[[
+	Loesbarkeitspruefung fuer BridgeLab - laeuft OHNE Roblox.
+
+	Das Skript baut mehrere Standard-Brueckenformen, laesst die Testfahrzeuge
+	rechnerisch darueberfahren und meldet Kosten und hoechste Auslastung.
+	So laesst sich vor dem Spielen feststellen, ob ein Level ueberhaupt
+	loesbar ist und ob das Budget passt.
+
+	Aufruf (luau von https://github.com/luau-lang/luau/releases):
+	    cd tools
+	    luau check_levels.luau
+
+	ACHTUNG: Das Skript liest Levels.luau NICHT aus. Neue Level muessen unten
+	in der LEVELS-Tabelle mit denselben Zahlen eingetragen werden.
+]]
 
 local TrussSolver = require("../src/Shared/TrussSolver")
 
 local SPECS = {
-	Beam   = { cost = 10, maxTension = 500, maxCompression = 500, massPerStud = 2,   minLength = 3, maxLength = 10, rigid = true,  vertical = false, drivable = true },
-	Cable  = { cost = 5,  maxTension = 300, maxCompression = 0,   massPerStud = 0.5, minLength = 3, maxLength = 40, rigid = false, vertical = false, drivable = false },
-	Pillar = { cost = 15, maxTension = 800, maxCompression = 800, massPerStud = 3,   minLength = 3, maxLength = 40, rigid = true,  vertical = true,  drivable = false },
+	Beam   = { cost = 10, maxTension = 500, maxCompression = 500, massPerStud = 2,   minLength = 3, maxLength = 10, rigid = true,  drivable = true },
+	Cable  = { cost = 5,  maxTension = 300, maxCompression = 0,   massPerStud = 0.5, minLength = 3, maxLength = 40, rigid = false, drivable = false },
+	Pillar = { cost = 15, maxTension = 800, maxCompression = 800, massPerStud = 3,   minLength = 3, maxLength = 40, rigid = true,  drivable = false },
 }
 
--- Wichtig: upperY - deckY muss <= Beam.maxLength (10) sein, sonst laesst sich
--- die obere Reihe ueberhaupt nicht mit Balken erreichen.
+--[[
+	decks    Liste der Fahrbahnhoehen, von unten nach oben
+	vehicles Liste der Testfahrzeuge: deck = Nummer der Fahrbahn,
+	         dir = 1 nach rechts, -1 nach links
+]]
 local LEVELS = {
-	{ id = "Level1", budget = 200, gap = 40, deckY = 40, upperY = 48, groundY = 20, spacing = 4 },
-	{ id = "Level2", budget = 240, gap = 48, deckY = 44, upperY = 52, groundY = 12, spacing = 4 },
-	{ id = "Level3", budget = 135, gap = 40, deckY = 40, upperY = 48, groundY = 18, spacing = 4 },
-	{ id = "Level4", budget = 260, gap = 64, deckY = 44, upperY = 52, groundY = 20, spacing = 4 },
-	{ id = "Level5", budget = 230, gap = 48, deckY = 44, upperY = 52, groundY = 6,  spacing = 4 },
-	{ id = "Level6", budget = 320, gap = 80, deckY = 46, upperY = 54, groundY = 22, spacing = 4 },
+	{ id = "Level1 Die erste Luecke", budget = 200, gap = 40, decks = { 40 }, upperY = 48, groundY = 20,
+	  vehicles = { { deck = 1, dir = 1 } } },
+
+	{ id = "Level2 Tiefer Graben",    budget = 240, gap = 48, decks = { 44 }, upperY = 52, groundY = 12,
+	  vehicles = { { deck = 1, dir = 1 } } },
+
+	{ id = "Level3 Schmales Budget",  budget = 135, gap = 40, decks = { 40 }, upperY = 48, groundY = 18,
+	  vehicles = { { deck = 1, dir = 1 } } },
+
+	{ id = "Level4 Gegenverkehr",     budget = 360, gap = 48, decks = { 44 }, upperY = 52, groundY = 16,
+	  vehicles = { { deck = 1, dir = 1 }, { deck = 1, dir = -1 } } },
+
+	{ id = "Level5 Doppeldecker",     budget = 480, gap = 32, decks = { 40, 56 }, upperY = 64, groundY = 20,
+	  vehicles = { { deck = 1, dir = 1 }, { deck = 2, dir = 1, mass = 600 } } },
+
+	{ id = "Level6 Grosse Schlucht",  budget = 320, gap = 80, decks = { 46 }, upperY = 54, groundY = 22,
+	  vehicles = { { deck = 1, dir = 1 } } },
 }
 
 local VEHICLE_MASS = 1000
 local VEHICLE_LENGTH = 8
+local SPACING = 4
 
 --------------------------------------------------------------------------------
 -- Ankerpunkte wie in Levels.luau
@@ -33,24 +60,25 @@ local function buildSnaps(L)
 	local snaps = {}
 	local right = L.gap / 2
 	local left = -right
-	local overlap = L.spacing
-	local deckHalf = right + overlap
-	local upperHalf = right + overlap
+	local half = right + SPACING
 
 	local function add(row, x, y, fixed)
 		snaps[#snaps + 1] = { id = #snaps + 1, row = row, x = x, y = y, fixed = fixed }
 	end
 
-	for x = -deckHalf, deckHalf, L.spacing do
-		add("deck", x, L.deckY, math.abs(x) >= right)
+	for index, deckY in L.decks do
+		for x = -half, half, SPACING do
+			add("deck" .. index, x, deckY, math.abs(x) >= right)
+		end
 	end
-	for x = -upperHalf, upperHalf, L.spacing do
-		add("upper", x, L.upperY, math.abs(x) >= upperHalf - 0.01)
+	for x = -half, half, SPACING do
+		add("upper", x, L.upperY, math.abs(x) >= half - 0.01)
 	end
-	for x = left, right, L.spacing do
+	for x = left, right, SPACING do
 		add("ground", x, L.groundY, true)
 	end
-	return snaps, left, right, deckHalf, upperHalf
+
+	return snaps, left, right
 end
 
 local function findSnap(snaps, row, x)
@@ -66,13 +94,11 @@ end
 -- Bauformen
 --------------------------------------------------------------------------------
 
--- Fahrbahn aus Balken mit gegebener Spannweite
-local function addDeck(members, snaps, left, right, span)
+local function addDeck(members, snaps, left, right, span, row)
 	local x = left
 	while x < right - 0.01 do
 		local nextX = math.min(x + span, right)
-		local a = findSnap(snaps, "deck", x)
-		local b = findSnap(snaps, "deck", nextX)
+		local a, b = findSnap(snaps, row, x), findSnap(snaps, row, nextX)
 		if not a or not b then return false end
 		if nextX - x > SPECS.Beam.maxLength + 0.01 then return false end
 		members[#members + 1] = { kind = "Beam", a = a, b = b }
@@ -81,93 +107,23 @@ local function addDeck(members, snaps, left, right, span)
 	return true
 end
 
--- Stuetzen vom Schluchtgrund unter jeden benutzten Fahrbahnknoten
-local function addPillars(members, snaps, L, xs)
+-- Senkrechte Stuetzen zwischen zwei Reihen
+local function addPillars(members, snaps, xs, fromRow, toRow, height)
+	if height > SPECS.Pillar.maxLength + 0.01 then return false end
 	for _, x in xs do
-		local top = findSnap(snaps, "deck", x)
-		local bottom = findSnap(snaps, "ground", x)
-		if not top or not bottom then return false end
-		local length = L.deckY - L.groundY
-		if length > SPECS.Pillar.maxLength + 0.01 then return false end
-		members[#members + 1] = { kind = "Pillar", a = bottom, b = top }
-	end
-	return true
-end
-
--- Fachwerk zwischen Fahrbahn und oberer Reihe (Vertikalen + Diagonalen)
-local function addTruss(members, snaps, L, left, right, span)
-	local height = L.upperY - L.deckY
-	if height > SPECS.Beam.maxLength + 0.01 then return false end
-	local diagonal = math.sqrt(span * span + height * height)
-	if diagonal > SPECS.Beam.maxLength + 0.01 then return false end
-
-	-- Obergurt
-	local x = left
-	while x < right - 0.01 do
-		local a = findSnap(snaps, "upper", x)
-		local b = findSnap(snaps, "upper", x + span)
+		local a, b = findSnap(snaps, fromRow, x), findSnap(snaps, toRow, x)
 		if not a or not b then return false end
-		members[#members + 1] = { kind = "Beam", a = a, b = b }
-		x += span
-	end
-
-	-- Vertikalen
-	x = left
-	while x <= right + 0.01 do
-		local a = findSnap(snaps, "deck", x)
-		local b = findSnap(snaps, "upper", x)
-		if a and b then
-			members[#members + 1] = { kind = "Beam", a = a, b = b }
-		end
-		x += span
-	end
-
-	-- Diagonalen, abwechselnd
-	x = left
-	local flip = false
-	while x < right - 0.01 do
-		local a, b
-		if flip then
-			a = findSnap(snaps, "deck", x)
-			b = findSnap(snaps, "upper", x + span)
-		else
-			a = findSnap(snaps, "upper", x)
-			b = findSnap(snaps, "deck", x + span)
-		end
-		if a and b then
-			members[#members + 1] = { kind = "Beam", a = a, b = b }
-		end
-		flip = not flip
-		x += span
+		members[#members + 1] = { kind = "Pillar", a = a, b = b }
 	end
 	return true
 end
 
--- Haengebruecke: Obergurt aus Balken, Seile nach unten zur Fahrbahn
-local function addSuspension(members, snaps, L, left, right, span)
-	local x = left - span
-	while x < right + span - 0.01 do
-		local a = findSnap(snaps, "upper", x)
-		local b = findSnap(snaps, "upper", x + span)
-		if a and b then
-			members[#members + 1] = { kind = "Beam", a = a, b = b }
-		end
-		x += span
+local function pillarXs(left, right, step)
+	local xs = {}
+	for x = left + step, right - step, step do
+		xs[#xs + 1] = x
 	end
-
-	local drop = L.upperY - L.deckY
-	if drop > SPECS.Cable.maxLength + 0.01 or drop < SPECS.Cable.minLength then return false end
-
-	x = left + span
-	while x < right - 0.01 do
-		local a = findSnap(snaps, "upper", x)
-		local b = findSnap(snaps, "deck", x)
-		if a and b then
-			members[#members + 1] = { kind = "Cable", a = a, b = b }
-		end
-		x += span
-	end
-	return true
+	return xs
 end
 
 --------------------------------------------------------------------------------
@@ -180,22 +136,19 @@ local function cost(members)
 	return total
 end
 
--- Fahrzeuglast auf die Knoten verteilen (wie TestRun: 3 Abtastpunkte)
-local function vehicleLoads(members, snaps, vehicleX, deckY)
-	local loads = {}
-	local share = VEHICLE_MASS / 3
+-- Last EINES Fahrzeugs auf die Knoten seiner Fahrbahn verteilen
+local function addVehicleLoads(loads, members, snaps, vehicleX, deckY, mass)
+	local share = (mass or VEHICLE_MASS) / 3
 	for i = 1, 3 do
 		local t = (i - 1) / 2
 		local sx = vehicleX - VEHICLE_LENGTH / 2 + t * VEHICLE_LENGTH
-		-- Fahrbahnbauteil finden, das diese Stelle ueberdeckt
 		for _, m in members do
 			if SPECS[m.kind].drivable then
 				local sa, sb = snaps[m.a], snaps[m.b]
 				if math.abs(sa.y - deckY) < 0.01 and math.abs(sb.y - deckY) < 0.01 then
 					local lo, hi = math.min(sa.x, sb.x), math.max(sa.x, sb.x)
 					if sx >= lo - 0.01 and sx <= hi + 0.01 and hi > lo then
-						local frac = (sx - sa.x) / (sb.x - sa.x)
-						frac = math.max(0, math.min(1, frac))
+						local frac = math.max(0, math.min(1, (sx - sa.x) / (sb.x - sa.x)))
 						loads[m.a] = (loads[m.a] or 0) + share * (1 - frac)
 						loads[m.b] = (loads[m.b] or 0) + share * frac
 						break
@@ -204,26 +157,30 @@ local function vehicleLoads(members, snaps, vehicleX, deckY)
 			end
 		end
 	end
-	return loads
 end
 
-local function evaluate(members, snaps, vehicleX, deckY)
-	-- Knoten sammeln
-	local used, order = {}, {}
+-- placements: Liste von { x = ..., deckY = ... }
+local function evaluate(members, snaps, placements)
+	local used = {}
 	for _, m in members do used[m.a] = true; used[m.b] = true end
+
 	local nodes, map = {}, {}
 	for id = 1, #snaps do
 		if used[id] then
 			local s = snaps[id]
 			nodes[#nodes + 1] = { x = s.x, y = s.y, fixed = s.fixed }
 			map[id] = #nodes
-			order[#nodes] = id
 		end
 	end
 
 	local sm = {}
 	for _, m in members do
 		sm[#sm + 1] = { a = map[m.a], b = map[m.b], tensionOnly = not SPECS[m.kind].rigid }
+	end
+
+	local rawLoads = {}
+	for _, p in placements do
+		addVehicleLoads(rawLoads, members, snaps, p.x, p.deckY, p.mass)
 	end
 
 	local loads, mag = {}, {}
@@ -233,6 +190,7 @@ local function evaluate(members, snaps, vehicleX, deckY)
 		mag[i] = (mag[i] or 0) + math.abs(down)
 	end
 
+	-- Eigengewicht
 	for _, m in members do
 		local sa, sb = snaps[m.a], snaps[m.b]
 		local len = math.sqrt((sb.x - sa.x) ^ 2 + (sb.y - sa.y) ^ 2)
@@ -240,11 +198,9 @@ local function evaluate(members, snaps, vehicleX, deckY)
 		addLoad(map[m.a], w / 2)
 		addLoad(map[m.b], w / 2)
 	end
-
-	if vehicleX then
-		for id, n in vehicleLoads(members, snaps, vehicleX, deckY) do
-			if map[id] then addLoad(map[id], n) end
-		end
+	-- Fahrzeuge
+	for id, n in rawLoads do
+		if map[id] then addLoad(map[id], n) end
 	end
 
 	local res = TrussSolver.solve(nodes, sm, loads)
@@ -259,24 +215,58 @@ local function evaluate(members, snaps, vehicleX, deckY)
 
 	local unstable = false
 	for i, r in res.residuals do
-		local tol = math.max(1.0, (mag[i] or 0) * 0.05)
-		if r > tol then unstable = true end
+		if r > math.max(1.0, (mag[i] or 0) * 0.05) then unstable = true end
 	end
 
 	return worst, worstKind, unstable, res.solved
 end
 
--- Fahrzeug ueber die ganze Bruecke schicken
+--------------------------------------------------------------------------------
+-- Alle Fahrzeugstellungen durchprobieren
+--------------------------------------------------------------------------------
+
 local function driveThrough(members, snaps, L, left, right)
 	local worst, worstKind, anyUnstable = 0, nil, false
-	local x = left
-	while x <= right do
-		local u, kind, unstable, solved = evaluate(members, snaps, x, L.deckY)
-		if not solved then return 999, "RECHNUNG FEHLGESCHLAGEN", true end
+
+	local function test(placements)
+		local u, kind, unstable, solved = evaluate(members, snaps, placements)
+		if not solved then
+			worst, worstKind, anyUnstable = 999, "RECHNUNG FEHLGESCHLAGEN", true
+			return
+		end
 		if u > worst then worst, worstKind = u, kind end
 		if unstable then anyUnstable = true end
-		x += 1
 	end
+
+	local from, to = left - 8, right + 8
+
+	if #L.vehicles == 1 then
+		local v = L.vehicles[1]
+		local deckY = L.decks[v.deck]
+		for x = from, to, 1 do
+			test({ { x = x, deckY = deckY, mass = v.mass } })
+		end
+	else
+		--[[
+			Zwei Fahrzeuge: alle Kombinationen ihrer Positionen durchgehen.
+			Schrittweite 3 statt 1, sonst dauert es zu lange - fuer die Frage
+			"haelt das ueberhaupt" ist das fein genug.
+		]]
+		local d1 = L.decks[L.vehicles[1].deck]
+		local d2 = L.decks[L.vehicles[2].deck]
+		for x1 = from, to, 3 do
+			for x2 = from, to, 3 do
+				-- Richtung -1 faehrt von rechts nach links.
+				local p1 = if L.vehicles[1].dir > 0 then x1 else -x1
+				local p2 = if L.vehicles[2].dir > 0 then x2 else -x2
+				test({
+					{ x = p1, deckY = d1, mass = L.vehicles[1].mass },
+					{ x = p2, deckY = d2, mass = L.vehicles[2].mass },
+				})
+			end
+		end
+	end
+
 	return worst, worstKind, anyUnstable
 end
 
@@ -288,50 +278,63 @@ print(string.rep("=", 78))
 print("BRIDGELAB - LOESBARKEITSPRUEFUNG")
 print(string.rep("=", 78))
 
+local allSolvable = true
+
 for _, L in LEVELS do
 	local snaps, left, right = buildSnaps(L)
-	print(string.format("\n%s   Budget %d   Luecke %d   Fahrbahn y=%d  Boden y=%d  oben y=%d",
-		L.id, L.budget, L.gap, L.deckY, L.groundY, L.upperY))
-	print(string.format("   Stuetzenlaenge Boden->Fahrbahn: %d Studs (max %d)  Hoehe Fahrbahn->oben: %d",
-		L.deckY - L.groundY, SPECS.Pillar.maxLength, L.upperY - L.deckY))
+	local deckList = ""
+	for _, y in L.decks do deckList ..= tostring(y) .. " " end
+
+	print(string.format("\n%s\n   Budget %d  Luecke %d  Fahrbahnen: %s Boden %d  oben %d  Fahrzeuge %d",
+		L.id, L.budget, L.gap, deckList, L.groundY, L.upperY, #L.vehicles))
 
 	local candidates = {}
 
 	for _, span in { 4, 8 } do
-		-- Stuetzen vom Boden
-		if not L.noPillar and (L.deckY - L.groundY) <= SPECS.Pillar.maxLength then
-			local m = {}
-			if addDeck(m, snaps, left, right, span) then
-				local xs = {}
-				for x = left + span, right - span, span do xs[#xs + 1] = x end
-				if addPillars(m, snaps, L, xs) then
-					candidates[#candidates + 1] =
-						{ name = string.format("Stuetzen (%der Fahrbahn)", span), members = m }
-				end
-			end
+		--[[
+			Grundform: jede Fahrbahn aus Balken, darunter Stuetzen.
+			Die unterste Fahrbahn stuetzt sich auf den Schluchtgrund,
+			jede weitere auf die Fahrbahn darunter.
+		]]
+		local m = {}
+		local ok = true
+		local xs = pillarXs(left, right, span)
+
+		for index, deckY in L.decks do
+			if not addDeck(m, snaps, left, right, span, "deck" .. index) then ok = false break end
+			local fromRow = if index == 1 then "ground" else "deck" .. (index - 1)
+			local fromY = if index == 1 then L.groundY else L.decks[index - 1]
+			if not addPillars(m, snaps, xs, fromRow, "deck" .. index, deckY - fromY) then ok = false break end
 		end
 
-		-- Fachwerk Fahrbahn <-> obere Reihe
-		do
-			local m = {}
-			if addDeck(m, snaps, left, right, span) and addTruss(m, snaps, L, left, right, span) then
-				candidates[#candidates + 1] =
-					{ name = string.format("Fachwerk (%der Felder)", span), members = m }
-			end
-		end
-
-		-- Haengebruecke
-		do
-			local m = {}
-			if addDeck(m, snaps, left, right, span) and addSuspension(m, snaps, L, left, right, span) then
-				candidates[#candidates + 1] =
-					{ name = string.format("Haengebruecke (%der Felder)", span), members = m }
-			end
+		if ok then
+			candidates[#candidates + 1] =
+				{ name = string.format("Stuetzen, %der Raster", span), members = m }
 		end
 	end
 
-	if #candidates == 0 then
-		print("   !! keine Standardform ueberhaupt baubar")
+	-- Zusatzform: 8er Fahrbahn, aber Stuetzen alle 4 Studs (mehr Tragkraft)
+	do
+		local m = {}
+		local ok = true
+		for index, deckY in L.decks do
+			if not addDeck(m, snaps, left, right, 8, "deck" .. index) then ok = false break end
+			local fromRow = if index == 1 then "ground" else "deck" .. (index - 1)
+			local fromY = if index == 1 then L.groundY else L.decks[index - 1]
+			-- Stuetzen nur dort, wo die 8er-Fahrbahn auch Knoten hat
+			if not addPillars(m, snaps, pillarXs(left, right, 8), fromRow, "deck" .. index, deckY - fromY) then
+				ok = false
+				break
+			end
+		end
+		-- zusaetzliche Stuetzen in der Mitte
+		if ok then
+			for index, deckY in L.decks do
+				local fromRow = if index == 1 then "ground" else "deck" .. (index - 1)
+				addPillars(m, snaps, { -4, 4 }, fromRow, "deck" .. index, deckY - (if index == 1 then L.groundY else L.decks[index - 1]))
+			end
+			candidates[#candidates + 1] = { name = "8er Fahrbahn + Mittelstuetzen", members = m }
+		end
 	end
 
 	local cheapest = nil
@@ -344,36 +347,36 @@ for _, L in LEVELS do
 		local verdict
 		if holds and fits then
 			verdict = "LOESUNG"
-			if not cheapest or price < cheapest.price then
+			-- Eine echte Loesung ersticht immer einen Eintrag, der nur "haelt,
+			-- aber zu teuer" war.
+			if not cheapest or cheapest.overBudget or price < cheapest.price then
 				cheapest = { price = price, name = c.name }
 			end
 		elseif holds then
 			verdict = "haelt, zu teuer"
-			if not cheapest or (cheapest.overBudget and price < cheapest.price) then
-				cheapest = { price = price, name = c.name, overBudget = true }
-			end
+			if not cheapest then cheapest = { price = price, name = c.name, overBudget = true } end
 		elseif fits then
 			verdict = if unstable then "bezahlbar, instabil" else "bezahlbar, bricht"
 		else
 			verdict = "zu teuer, haelt nicht"
 		end
 
-		print(string.format("   %-30s Kosten %3d/%3d  max %5.0f%%  %s%s",
+		print(string.format("   %-32s Kosten %3d/%3d  max %5.0f%%  %s%s",
 			c.name, price, L.budget, worst * 100, verdict, kind and (" [" .. kind .. "]") or ""))
 	end
 
 	if cheapest and not cheapest.overBudget then
-		local headroom = math.floor((L.budget - cheapest.price) / L.budget * 100)
 		print(string.format("   => LOESBAR ueber '%s' fuer %d (%d%% Budget uebrig)",
-			cheapest.name, cheapest.price, headroom))
+			cheapest.name, cheapest.price, math.floor((L.budget - cheapest.price) / L.budget * 100)))
 	elseif cheapest then
-		-- Eine haltende Form gibt es, sie passt nur nicht ins Budget.
-		local suggestion = math.ceil(cheapest.price * 1.5 / 10) * 10
-		print(string.format("   => NICHT LOESBAR. Billigste haltende Form '%s' kostet %d -> Budget %d empfohlen",
-			cheapest.name, cheapest.price, suggestion))
+		allSolvable = false
+		print(string.format("   => NICHT LOESBAR. Billigste haltende Form kostet %d -> Budget %d empfohlen",
+			cheapest.price, math.ceil(cheapest.price * 1.4 / 10) * 10))
 	else
-		print("   => NICHT LOESBAR. Keine geprueffte Form haelt ueberhaupt.")
+		allSolvable = false
+		print("   => NICHT LOESBAR. Keine geprueffte Form haelt.")
 	end
 end
 
 print("\n" .. string.rep("=", 78))
+print(if allSolvable then "ALLE LEVEL LOESBAR" else "ACHTUNG: mindestens ein Level ist nicht loesbar")

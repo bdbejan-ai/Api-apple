@@ -273,7 +273,12 @@ hud.onRemoveMode = function()
 end
 
 hud.onTest = function()
-	remote.StartTest:FireServer()
+	-- Das am Tacho eingestellte Tempo geht mit; der Server prueft es.
+	remote.StartTest:FireServer(hud.speed)
+end
+
+hud.onSpeedChanged = function(speed)
+	remote.SetTestSpeed:FireServer(speed)
 end
 
 hud.onReset = function()
