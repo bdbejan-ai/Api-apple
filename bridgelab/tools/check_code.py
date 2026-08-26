@@ -207,6 +207,20 @@ if boat_keys and "function TestRun:spawnBoat" in testrun:
             continue
         note(f'TestRun: liest vom Schiff das Feld "{field}", das in Levels.luau fehlt')
 
+# --- 7b: Kurzfassung fuers Levelmenue -----------------------------------------
+
+# Die Levelauswahl zeigt nicht das ganze Level, sondern die Kurzfassung aus
+# Levels.summaries(). Liest sie ein Feld, das dort nicht drinsteht, bleibt die
+# Karte einfach leer oder es kracht - je nachdem, was mit dem nil passiert.
+block = levels_text[levels_text.index("function Levels.summaries"):]
+block = block[:block.index("\nend")]
+provided = set(re.findall(r"^\s*(\w+)\s*=", block, re.M))
+
+select_gui = (SRC / "Client" / "LevelSelectGui.luau").read_text(encoding="utf-8")
+for field in sorted(set(re.findall(r"summary\.(\w+)", select_gui))):
+    if field not in provided:
+        note(f'LevelSelectGui: liest summary.{field}, das Levels.summaries() nicht liefert')
+
 # --- 8: unbenutzte Einstellungen ----------------------------------------------
 
 # Nach einem Umbau bleiben gern Einstellungen stehen, die niemand mehr liest -

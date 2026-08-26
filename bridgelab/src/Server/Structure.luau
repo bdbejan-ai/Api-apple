@@ -143,25 +143,64 @@ function Structure:ensureJoint(x: number, y: number)
 	local anchor = self.level.anchorAt(x, y)
 	local size = Config.Build.jointSize
 
+	--[[
+		DER KNOTEN IST EIN KNOTENBLECH, KEINE KUGEL
+
+		Frueher war jeder Knoten eine Kugel. Das sah nach Spielzeug aus und
+		verriet nichts: an einer echten Bruecke treffen sich die Staebe auf
+		einem flachen Stahlblech, das quer zur Bruecke liegt.
+
+		Gebaut wird das als Zylinder, der auf der Seite liegt: die runde
+		Flaeche zeigt zur Kamera, die flache Seite in die Tiefe. In Roblox
+		wird ein Zylinder entlang seiner X-Achse gestreckt, deshalb die
+		Vierteldrehung um die Y-Achse - danach zeigt die Dicke in die Tiefe
+		und die Scheibe zur Kamera.
+	]]
+	local thickness = size * 0.45
+	local diameter = size * 1.5
+
 	local part = Instance.new("Part")
 	part.Name = "Joint_" .. key
-	part.Shape = Enum.PartType.Ball
-	part.Size = Vector3.new(size, size, size)
-	part.CFrame = CFrame.new(self:worldPosition(x, y))
+	part.Shape = Enum.PartType.Cylinder
+	part.Size = Vector3.new(thickness, diameter, diameter)
+	part.CFrame = CFrame.new(self:worldPosition(x, y)) * CFrame.Angles(0, math.pi / 2, 0)
 	part.Anchored = true -- im Baumodus haelt alles still
-	part.CanCollide = false -- die Kugeln sollen dem Fahrzeug nicht im Weg sein
+	part.CanCollide = false -- die Bleche sollen dem Fahrzeug nicht im Weg sein
 	part.CanQuery = false
 	part.CanTouch = false
 	part.Material = Enum.Material.Metal
 	part.Reflectance = 0.15
 	--[[
-		Anker sind golden, freie Knoten grau. Das ist die wichtigste optische
-		Auskunft im ganzen Spiel: nur an den goldenen Punkten kann die Bruecke
-		Last in den Boden abgeben.
+		Anker sind golden, freie Knoten stahlgrau. Das ist die wichtigste
+		optische Auskunft im ganzen Spiel: nur an den goldenen Punkten kann
+		die Bruecke Last in den Boden abgeben.
 	]]
-	part.Color = if anchor then Color3.fromRGB(228, 168, 72) else Color3.fromRGB(108, 112, 124)
+	part.Color = if anchor then Color3.fromRGB(228, 168, 72) else Color3.fromRGB(126, 132, 144)
 	part:SetAttribute("JointKey", key)
 	part.Parent = self.folders.nodes
+
+	--[[
+		Ein Bolzen in der Mitte. Er haengt am Blech, traegt aber keine Masse -
+		die Rechnung von oben soll stimmen.
+	]]
+	local bolt = Instance.new("Part")
+	bolt.Name = "Bolzen"
+	bolt.Shape = Enum.PartType.Cylinder
+	bolt.Size = Vector3.new(thickness * 1.6, diameter * 0.38, diameter * 0.38)
+	bolt.CFrame = part.CFrame
+	bolt.Anchored = false
+	bolt.Massless = true
+	bolt.CanCollide = false
+	bolt.CanQuery = false
+	bolt.CanTouch = false
+	bolt.Material = Enum.Material.Metal
+	bolt.Color = if anchor then Color3.fromRGB(158, 112, 40) else Color3.fromRGB(74, 78, 88)
+	bolt.Parent = part
+
+	local boltWeld = Instance.new("WeldConstraint")
+	boltWeld.Part0 = part
+	boltWeld.Part1 = bolt
+	boltWeld.Parent = part
 
 	local attachment = Instance.new("Attachment")
 	attachment.Name = "JointAttachment"
@@ -212,8 +251,15 @@ function Structure:refreshJointMasses()
 		tributary[member.keyB] = (tributary[member.keyB] or 0) + half
 	end
 
+	--[[
+		Das Volumen muss zur FORM des Knotenblechs passen, sonst stimmt die
+		Dichte nicht und die Knoten waeren zu leicht oder zu schwer. Ein
+		liegender Zylinder: Grundflaeche mal Dicke.
+	]]
 	local size = Config.Build.jointSize
-	local volume = (4 / 3) * math.pi * (size / 2) ^ 3
+	local thickness = size * 0.45
+	local diameter = size * 1.5
+	local volume = math.pi * (diameter / 2) ^ 2 * thickness
 
 	for key, joint in self.joints do
 		local mass = math.max(tributary[key] or 0, Config.Physics.minNodeMass)
@@ -279,6 +325,30 @@ local function buildRoadway(self, member, spec, newPart, length)
 	-- Mittelstrich, damit man die Fahrtrichtung sieht.
 	local stripe = newPart("Mittelstrich", Vector3.new(0.5, 0.08, length * 0.55), Color3.fromRGB(232, 232, 226), Enum.Material.SmoothPlastic)
 	addVisual(member, stripe, { mode = "part", from = 0.225, to = 0.775, up = 0.04 })
+
+	--[[
+		Die VERSTAERKTE Fahrbahn bekommt einen sichtbaren Untergurt.
+
+		Sie kostet fast das Doppelte und traegt das Doppelte - man muss ihr das
+		also ansehen koennen, ohne erst ein Bauteil anzuklicken. Ein Traeger
+		unter der Fahrbahn ist genau das, was den Unterschied ausmacht, und
+		sagt zugleich, WARUM sie mehr traegt.
+	]]
+	if spec.key == "ReinforcedRoad" then
+		local girder = newPart(
+			"Untergurt",
+			Vector3.new(width * 0.4, slabThickness * 0.9, length),
+			spec.accentColor,
+			spec.accentMaterial
+		)
+		addVisual(member, girder, { mode = "span", up = -slabThickness * 1.5 })
+
+		-- Ein paar Querrippen, damit der Traeger nicht wie ein Brett wirkt.
+		for i = 1, 3 do
+			local rib = newPart("Rippe", Vector3.new(width * 0.7, slabThickness * 0.7, 0.35), spec.color, spec.material)
+			addVisual(member, rib, { mode = "part", from = i / 4, to = i / 4, up = -slabThickness * 1.3 })
+		end
+	end
 
 	member.mainPart = slab
 	member.stressParts = { slab }
@@ -637,7 +707,12 @@ function Structure:updateMemberVisual(member)
 			local anchorPoint = (if visual.endAt == 1 then posA else posB) + offset
 			part.CFrame = CFrame.lookAt(anchorPoint, anchorPoint + direction, helper)
 		elseif visual.mode == "part" then
-			-- Nur ein Abschnitt der Gesamtlaenge.
+			--[[
+				Nur ein Abschnitt der Gesamtlaenge. Sind Anfang und Ende
+				gleich, ist es kein Abschnitt, sondern ein PUNKT auf der
+				Achse - so sitzen die Querrippen. Dann bleibt die Groesse,
+				wie sie ist, und nur die Lage wird gesetzt.
+			]]
 			local from = posA + delta * visual.from + offset
 			local to = posA + delta * visual.to + offset
 			local piece = to - from
@@ -646,6 +721,8 @@ function Structure:updateMemberVisual(member)
 				local middle = from + piece / 2
 				part.Size = Vector3.new(part.Size.X, part.Size.Y, pieceLength)
 				part.CFrame = CFrame.lookAt(middle, middle + piece.Unit, helper)
+			else
+				part.CFrame = CFrame.lookAt(from, from + direction, helper)
 			end
 		elseif visual.mode == "sag" then
 			--[[

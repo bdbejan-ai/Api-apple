@@ -256,6 +256,77 @@ end
 	Dieselbe Farbe hat das Bauteil in der Welt - so findet man wieder,
 	womit man gerade gebaut hat.
 ]]
+--[[
+	KLEINE ZEICHNUNGEN STATT SCHRIFTZEICHEN
+
+	Jeder Baustoff bekommt ein Symbol aus ein paar Rechtecken - ein I-Profil
+	fuer Stahl, uebereinanderliegende Bohlen fuer Holz, eine Kette fuer das
+	Seil. Buchstaben oder Sonderzeichen waeren einfacher gewesen, sagen aber
+	nichts: man muss sie erst lesen und dann uebersetzen. Eine Form erkennt
+	man sofort, und sie sieht auch noch aus wie das, was gebaut wird.
+
+	Bilder aus dem Netz gehen nicht - dafuer braeuchte es hochgeladene
+	Roblox-Grafiken, und die kann dieses Projekt nicht mitliefern.
+]]
+local function drawMaterialIcon(parent: Instance, key: string, color: Color3)
+	local box = Instance.new("Frame")
+	box.Name = "Symbol"
+	box.Size = UDim2.fromOffset(22, 22)
+	box.Position = UDim2.fromOffset(0, 0)
+	box.BackgroundTransparency = 1
+	box.Parent = parent
+
+	local function bar(x: number, y: number, w: number, h: number, shade: Color3?, rotation: number?)
+		local piece = Instance.new("Frame")
+		piece.Name = "Teil"
+		piece.Size = UDim2.fromOffset(w, h)
+		piece.Position = UDim2.fromOffset(x, y)
+		piece.BackgroundColor3 = shade or color
+		piece.BorderSizePixel = 0
+		piece.Rotation = rotation or 0
+		piece.Parent = box
+		return piece
+	end
+
+	local dark = color:Lerp(Color3.fromRGB(0, 0, 0), 0.45)
+
+	if key == "Road" or key == "ReinforcedRoad" then
+		-- Fahrbahnband mit Mittelstrich, bei der verstaerkten ein Untergurt.
+		bar(1, 8, 20, 6)
+		bar(8, 10, 6, 2, Color3.fromRGB(236, 236, 230))
+		if key == "ReinforcedRoad" then
+			bar(4, 15, 14, 3, dark)
+		end
+	elseif key == "Steel" then
+		-- I-Profil: zwei Gurte und ein Steg.
+		bar(3, 4, 16, 3)
+		bar(9, 7, 4, 8)
+		bar(3, 15, 16, 3)
+	elseif key == "Wood" then
+		-- Drei Bohlen mit einem Band quer darueber.
+		bar(2, 5, 18, 3)
+		bar(2, 10, 18, 3)
+		bar(2, 15, 18, 3)
+		bar(9, 3, 3, 17, dark)
+	elseif key == "Rope" or key == "Cable" then
+		--[[
+			Ein durchhaengendes Seil, aus drei gedrehten Strichen. Genau so
+			sieht es auch in der Welt aus - dort haengt es ebenfalls durch.
+		]]
+		local width = if key == "Cable" then 3 else 2
+		bar(2, 7, 8, width, nil, 26)
+		bar(7, 12, 8, width, nil, 0)
+		bar(12, 7, 8, width, nil, -26)
+	elseif key == "Hydraulic" then
+		-- Zylinder und herausfahrende Kolbenstange.
+		bar(2, 8, 11, 7)
+		bar(13, 10, 7, 3, dark)
+		bar(19, 8, 2, 7, dark)
+	end
+
+	return box
+end
+
 function BuildHud:buildMaterialRail()
 	local rail = Theme.panel(self.root, "MaterialRail")
 	rail.BackgroundTransparency = 0.08
@@ -290,31 +361,34 @@ function BuildHud:buildMaterialRail()
 		local stripe = Instance.new("Frame")
 		stripe.Name = "Stripe"
 		stripe.Size = UDim2.new(0, 4, 1, -12)
-		stripe.Position = UDim2.fromOffset(7, 6)
+		stripe.Position = UDim2.fromOffset(6, 6)
 		stripe.BackgroundColor3 = spec.uiColor
 		stripe.BorderSizePixel = 0
 		stripe.Parent = button
 		Theme.corner(stripe, 2)
 
+		local icon = drawMaterialIcon(button, key, spec.uiColor)
+		icon.Position = UDim2.fromOffset(14, 17)
+
 		Theme.label(button, "Name", {
-			size = UDim2.new(1, -22, 0, 18),
-			position = UDim2.fromOffset(18, 6),
+			size = UDim2.new(1, -46, 0, 18),
+			position = UDim2.fromOffset(42, 6),
 			text = spec.displayName,
 			textSize = 14,
 			bold = true,
 		})
 
 		Theme.label(button, "Cost", {
-			size = UDim2.new(1, -22, 0, 14),
-			position = UDim2.fromOffset(18, 23),
+			size = UDim2.new(1, -46, 0, 14),
+			position = UDim2.fromOffset(42, 23),
 			text = string.format("%d je Stud", spec.costPerStud),
 			textSize = 11,
 			color = Theme.colors.textDim,
 		})
 
 		Theme.label(button, "Limits", {
-			size = UDim2.new(1, -22, 0, 14),
-			position = UDim2.fromOffset(18, 37),
+			size = UDim2.new(1, -46, 0, 14),
+			position = UDim2.fromOffset(42, 37),
 			--[[
 				Bei Seilen steht ausdruecklich "kein Druck" statt einer Null.
 				Eine 0 liest sich wie ein vergessener Wert; "kein Druck" sagt,
