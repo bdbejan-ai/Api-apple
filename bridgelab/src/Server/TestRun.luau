@@ -97,7 +97,8 @@ function TestRun:spawnVehicle(spec)
 	-- Nach links fahrende Fahrzeuge werden gedreht, damit das Fahrerhaus vorn ist.
 	local facing = if spec.direction > 0 then CFrame.identity else CFrame.Angles(0, math.pi, 0)
 	body.CFrame = CFrame.new(
-		self.origin + Vector3.new(spec.startX, spec.deckY + size.Y / 2 + 0.25, self.level.z + (spec.laneZ or 0))
+		self.origin
+			+ Vector3.new(spec.startX, spec.startY + size.Y / 2 + 0.25, self.level.z + (spec.laneZ or 0))
 	) * facing
 	body.Parent = self.folders.vehicle
 

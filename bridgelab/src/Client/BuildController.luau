@@ -261,6 +261,22 @@ function BuildController:setEnabled(enabled: boolean)
 	self.cursorGui.Enabled = enabled and Device.isGamepad()
 end
 
+--[[
+	Kraeftig rot im Abrissmodus ("das ist gleich weg"), dezent hell sonst
+	("hier wuerde ein Rechtsklick hintreffen").
+]]
+function BuildController:setHighlightStyle(removing: boolean)
+	if removing then
+		self.removeHighlight.FillColor = Color3.fromRGB(235, 80, 70)
+		self.removeHighlight.FillTransparency = 0.55
+		self.removeHighlight.OutlineColor = Color3.fromRGB(255, 150, 140)
+	else
+		self.removeHighlight.FillColor = Color3.fromRGB(210, 225, 255)
+		self.removeHighlight.FillTransparency = 0.85
+		self.removeHighlight.OutlineColor = Color3.fromRGB(180, 210, 255)
+	end
+end
+
 function BuildController:hideMarkers()
 	self.hoverMarker.Transparency = 1
 	self.startMarker.Transparency = 1
@@ -412,17 +428,23 @@ function BuildController:update(dt: number)
 		self.startMarker.Transparency = 1
 
 		local _, model = self:findMemberUnderPointer()
+		self:setHighlightStyle(true)
 		self.removeHighlight.Adornee = model
 		return
 	end
 
 	--[[
-		Auch ausserhalb des Abrissmodus wird das Bauteil unter dem Zeiger
-		markiert, solange keine Auswahl offen ist - denn ein Rechtsklick
-		reisst es dann ab.
+		Ausserhalb des Abrissmodus wird ein Bauteil nur dann markiert, wenn
+		gerade KEIN Ankerpunkt unter dem Zeiger liegt. Sonst leuchtete beim
+		normalen Bauen staendig etwas auf, obwohl man gar nichts abreissen
+		will - und der Ankerpunkt ist in dem Fall eindeutig das Gemeinte.
+
+		Die Markierung ist dann auch dezenter: sie sagt nur "ein Rechtsklick
+		wuerde das hier treffen".
 	]]
-	if not self.firstSnap then
+	if not self.firstSnap and not index then
 		local _, model = self:findMemberUnderPointer()
+		self:setHighlightStyle(false)
 		self.removeHighlight.Adornee = model
 	else
 		self.removeHighlight.Adornee = nil

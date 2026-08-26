@@ -24,10 +24,32 @@ local SPECS = {
 }
 
 --[[
-	decks    Liste der Fahrbahnhoehen, von unten nach oben
-	vehicles Liste der Testfahrzeuge: deck = Nummer der Fahrbahn,
-	         dir = 1 nach rechts, -1 nach links
+	decks     Liste der Fahrbahnhoehen, von unten nach oben.
+	          Ein Eintrag ist entweder eine Zahl (waagerechte Fahrbahn) oder
+	          ein Paar { links, rechts } fuer eine ANSTEIGENDE Fahrbahn.
+	upperOff  Abstand der oberen Ankerreihe ueber der obersten Fahrbahn
+	vehicles  Liste der Testfahrzeuge: deck = Nummer der Fahrbahn,
+	          dir = 1 nach rechts, -1 nach links, mass optional
 ]]
+
+-- Hoehe einer Fahrbahn an der Stelle x (waagerecht oder ansteigend)
+local function deckYAt(L, deckIndex, x)
+	local entry = L.decks[deckIndex]
+	if type(entry) == "number" then
+		return entry
+	end
+	local right = L.gap / 2
+	local t = math.clamp((x + right) / L.gap, 0, 1)
+	return entry[1] + (entry[2] - entry[1]) * t
+end
+
+local function deckTop(L, deckIndex)
+	local entry = L.decks[deckIndex]
+	if type(entry) == "number" then
+		return entry
+	end
+	return math.max(entry[1], entry[2])
+end
 local LEVELS = {
 	{ id = "Level1 Die erste Luecke", budget = 200, gap = 40, decks = { 40 }, upperY = 48, groundY = 20,
 	  vehicles = { { deck = 1, dir = 1 } } },
@@ -45,6 +67,10 @@ local LEVELS = {
 	  vehicles = { { deck = 1, dir = 1 }, { deck = 2, dir = 1, mass = 600 } } },
 
 	{ id = "Level6 Grosse Schlucht",  budget = 320, gap = 80, decks = { 46 }, upperY = 54, groundY = 22,
+	  vehicles = { { deck = 1, dir = 1 } } },
+
+	-- Ansteigende Fahrbahn: links 40, rechts 56
+	{ id = "Level7 Steile Rampe",     budget = 240, gap = 48, decks = { { 40, 56 } }, upperOff = 8, groundY = 20,
 	  vehicles = { { deck = 1, dir = 1 } } },
 }
 
@@ -66,13 +92,17 @@ local function buildSnaps(L)
 		snaps[#snaps + 1] = { id = #snaps + 1, row = row, x = x, y = y, fixed = fixed }
 	end
 
-	for index, deckY in L.decks do
+	for index in L.decks do
 		for x = -half, half, SPACING do
-			add("deck" .. index, x, deckY, math.abs(x) >= right)
+			add("deck" .. index, x, deckYAt(L, index, x), math.abs(x) >= right)
 		end
 	end
+
+	-- Obere Reihe laeuft parallel ueber der obersten Fahrbahn.
+	local topIndex = #L.decks
+	local upperOffset = L.upperOff or (L.upperY - deckTop(L, topIndex))
 	for x = -half, half, SPACING do
-		add("upper", x, L.upperY, math.abs(x) >= half - 0.01)
+		add("upper", x, deckYAt(L, topIndex, x) + upperOffset, math.abs(x) >= half - 0.01)
 	end
 	for x = left, right, SPACING do
 		add("ground", x, L.groundY, true)
@@ -100,19 +130,28 @@ local function addDeck(members, snaps, left, right, span, row)
 		local nextX = math.min(x + span, right)
 		local a, b = findSnap(snaps, row, x), findSnap(snaps, row, nextX)
 		if not a or not b then return false end
-		if nextX - x > SPECS.Beam.maxLength + 0.01 then return false end
+		-- Bei einer Steigung ist der Balken laenger als der waagerechte Abstand.
+		local dx = snaps[b].x - snaps[a].x
+		local dy = snaps[b].y - snaps[a].y
+		if math.sqrt(dx * dx + dy * dy) > SPECS.Beam.maxLength + 0.01 then return false end
 		members[#members + 1] = { kind = "Beam", a = a, b = b }
 		x = nextX
 	end
 	return true
 end
 
--- Senkrechte Stuetzen zwischen zwei Reihen
-local function addPillars(members, snaps, xs, fromRow, toRow, height)
-	if height > SPECS.Pillar.maxLength + 0.01 then return false end
+--[[
+	Senkrechte Stuetzen zwischen zwei Reihen.
+	Die Laenge wird je Stelle aus den Knoten selbst genommen - bei einer
+	ansteigenden Fahrbahn ist sie an jeder Stelle anders.
+]]
+local function addPillars(members, snaps, xs, fromRow, toRow)
 	for _, x in xs do
 		local a, b = findSnap(snaps, fromRow, x), findSnap(snaps, toRow, x)
 		if not a or not b then return false end
+		if math.abs(snaps[b].y - snaps[a].y) > SPECS.Pillar.maxLength + 0.01 then
+			return false
+		end
 		members[#members + 1] = { kind = "Pillar", a = a, b = b }
 	end
 	return true
@@ -145,7 +184,9 @@ local function addVehicleLoads(loads, members, snaps, vehicleX, deckY, mass)
 		for _, m in members do
 			if SPECS[m.kind].drivable then
 				local sa, sb = snaps[m.a], snaps[m.b]
-				if math.abs(sa.y - deckY) < 0.01 and math.abs(sb.y - deckY) < 0.01 then
+				-- Ein Fahrbahnbauteil liegt in der Naehe der gesuchten Hoehe.
+				-- Bei einer Steigung sind seine Enden verschieden hoch.
+				if math.abs((sa.y + sb.y) / 2 - deckY) < 3 then
 					local lo, hi = math.min(sa.x, sb.x), math.max(sa.x, sb.x)
 					if sx >= lo - 0.01 and sx <= hi + 0.01 and hi > lo then
 						local frac = math.max(0, math.min(1, (sx - sa.x) / (sb.x - sa.x)))
@@ -242,9 +283,8 @@ local function driveThrough(members, snaps, L, left, right)
 
 	if #L.vehicles == 1 then
 		local v = L.vehicles[1]
-		local deckY = L.decks[v.deck]
 		for x = from, to, 1 do
-			test({ { x = x, deckY = deckY, mass = v.mass } })
+			test({ { x = x, deckY = deckYAt(L, v.deck, x), mass = v.mass } })
 		end
 	else
 		--[[
@@ -252,16 +292,14 @@ local function driveThrough(members, snaps, L, left, right)
 			Schrittweite 3 statt 1, sonst dauert es zu lange - fuer die Frage
 			"haelt das ueberhaupt" ist das fein genug.
 		]]
-		local d1 = L.decks[L.vehicles[1].deck]
-		local d2 = L.decks[L.vehicles[2].deck]
 		for x1 = from, to, 3 do
 			for x2 = from, to, 3 do
 				-- Richtung -1 faehrt von rechts nach links.
 				local p1 = if L.vehicles[1].dir > 0 then x1 else -x1
 				local p2 = if L.vehicles[2].dir > 0 then x2 else -x2
 				test({
-					{ x = p1, deckY = d1, mass = L.vehicles[1].mass },
-					{ x = p2, deckY = d2, mass = L.vehicles[2].mass },
+					{ x = p1, deckY = deckYAt(L, L.vehicles[1].deck, p1), mass = L.vehicles[1].mass },
+					{ x = p2, deckY = deckYAt(L, L.vehicles[2].deck, p2), mass = L.vehicles[2].mass },
 				})
 			end
 		end
@@ -283,10 +321,21 @@ local allSolvable = true
 for _, L in LEVELS do
 	local snaps, left, right = buildSnaps(L)
 	local deckList = ""
-	for _, y in L.decks do deckList ..= tostring(y) .. " " end
+	for index, entry in L.decks do
+		if type(entry) == "number" then
+			deckList ..= tostring(entry) .. " "
+		else
+			deckList ..= string.format("%d->%d ", entry[1], entry[2])
+		end
+	end
+
+	-- Ein Level gibt die obere Reihe entweder absolut (upperY) oder als
+	-- Abstand ueber der obersten Fahrbahn (upperOff) an.
+	local topIndex = #L.decks
+	local upperTop = L.upperY or (deckTop(L, topIndex) + L.upperOff)
 
 	print(string.format("\n%s\n   Budget %d  Luecke %d  Fahrbahnen: %s Boden %d  oben %d  Fahrzeuge %d",
-		L.id, L.budget, L.gap, deckList, L.groundY, L.upperY, #L.vehicles))
+		L.id, L.budget, L.gap, deckList, L.groundY, upperTop, #L.vehicles))
 
 	local candidates = {}
 
@@ -300,11 +349,10 @@ for _, L in LEVELS do
 		local ok = true
 		local xs = pillarXs(left, right, span)
 
-		for index, deckY in L.decks do
+		for index in L.decks do
 			if not addDeck(m, snaps, left, right, span, "deck" .. index) then ok = false break end
 			local fromRow = if index == 1 then "ground" else "deck" .. (index - 1)
-			local fromY = if index == 1 then L.groundY else L.decks[index - 1]
-			if not addPillars(m, snaps, xs, fromRow, "deck" .. index, deckY - fromY) then ok = false break end
+			if not addPillars(m, snaps, xs, fromRow, "deck" .. index) then ok = false break end
 		end
 
 		if ok then
@@ -317,21 +365,20 @@ for _, L in LEVELS do
 	do
 		local m = {}
 		local ok = true
-		for index, deckY in L.decks do
+		for index in L.decks do
 			if not addDeck(m, snaps, left, right, 8, "deck" .. index) then ok = false break end
 			local fromRow = if index == 1 then "ground" else "deck" .. (index - 1)
-			local fromY = if index == 1 then L.groundY else L.decks[index - 1]
 			-- Stuetzen nur dort, wo die 8er-Fahrbahn auch Knoten hat
-			if not addPillars(m, snaps, pillarXs(left, right, 8), fromRow, "deck" .. index, deckY - fromY) then
+			if not addPillars(m, snaps, pillarXs(left, right, 8), fromRow, "deck" .. index) then
 				ok = false
 				break
 			end
 		end
 		-- zusaetzliche Stuetzen in der Mitte
 		if ok then
-			for index, deckY in L.decks do
+			for index in L.decks do
 				local fromRow = if index == 1 then "ground" else "deck" .. (index - 1)
-				addPillars(m, snaps, { -4, 4 }, fromRow, "deck" .. index, deckY - (if index == 1 then L.groundY else L.decks[index - 1]))
+				addPillars(m, snaps, { -4, 4 }, fromRow, "deck" .. index)
 			end
 			candidates[#candidates + 1] = { name = "8er Fahrbahn + Mittelstuetzen", members = m }
 		end

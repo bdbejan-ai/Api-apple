@@ -96,17 +96,25 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 	local z = level.z
 	local depth = level.platformDepth
 	local halfLength = level.platformLength / 2
-	local lowestDeckY = level.decks[1].y
+
+	--[[
+		Eine Fahrbahn kann ansteigen: dann liegt die rechte Seite hoeher als
+		die linke. Alles, was auf einer Plattform steht, muss deshalb die
+		Hoehe SEINER Seite kennen.
+	]]
+	local function deckSideY(deckIndex: number, side: number): number
+		return level.deckYAt(deckIndex, if side < 0 then level.gapLeftX else level.gapRightX)
+	end
 
 	----------------------------------------------------------------------------
 	-- Plattformen links und rechts
 	-- Aufbau von unten nach oben: Fels, darauf eine duenne Grasschicht.
 	----------------------------------------------------------------------------
 
-	local rockHeight = lowestDeckY - 2
-
 	for _, side in { -1, 1 } do
 		local centerX = if side < 0 then level.gapLeftX - halfLength else level.gapRightX + halfLength
+		local lowestDeckY = deckSideY(1, side)
+		local rockHeight = lowestDeckY - 2
 
 		local rock = makePart(
 			"PlatformRock",
@@ -167,8 +175,8 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 				sind verankert, das Fahrzeug steht auf dem Strassenstueck selbst.
 			]]
 			if index > 1 then
-				local below = level.decks[index - 1].y
-				local height = deck.y - below
+				local below = deckSideY(index - 1, side)
+				local height = deckSideY(index, side) - below
 				for _, wallZ in { -depth * 0.26, depth * 0.26 } do
 					local wall = makePart(
 						"Abutment",
@@ -182,10 +190,11 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 				end
 			end
 
+			local roadY = deckSideY(index, side)
 			local road = makePart(
 				"Road",
 				Vector3.new(level.platformLength, 0.4, 8),
-				origin + Vector3.new(centerX, deck.y + 0.2, z),
+				origin + Vector3.new(centerX, roadY + 0.2, z),
 				terrain
 			)
 			road.Color = Color3.fromRGB(58, 60, 66)
@@ -196,7 +205,7 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 				local stripe = makeDecor(
 					"Stripe",
 					Vector3.new(4, 0.05, 0.5),
-					origin + Vector3.new(centerX - halfLength + 6 + i * 9, deck.y + 0.42, z),
+					origin + Vector3.new(centerX - halfLength + 6 + i * 9, roadY + 0.42, z),
 					decor
 				)
 				stripe.Color = Color3.fromRGB(232, 232, 224)
@@ -280,17 +289,22 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 	-- Pylone: sie tragen die beiden festen Ankerpunkte der oberen Reihe
 	----------------------------------------------------------------------------
 
-	local topDeckY = level.topDeckY
-	local pylonHeight = level.upperY - topDeckY
+	local topIndex = #level.decks
 	local outerX = level.gapRightX + level.snapSpacing
 
-	if pylonHeight > 0 then
-		for _, x in { -outerX, outerX } do
+	for _, side in { -1, 1 } do
+		local x = side * outerX
+		-- Fuss und Kopf des Pylons richten sich nach der Hoehe DIESER Seite.
+		local footY = deckSideY(topIndex, side)
+		local headY = footY + level.upperOffset
+		local pylonHeight = headY - footY
+
+		if pylonHeight > 0 then
 			for _, offsetZ in { -5, 5 } do
 				local pylon = makeDecor(
 					"Pylon",
 					Vector3.new(2.2, pylonHeight, 2.2),
-					origin + Vector3.new(x, topDeckY + pylonHeight / 2, z + offsetZ),
+					origin + Vector3.new(x, footY + pylonHeight / 2, z + offsetZ),
 					terrain
 				)
 				pylon.Color = Color3.fromRGB(162, 156, 146)
@@ -300,7 +314,7 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 			local crossBeam = makeDecor(
 				"PylonTop",
 				Vector3.new(2.4, 1.2, 12),
-				origin + Vector3.new(x, level.upperY, z),
+				origin + Vector3.new(x, headY, z),
 				terrain
 			)
 			crossBeam.Color = Color3.fromRGB(142, 136, 126)
@@ -321,7 +335,7 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 		local start = makeDecor(
 			"StartMarker",
 			Vector3.new(1.2, 0.4, width),
-			origin + Vector3.new(vehicle.startX, vehicle.deckY + 0.45, z + lane),
+			origin + Vector3.new(vehicle.startX, vehicle.startY + 0.45, z + lane),
 			decor
 		)
 		start.Color = if vehicle.color then vehicle.color else Color3.fromRGB(235, 235, 235)
@@ -330,7 +344,7 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 		local finish = makeDecor(
 			"FinishZone",
 			Vector3.new(1.6, 9, if lane ~= 0 then 5 else 12),
-			origin + Vector3.new(vehicle.finishX, vehicle.deckY + 4.5, z + lane),
+			origin + Vector3.new(vehicle.finishX, vehicle.finishY + 4.5, z + lane),
 			decor
 		)
 		finish.Color = Color3.fromRGB(74, 208, 118)

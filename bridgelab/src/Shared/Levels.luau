@@ -72,11 +72,43 @@ local function makeLevel(def)
 	for index, deck in level.decks do
 		deck.index = index
 		deck.row = "deck" .. index
+		--[[
+			Eine Fahrbahn darf ANSTEIGEN: dann liegt die rechte Seite hoeher
+			als die linke. Ohne Angabe von rightY ist sie waagerecht.
+			Zwischen den beiden Rand-Hoehen wird ueber die Luecke hinweg
+			gleichmaessig ueberblendet; ausserhalb der Luecke bleibt es flach,
+			denn dort steht ja fester Boden.
+		]]
+		deck.leftY = deck.y
+		deck.rightY = deck.rightY or deck.y
 	end
 
-	-- Die unterste Fahrbahn ist die Hauptfahrbahn (Kamera, Plattformhoehe).
-	level.deckY = level.decks[1].y
-	level.topDeckY = level.decks[#level.decks].y
+	--[[
+		Hoehe einer Fahrbahn an einer bestimmten Stelle.
+		Alle anderen Teile fragen hier nach, statt selbst zu rechnen.
+	]]
+	function level.deckYAt(deckIndex: number, x: number): number
+		local deck = level.decks[deckIndex]
+		local t = math.clamp((x - level.gapLeftX) / level.gapWidth, 0, 1)
+		return deck.leftY + (deck.rightY - deck.leftY) * t
+	end
+
+	local topDeck = level.decks[#level.decks]
+
+	-- Die unterste Fahrbahn ist die Hauptfahrbahn (Plattformhoehe).
+	level.deckY = level.decks[1].leftY
+	level.topDeckY = math.max(topDeck.leftY, topDeck.rightY)
+
+	-- Worauf die Kamera anfangs blickt: bei einer Steigung die Mitte.
+	level.cameraDeckY = (level.decks[1].leftY + level.decks[1].rightY) / 2
+
+	--[[
+		Die obere Ankerreihe laeuft PARALLEL zur obersten Fahrbahn, in festem
+		Abstand darueber. Waere sie waagerecht, waere sie bei einer ansteigenden
+		Fahrbahn am tiefen Ende ausser Reichweite eines Balkens.
+	]]
+	level.upperOffset = def.upperOffset or ((def.upperY or (topDeck.leftY + 8)) - topDeck.leftY)
+	level.upperY = level.topDeckY + level.upperOffset
 
 	----------------------------------------------------------------------------
 	-- Ankerpunkte erzeugen
@@ -105,14 +137,19 @@ local function makeLevel(def)
 	-- Je Fahrbahn eine Reihe. Alles ab dem Rand der Luecke steht auf festem Boden.
 	for _, deck in level.decks do
 		for x = -half, half, level.snapSpacing do
-			addSnapPoint(deck.row, x, deck.y, math.abs(x) >= level.gapRightX)
+			addSnapPoint(deck.row, x, level.deckYAt(deck.index, x), math.abs(x) >= level.gapRightX)
 		end
 	end
 
-	-- Obere Reihe. Nur die beiden aeussersten Punkte sind fest - sie sitzen
-	-- auf den Pylonen, die auf den Plattformen stehen.
+	-- Obere Reihe, parallel ueber der obersten Fahrbahn. Nur die beiden
+	-- aeussersten Punkte sind fest - sie sitzen auf den Pylonen.
 	for x = -half, half, level.snapSpacing do
-		addSnapPoint("upper", x, level.upperY, math.abs(x) >= half - 0.01)
+		addSnapPoint(
+			"upper",
+			x,
+			level.deckYAt(topDeck.index, x) + level.upperOffset,
+			math.abs(x) >= half - 0.01
+		)
 	end
 
 	-- Bodenreihe im Schluchtgrund. Alle Punkte sind fest.
@@ -134,15 +171,22 @@ local function makeLevel(def)
 		local outsideLeft = level.gapLeftX - 14
 		local outsideRight = level.gapRightX + 14
 
+		local startX = if direction > 0 then outsideLeft else outsideRight
+		local finishX = if direction > 0 then outsideRight else outsideLeft
+
 		level.vehicles[index] = {
 			index = index,
 			deckIndex = deck.index,
 			deckRow = deck.row,
-			deckY = deck.y,
+			-- Hoehe der Fahrbahn dort, wo das Fahrzeug steht bzw. ankommt.
+			-- Bei einer ansteigenden Fahrbahn sind das zwei verschiedene Werte.
+			deckY = deck.leftY,
+			startY = level.deckYAt(deck.index, startX),
+			finishY = level.deckYAt(deck.index, finishX),
 			direction = direction,
 			-- Nach rechts: links starten. Nach links: rechts starten.
-			startX = if direction > 0 then outsideLeft else outsideRight,
-			finishX = if direction > 0 then outsideRight else outsideLeft,
+			startX = startX,
+			finishX = finishX,
 			mass = entry.mass or def.vehicle.mass,
 			size = entry.size or def.vehicle.size,
 			color = entry.color,
@@ -280,6 +324,45 @@ Levels.list = {
 		},
 	}),
 
+	--[[
+		Die Kennung (id) hat nichts mit der angezeigten Nummer zu tun - die
+		ergibt sich aus der Reihenfolge in dieser Liste. Deshalb laesst sich
+		ein Level einschieben, ohne den Fortschritt der anderen zu verlieren.
+	]]
+	makeLevel({
+		id = "LevelRamp",
+		displayName = "Steile Rampe",
+		subtitle = "Die andere Seite liegt 16 Studs hoeher.",
+		difficulty = 3,
+
+		-- Geprueft: die guenstigste tragende Loesung kostet 135.
+		budget = 240,
+		maxDropStuds = 10,
+
+		gapWidth = 48,
+		groundY = 20,
+
+		--[[
+			Ansteigende Fahrbahn: links 40, rechts 56. Damit wird jede Stuetze
+			weiter rechts laenger und schwerer - und die Balken liegen schraeg,
+			sind also laenger als der waagerechte Abstand vermuten laesst.
+		]]
+		decks = {
+			{ y = 40, rightY = 56 },
+		},
+
+		-- Die obere Reihe laeuft parallel mit, 8 Studs ueber der Fahrbahn.
+		upperOffset = 8,
+
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
+
+		hints = {
+			"Die Fahrbahn steigt an. Nach rechts hin wird jede Stuetze laenger - und laengere Stuetzen sind schwerer, ihr Eigengewicht haengt zusaetzlich an der Bruecke.",
+			"Ein Balken darf 10 Studs lang sein, SCHRAEG gemessen. Bei dieser Steigung sind 8 Studs waagerecht etwa 8,4 Studs schraeg - das passt noch bequem.",
+			"Loesung: sechs Balken ueber je zwei Rasterschritte (60) und fuenf Stuetzen bis zum Grund (75) ergeben 135 von 240.",
+		},
+	}),
+
 	makeLevel({
 		id = "Level4",
 		displayName = "Gegenverkehr",
@@ -410,6 +493,8 @@ function Levels.summaries()
 			gapWidth = level.gapWidth,
 			deckCount = #level.decks,
 			vehicleCount = #level.vehicles,
+			-- Hoehenunterschied der Fahrbahn: 0 = waagerecht
+			slope = level.decks[1].rightY - level.decks[1].leftY,
 			hintCount = #level.hints,
 			freeHints = level.freeHints,
 		}

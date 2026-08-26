@@ -233,12 +233,15 @@ local function createPreview(parent: Instance, summary): Frame
 	water.BorderSizePixel = 0
 	water.Parent = box
 
-	-- Plattformen links und rechts
+	-- Plattformen links und rechts. Bei einer Rampe steht die rechte hoeher.
+	local rightLift = if (summary.slope or 0) ~= 0 then 16 else 0
+
 	for _, side in { 0, 1 } do
+		local lift = if side == 1 then rightLift else 0
 		local platform = Instance.new("Frame")
 		platform.Name = "Platform"
-		platform.Size = UDim2.new(sideWidth, 0, 0, 40)
-		platform.Position = UDim2.new(if side == 0 then 0 else 1 - sideWidth, 0, 1, -40)
+		platform.Size = UDim2.new(sideWidth, 0, 0, 40 + lift)
+		platform.Position = UDim2.new(if side == 0 then 0 else 1 - sideWidth, 0, 1, -40 - lift)
 		platform.BackgroundColor3 = Color3.fromRGB(88, 92, 84)
 		platform.BorderSizePixel = 0
 		platform.Parent = box
@@ -251,12 +254,24 @@ local function createPreview(parent: Instance, summary): Frame
 		grass.Parent = platform
 	end
 
+	--[[
+		Steigt die Fahrbahn an, kippen wir die Linie einfach um den passenden
+		Winkel. GuiObject.Rotation dreht um die Mitte - genau richtig, denn
+		eine Rampe steigt ja um ihre Mitte herum an.
+	]]
+	local slopeAngle = 0
+	if (summary.slope or 0) ~= 0 then
+		-- Bildschirm-Y zeigt nach unten, deshalb das Minuszeichen.
+		slopeAngle = -math.deg(math.atan2(summary.slope, summary.gapWidth))
+	end
+
 	-- Fahrbahnen: die unterste liegt auf Plattformhoehe, jede weitere darueber.
 	for index = 1, summary.deckCount do
 		local deck = Instance.new("Frame")
 		deck.Name = "Deck" .. index
 		deck.Size = UDim2.new(1, -8, 0, 3)
 		deck.Position = UDim2.new(0, 4, 1, -42 - (index - 1) * 18)
+		deck.Rotation = slopeAngle
 		deck.BackgroundColor3 = Color3.fromRGB(206, 210, 220)
 		deck.BorderSizePixel = 0
 		deck.Parent = box
@@ -406,7 +421,10 @@ function LevelSelectGui:createCard(summary)
 	x += 78
 
 	-- Besonderheiten deutlich hervorheben
-	if summary.deckCount > 1 then
+	if (summary.slope or 0) ~= 0 then
+		chip(card, "Slope", string.format("Steigung %d", summary.slope), x, Theme.colors.warning)
+		x += 94
+	elseif summary.deckCount > 1 then
 		chip(card, "Decks", "2 Ebenen", x, Theme.colors.warning)
 		x += 76
 	elseif summary.vehicleCount > 1 then

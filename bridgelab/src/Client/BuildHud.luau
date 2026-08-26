@@ -62,6 +62,8 @@ function BuildHud.new()
 	-- Am Tacho eingestellte Fahrgeschwindigkeit.
 	self.speed = Config.Test.defaultSpeed
 	self.draggingSpeed = false
+	self.lastSpeedPush = nil
+	self.pendingSpeedPush = false
 
 	self:build()
 
@@ -473,7 +475,13 @@ function BuildHud:buildSpeedPanel()
 			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
-			self.draggingSpeed = false
+			if self.draggingSpeed then
+				self.draggingSpeed = false
+				-- Zum Schluss den endgueltigen Wert auf jeden Fall melden.
+				if self.pendingSpeedPush then
+					self:pushSpeed(true)
+				end
+			end
 		end
 	end)
 
@@ -486,10 +494,28 @@ function BuildHud:setSpeed(speed: number)
 	self:refreshSpeedDisplay()
 end
 
-function BuildHud:pushSpeed()
-	if self.onSpeedChanged then
-		self.onSpeedChanged(self.speed)
+--[[
+	Den neuen Wert an den Server melden - aber hoechstens etwa fuenfzehnmal
+	pro Sekunde. Beim Ziehen liefert die Maus sonst jede Bildwiederholung
+	einen Wert, und der Server verwirft die meisten davon ohnehin.
+
+	Der letzte Wert geht immer durch: sonst bliebe am Ende einer Ziehbewegung
+	womoeglich ein veralteter Wert stehen.
+]]
+function BuildHud:pushSpeed(force: boolean?)
+	if not self.onSpeedChanged then
+		return
 	end
+
+	local now = os.clock()
+	if not force and self.lastSpeedPush and now - self.lastSpeedPush < 1 / 15 then
+		self.pendingSpeedPush = true
+		return
+	end
+
+	self.lastSpeedPush = now
+	self.pendingSpeedPush = false
+	self.onSpeedChanged(self.speed)
 end
 
 function BuildHud:refreshSpeedDisplay()

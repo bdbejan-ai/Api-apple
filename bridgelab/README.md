@@ -27,15 +27,16 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 
 | | |
 |---|---|
-| **Level-Auswahl** | Sechs Level mit Vorschaubild, Schwierigkeitsgrad (1–5), Budget, Lückenbreite und Haken für geschaffte Level |
+| **Level-Auswahl** | Sieben Level mit Vorschaubild, Schwierigkeitsgrad (1–5), Budget, Lückenbreite und Haken für geschaffte Level |
 | **Interaktive Anleitung** | Startet beim allerersten Spielstart automatisch. Neun Schritte, in denen man wirklich selbst baut. Texte passen sich dem Eingabegerät an |
 | **Seitenansicht** | Keine Spielfigur. Beliebig nah heranzoomen; herauszoomen nur so weit, bis das Level das Bild füllt |
 | **Tacho** | Schieberegler von 1 bis 14 Studs/s. Einstellbar vor dem Test **und mitten in der Fahrt**. Das Zeitlimit passt sich mit an |
 | **Belastungsanzeige** | Über jedem Bauteil steht während des Tests die Auslastung in Prozent und in Newton, dazu ein Farbbalken |
 | **Genaues Abreißen** | Das Bauteil unter dem Zeiger wird rot hervorgehoben, bevor man klickt — auch bei dünnen Seilen und sich kreuzenden Streben |
-| **Gegenverkehr** | Level 4: zwei Fahrzeuge fahren aufeinander zu. In der Mitte liegen 2000 N auf wenigen Studs |
-| **Doppeldecker** | Level 5: zwei Fahrbahnen übereinander, auf jeder ein Fahrzeug. Nur Stützen überbrücken die 16 Studs dazwischen |
-| **Tipps** | Drei pro Level. In Level 1–3 ist der erste gratis, ab Level 4 kostet schon der erste Robux |
+| **Steile Rampe** | Level 4: die andere Seite liegt 16 Studs höher. Die Stützen werden nach rechts hin immer länger und schwerer |
+| **Gegenverkehr** | Level 5: zwei Fahrzeuge fahren aufeinander zu. In der Mitte liegen 2000 N auf wenigen Studs |
+| **Doppeldecker** | Level 6: zwei Fahrbahnen übereinander, auf jeder ein Fahrzeug. Nur Stützen überbrücken die 16 Studs dazwischen |
+| **Tipps** | Drei pro Level. Bei Schwierigkeit 1–3 ist der erste gratis, ab Schwierigkeit 4 kostet schon der erste Robux |
 | **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp-Gutscheine werden dauerhaft gespeichert |
 | **Mehrspieler** | Jeder Spieler bekommt seine eigene Arena und kann ein eigenes Level spielen |
 
@@ -326,7 +327,25 @@ vehicles = {
 ```
 
 `direction = 1` fährt nach rechts, `-1` nach links. `mass` ist optional und
-überschreibt das Gewicht aus `vehicle.mass`.
+überschreibt das Gewicht aus `vehicle.mass`. Bei Gegenverkehr braucht jedes
+Fahrzeug zusätzlich eine eigene `lane` (seitlicher Versatz), sonst fahren sie
+frontal ineinander.
+
+### Ansteigende Fahrbahn
+
+Eine Fahrbahn darf schräg verlaufen. `rightY` gibt die Höhe am rechten Rand an:
+
+```lua
+decks = { { y = 40, rightY = 56 } },   -- steigt über die Lücke um 16 Studs
+upperOffset = 8,                        -- obere Reihe läuft parallel mit
+```
+
+Zwischen den beiden Rändern wird gleichmäßig überblendet, außerhalb der Lücke
+bleibt es flach. Die obere Ankerreihe läuft dann **parallel** zur Fahrbahn —
+wäre sie waagerecht, läge sie am tiefen Ende außerhalb der Balkenreichweite.
+
+Achte darauf, dass die Balken schräg gemessen werden: bei 16 Studs Steigung auf
+48 Studs Länge ist ein Feld von 8 Studs waagerecht rund 8,4 Studs lang.
 
 > Zwischen zwei Fahrbahnen kommt man nur mit **Stützen** hoch, sobald der
 > Abstand größer als 10 Studs ist — die maximale Balkenlänge. Genau das macht
@@ -359,7 +378,7 @@ Wenn dort `NICHT LOESBAR` steht, schlägt das Skript ein passendes Budget vor.
 Trägst du neue Level ein, musst du sie auch in der `LEVELS`-Tabelle **im
 Prüfskript** ergänzen — es liest `Levels.luau` nicht selbst aus.
 
-**Alle sechs mitgelieferten Level sind damit geprüft** und haben zwischen 18 %
+**Alle sieben mitgelieferten Level sind damit geprüft** und haben zwischen 18 %
 und 45 % Budgetreserve gegenüber der günstigsten funktionierenden Lösung.
 
 ### Den Code prüfen
@@ -495,4 +514,5 @@ Ehrlich gesagt, was noch fehlt oder wacklig ist:
 - **Der Fluss ist reine Optik.** Er kollidiert mit nichts; Stützen dürfen
   mitten hindurch. Echtes Wasser mit Auftrieb würde die Kräfteberechnung
   verfälschen.
+- **Der Fluss hat keine Physik** — kein Auftrieb, keine Strömung.
 - **Keine Bestenliste, keine Sterne-Wertung, kein Level-Editor.**

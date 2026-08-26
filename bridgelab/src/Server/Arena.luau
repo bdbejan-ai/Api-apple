@@ -120,7 +120,8 @@ function Arena:buildState()
 		-- Die Kamera des Clients muss wissen, wo seine Arena steht.
 		originY = self.origin.Y,
 		bounds = self.level.bounds,
-		deckY = self.level.deckY,
+		-- Bei ansteigender Fahrbahn blickt die Kamera auf die Mitte.
+		deckY = self.level.cameraDeckY,
 	}
 end
 
