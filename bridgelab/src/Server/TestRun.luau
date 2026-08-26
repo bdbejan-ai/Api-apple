@@ -329,7 +329,8 @@ function TestRun:step(dt: number)
 		self.solveAccumulator = 0
 		self.currentNodeLoads = self:computeVehicleLoads()
 		local result = self.forceEngine:evaluate(self.currentNodeLoads)
-		self.forceEngine:applyColors()
+		-- Im Test zaehlt die Belastung, also faerben wir danach ein.
+		self.forceEngine:applyColors(true)
 		self.lastResult = result
 
 		-- Bauteile duerfen erst nach der Schonfrist brechen. Sonst zerstoert

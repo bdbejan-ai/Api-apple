@@ -203,14 +203,42 @@ end
 -- Faerbung und Zahlen
 --------------------------------------------------------------------------------
 
--- Faerbt alle Bauteile nach ihrer Auslastung: gruen = locker, rot = am Limit.
-function ForceEngine:applyColors()
+--[[
+	Faerbt die Bauteile ein.
+
+	showLoad = true  (waehrend des Tests)
+	    Nach Auslastung: gruen = locker, gelb = wird eng, rot = am Limit.
+	    Genau darum geht es im Test, also faerben wir alles danach.
+
+	showLoad = false (waehrend des Bauens)
+	    In ihrer eigenen Farbe: Stahl, Beton, Seil. Wuerden wir auch hier nach
+	    Auslastung faerben, waere im leeren Zustand einfach alles gruen - und
+	    man saehe den Bauteilen nicht mehr an, was sie sind.
+	    Nur wenn ein Bauteil schon beim blossen Danebenstehen ueber 60 Prozent
+	    kommt, blenden wir zur Warnfarbe hinueber. Das ist ein echtes Problem
+	    und soll auffallen, bevor der Test ueberhaupt losgeht.
+]]
+function ForceEngine:applyColors(showLoad: boolean)
 	for _, member in self.structure:activeMembers() do
-		if member.stressParts then
-			local color = Config.utilisationColor(ForceEngine.utilisation(member))
-			for _, part in member.stressParts do
-				part.Color = color
-			end
+		if not member.stressParts then
+			continue
+		end
+
+		local spec = Config.PartTypes[member.kind]
+		local utilisation = ForceEngine.utilisation(member)
+		local color
+
+		if showLoad then
+			color = Config.utilisationColor(utilisation)
+		elseif utilisation > 0.6 then
+			local blend = math.clamp((utilisation - 0.6) / 0.4, 0, 1)
+			color = spec.color:Lerp(Config.utilisationColor(utilisation), blend)
+		else
+			color = spec.color
+		end
+
+		for _, part in member.stressParts do
+			part.Color = color
 		end
 	end
 end

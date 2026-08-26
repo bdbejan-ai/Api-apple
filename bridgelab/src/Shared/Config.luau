@@ -152,9 +152,15 @@ Config.PartOrder = { "Beam", "Cable", "Pillar" }
 --------------------------------------------------------------------------------
 
 Config.Physics = {
-	-- Wie oft pro Sekunde der Fachwerk-Rechner die Kraefte neu bestimmt.
+	--[[
+		Wie oft pro Sekunde der Fachwerk-Rechner waehrend des Tests die
+		Kraefte neu bestimmt.
+
+		Im Baumodus gibt es keine feste Rate: dort sind alle Knoten verankert,
+		es bewegt sich also nichts. Gerechnet wird nur, wenn ein Bauteil
+		dazukommt oder verschwindet.
+	]]
 	solveRateTest = 20,
-	solveRateBuild = 4,
 
 	-- Glaettung der Kraefte, damit einzelne Rechenspitzen kein Bauteil zerstoeren.
 	-- 0 = gar keine Aenderung, 1 = ungeglaettet.

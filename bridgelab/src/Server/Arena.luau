@@ -63,7 +63,14 @@ function Arena.new(player: Player, level, slotIndex: number, parentFolder: Insta
 	-- Vom Spieler am Tacho eingestellte Fahrgeschwindigkeit.
 	self.testSpeed = Config.Test.defaultSpeed
 
-	self.buildSolveAccumulator = 0
+	--[[
+		Muss neu gerechnet werden?
+		Im Baumodus sind alle Knoten verankert - es bewegt sich nichts, und
+		das Ergebnis kann sich nur aendern, wenn ein Bauteil dazukommt oder
+		verschwindet. Staendiges Nachrechnen waere reine Verschwendung,
+		besonders bei sechzehn Arenen gleichzeitig.
+	]]
+	self.needsAnalysis = false
 
 	-- Wird von aussen gesetzt: "der Zustand hat sich geaendert, bitte senden".
 	self.onStateChanged = nil
@@ -128,21 +135,28 @@ end
 --------------------------------------------------------------------------------
 
 --[[
-	Wird jeden Frame vom Hauptskript aufgerufen. Im Baumodus rechnen wir nur
-	ein paar Mal pro Sekunde - oefter waere Verschwendung, weil sich zwischen
-	zwei Klicks nichts aendert.
+	Wird jeden Frame vom Hauptskript aufgerufen, rechnet aber nur dann wirklich,
+	wenn sich seit dem letzten Mal etwas geaendert hat.
 ]]
 function Arena:tick(dt: number)
+	--[[
+		Waehrend des Tests rechnet TestRun selbst - und zwar mit den Lasten der
+		Fahrzeuge. Hier waere das doppelt gemoppelt.
+	]]
 	if self.phase == "Test" then
 		return
 	end
 
-	self.buildSolveAccumulator += dt
-	local interval = 1 / Config.Physics.solveRateBuild
-	if self.buildSolveAccumulator < interval then
+	--[[
+		Ausserhalb des Tests sind alle Knoten verankert: es bewegt sich nichts.
+		Das Ergebnis kann sich also nur aendern, wenn ein Bauteil dazukommt
+		oder verschwindet. Deshalb wird nur auf Anforderung gerechnet - bei
+		sechzehn Arenen spart das eine Menge Rechenzeit.
+	]]
+	if not self.needsAnalysis then
 		return
 	end
-	self.buildSolveAccumulator = 0
+	self.needsAnalysis = false
 
 	self:updateAnalysis()
 end
@@ -150,7 +164,8 @@ end
 -- Kraefte neu bestimmen, einfaerben und bei Aenderung den Client benachrichtigen.
 function Arena:updateAnalysis()
 	local result = self.forceEngine:evaluate(nil)
-	self.forceEngine:applyColors()
+	-- Im Baumodus behalten die Bauteile ihre eigene Farbe (Stahl, Beton, Seil).
+	self.forceEngine:applyColors(false)
 
 	local stable = not result.unstable
 	if stable ~= self.stable or result.worstNodeIndex ~= self.unstableNode then
@@ -231,6 +246,9 @@ function Arena:startTest(speed: number, onComplete): (boolean, string)
 		self.result = { success = success, reason = reason }
 		self.message = reason
 		self.testProgress = nil
+		-- Einmal nachrechnen, damit die Bauteile wieder ihre eigene Farbe
+		-- bekommen statt der Auslastungsfarbe aus dem Test.
+		self.needsAnalysis = true
 		self:notify()
 
 		if onComplete then
@@ -264,6 +282,7 @@ function Arena:reset()
 	self.result = nil
 	self.testProgress = nil
 	self.message = ""
+	self.needsAnalysis = true
 	self:updateAnalysis()
 	self:notify()
 end
