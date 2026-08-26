@@ -4,19 +4,32 @@
 	Verwaltet alle Bauteile EINER Arena. Jeder Spieler hat seine eigene
 	Structure-Instanz (deshalb eine Klasse und kein einfaches Modul).
 
+	WAS SICH GEGENUEBER FRUEHER GEAENDERT HAT - FREIES BAUEN
+
+	Frueher gab es je Level eine feste Liste von Ankerpunkten, und ein Bauteil
+	verband zwei davon ueber ihre NUMMER. Damit war die Bruecke im Grunde ein
+	Ausmalbild: die moeglichen Knoten standen schon fest.
+
+	Jetzt gibt es nur noch ein RASTER. Jeder Rasterpunkt im Baubereich kann ein
+	Knoten werden, sobald das erste Bauteil ihn benutzt. Ein Knoten wird ueber
+	seine Rasterkoordinate angesprochen:
+
+	    key(x, y) = "gx:gy"        gx = x / 2, gy = y / 2
+
+	Nur die wenigen ANKER des Levels sind fest mit dem Boden verbunden. Alles
+	andere muss die Konstruktion selbst tragen - daraus entsteht die Aufgabe.
+
 	ZWEI EBENEN, SAUBER GETRENNT
 
-	1) Der BAUPLAN (self.members). Eine reine Datentabelle: welcher Bauteiltyp
-	   verbindet welche zwei Ankerpunkte. Der Bauplan geht nie verloren - auch
+	1) Der BAUPLAN (self.members). Eine reine Datentabelle: welcher Baustoff
+	   verbindet welche zwei Rasterpunkte. Der Bauplan geht nie verloren - auch
 	   nicht, wenn im Test etwas bricht. Deshalb kann rebuild() jederzeit alles
 	   wiederherstellen.
 
-	2) Die SICHTBAREN TEILE. Fuer jedes Bauteil im Bauplan gibt es
-	   - ein Model mit mehreren Parts (Traeger, Fahrbahndecke, Klemmen ...),
-	   - ein Constraint zwischen den beiden Knotenkugeln
-	     (RodConstraint = starr, RopeConstraint = nur Zug),
-	   - eine Belastungsanzeige (BillboardGui),
-	   - und je Ankerpunkt eine Knotenkugel, sobald dieser genutzt wird.
+	2) Die SICHTBAREN TEILE. Fuer jedes Bauteil im Bauplan gibt es ein Model
+	   aus mehreren Parts, ein Constraint zwischen den beiden Knotenkugeln
+	   (RodConstraint = starr, RopeConstraint = nur Zug) und eine
+	   Belastungsanzeige.
 
 	WICHTIGE VEREINFACHUNG
 	Die Bauteil-Parts sind immer verankert (Anchored) und werden Bild fuer Bild
@@ -29,6 +42,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
+local Materials = require(Shared.Materials)
+local Terrain = require(Shared.Terrain)
 
 local LevelBuilder = require(script.Parent.LevelBuilder)
 
@@ -77,7 +92,7 @@ function Structure.new(level, origin: Vector3, folders)
 	self.folders = folders
 
 	self.members = {} -- der Bauplan
-	self.nodes = {} -- Knotenkugeln, indiziert nach Ankerpunkt-Nummer
+	self.joints = {} -- key -> Knoten, wird beim Bauen angelegt
 	self.nextMemberId = 1
 	self.labelsVisible = false
 
@@ -85,73 +100,96 @@ function Structure.new(level, origin: Vector3, folders)
 end
 
 --------------------------------------------------------------------------------
--- Positionen
+-- Rasterpunkte und Knoten
 --------------------------------------------------------------------------------
 
--- Ruheposition eines Ankerpunkts in Weltkoordinaten (inklusive Arena-Versatz).
-function Structure:snapPosition(index: number): Vector3
-	return self.origin + self.level.snapPoints[index].position
+--[[
+	Ein Knoten wird ueber seine RASTERKOORDINATE angesprochen, nicht ueber eine
+	laufende Nummer. Zwei Bauteile, die auf denselben Rasterpunkt gezogen
+	werden, treffen sich dadurch automatisch am selben Knoten - genau das macht
+	freies Bauen ueberhaupt erst moeglich.
+]]
+local function jointKey(x: number, y: number): string
+	local g = Config.Build.gridSize
+	return string.format("%d:%d", math.round(x / g), math.round(y / g))
+end
+
+Structure.jointKey = jointKey
+
+-- Ruheposition eines Rasterpunkts in Weltkoordinaten (inklusive Arena-Versatz).
+function Structure:worldPosition(x: number, y: number): Vector3
+	return self.origin + Vector3.new(x, y, self.level.z or 0)
 end
 
 -- Aktuelle Position eines Knotens (im Test bewegt er sich).
-function Structure:nodePosition(index: number): Vector3
-	local node = self.nodes[index]
-	if node and node.part then
-		return node.part.Position
+function Structure:jointPosition(key: string): Vector3
+	local joint = self.joints[key]
+	if not joint then
+		return self.origin
 	end
-	return self:snapPosition(index)
+	if joint.part then
+		return joint.part.Position
+	end
+	return self:worldPosition(joint.x, joint.y)
 end
 
---------------------------------------------------------------------------------
--- Knotenkugeln
---------------------------------------------------------------------------------
-
-function Structure:ensureNode(index: number)
-	if self.nodes[index] then
-		return self.nodes[index]
+function Structure:ensureJoint(x: number, y: number)
+	local key = jointKey(x, y)
+	local existing = self.joints[key]
+	if existing then
+		return existing, key
 	end
 
-	local snap = self.level.snapPoints[index]
-	local size = Config.Physics.nodeSize
+	local anchor = self.level.anchorAt(x, y)
+	local size = Config.Build.jointSize
 
 	local part = Instance.new("Part")
-	part.Name = "Node_" .. index
+	part.Name = "Joint_" .. key
 	part.Shape = Enum.PartType.Ball
 	part.Size = Vector3.new(size, size, size)
-	part.CFrame = CFrame.new(self:snapPosition(index))
+	part.CFrame = CFrame.new(self:worldPosition(x, y))
 	part.Anchored = true -- im Baumodus haelt alles still
 	part.CanCollide = false -- die Kugeln sollen dem Fahrzeug nicht im Weg sein
 	part.CanQuery = false
 	part.CanTouch = false
 	part.Material = Enum.Material.Metal
 	part.Reflectance = 0.15
-	part.Color = if snap.fixed then Color3.fromRGB(228, 168, 72) else Color3.fromRGB(92, 96, 108)
-	part:SetAttribute("SnapIndex", index)
+	--[[
+		Anker sind golden, freie Knoten grau. Das ist die wichtigste optische
+		Auskunft im ganzen Spiel: nur an den goldenen Punkten kann die Bruecke
+		Last in den Boden abgeben.
+	]]
+	part.Color = if anchor then Color3.fromRGB(228, 168, 72) else Color3.fromRGB(108, 112, 124)
+	part:SetAttribute("JointKey", key)
 	part.Parent = self.folders.nodes
 
 	local attachment = Instance.new("Attachment")
-	attachment.Name = "NodeAttachment"
+	attachment.Name = "JointAttachment"
 	attachment.Parent = part
 
-	self.nodes[index] = {
+	local joint = {
+		key = key,
+		x = x,
+		y = y,
 		part = part,
 		attachment = attachment,
-		fixed = snap.fixed,
+		fixed = anchor ~= nil,
 	}
-	return self.nodes[index]
+	self.joints[key] = joint
+	return joint, key
 end
 
 -- Knoten entfernen, sobald kein Bauteil mehr daran haengt.
-function Structure:cleanUnusedNodes()
-	local used: { [number]: boolean } = {}
+function Structure:cleanUnusedJoints()
+	local used: { [string]: boolean } = {}
 	for _, member in self.members do
-		used[member.a] = true
-		used[member.b] = true
+		used[member.keyA] = true
+		used[member.keyB] = true
 	end
-	for index, node in self.nodes do
-		if not used[index] then
-			node.part:Destroy()
-			self.nodes[index] = nil
+	for key, joint in self.joints do
+		if not used[key] then
+			joint.part:Destroy()
+			self.joints[key] = nil
 		end
 	end
 end
@@ -161,27 +199,26 @@ end
 	Jeder Knoten bekommt die Haelfte des Eigengewichts aller Bauteile, die an
 	ihm haengen. So wirkt die Bruecke in der Roblox-Physik plausibel schwer.
 ]]
-function Structure:refreshNodeMasses()
-	local tributary: { [number]: number } = {}
+function Structure:refreshJointMasses()
+	local tributary: { [string]: number } = {}
 
 	for _, member in self.members do
 		if member.broken then
 			continue
 		end
-		local spec = Config.PartTypes[member.kind]
-		local length = (self:snapPosition(member.b) - self:snapPosition(member.a)).Magnitude
-		local half = length * spec.massPerStud / 2
-		tributary[member.a] = (tributary[member.a] or 0) + half
-		tributary[member.b] = (tributary[member.b] or 0) + half
+		local spec = Materials.get(member.material)
+		local half = member.length * spec.massPerStud / 2
+		tributary[member.keyA] = (tributary[member.keyA] or 0) + half
+		tributary[member.keyB] = (tributary[member.keyB] or 0) + half
 	end
 
-	local size = Config.Physics.nodeSize
+	local size = Config.Build.jointSize
 	local volume = (4 / 3) * math.pi * (size / 2) ^ 3
 
-	for index, node in self.nodes do
-		local mass = math.max(tributary[index] or 0, Config.Physics.minNodeMass)
+	for key, joint in self.joints do
+		local mass = math.max(tributary[key] or 0, Config.Physics.minNodeMass)
 		local density = math.clamp(mass / volume, 0.05, 100)
-		node.part.CustomPhysicalProperties = PhysicalProperties.new(density, 0.6, 0.1, 1, 1)
+		joint.part.CustomPhysicalProperties = PhysicalProperties.new(density, 0.6, 0.1, 1, 1)
 	end
 end
 
@@ -193,29 +230,187 @@ end
 	Jedes Bauteil besteht aus mehreren Parts. Damit sie jedes Bild neu
 	ausgerichtet werden koennen, merkt sich jeder Part, WIE er sitzt:
 
-	  mode = "span"  -> laeuft ueber die ganze Laenge (Traeger, Fahrbahn, Seil)
+	  mode = "span"  -> laeuft ueber die ganze Laenge (Traeger, Fahrbahn)
 	  mode = "end"   -> sitzt an einem Ende (Klemme, Sockel, Kopf)
+	  mode = "part"  -> nur ueber einen Abschnitt von "from" bis "to"
+	                    (Anteile der Gesamtlaenge, jeweils 0 bis 1)
+	  mode = "sag"   -> wie "part", haengt aber nach unten durch (Seile)
 
-	  up      Versatz senkrecht zur Bauteilachse (positiv = nach oben)
-	  endAt   nur bei mode = "end": 1 = beim Knoten a, 2 = beim Knoten b
+	  up    Versatz senkrecht zur Bauteilachse in der Bildebene
+	  side  Versatz quer dazu (in die Tiefe) - dafuer sind Bohlen nebeneinander
+	  endAt nur bei mode = "end": 1 = beim Knoten a, 2 = beim Knoten b
 ]]
-local function addVisual(member, part: Part, mode: string, up: number, endAt: number?)
+local function addVisual(member, part: Part, options)
 	table.insert(member.visuals, {
 		part = part,
-		mode = mode,
-		up = up,
-		endAt = endAt,
+		mode = options.mode,
+		up = options.up or 0,
+		side = options.side or 0,
+		endAt = options.endAt,
+		from = options.from,
+		to = options.to,
+		sag = options.sag,
 	})
 end
 
-function Structure:createMemberInstances(member)
-	local spec = Config.PartTypes[member.kind]
-	local posA = self:snapPosition(member.a)
-	local posB = self:snapPosition(member.b)
-	local length = (posB - posA).Magnitude
+--------------------------------------------------------------------------------
+-- Die einzelnen Bauformen
+--------------------------------------------------------------------------------
 
-	local nodeA = self:ensureNode(member.a)
-	local nodeB = self:ensureNode(member.b)
+--[[
+	FAHRBAHN
+	Eine Platte mit zwei Randstreifen und einer Mittelmarkierung. Die
+	Oberkante liegt genau auf der Verbindungslinie der beiden Knoten, damit
+	die Fahrbahn buendig an die Ufer anschliesst.
+]]
+local function buildRoadway(self, member, spec, newPart, length)
+	local slabThickness = spec.thickness
+	local width = spec.width
+
+	local slab = newPart("Fahrbahn", Vector3.new(width, slabThickness, length), spec.color, spec.material)
+	addVisual(member, slab, { mode = "span", up = -slabThickness / 2 })
+
+	-- Zwei Randstreifen aus Metall - die Bordkante.
+	for _, side in { -1, 1 } do
+		local kerb = newPart("Bordkante", Vector3.new(0.5, slabThickness * 1.4, length), spec.accentColor, spec.accentMaterial)
+		addVisual(member, kerb, { mode = "span", up = -slabThickness / 2, side = side * (width / 2 - 0.25) })
+	end
+
+	-- Mittelstrich, damit man die Fahrtrichtung sieht.
+	local stripe = newPart("Mittelstrich", Vector3.new(0.5, 0.08, length * 0.55), Color3.fromRGB(232, 232, 226), Enum.Material.SmoothPlastic)
+	addVisual(member, stripe, { mode = "part", from = 0.225, to = 0.775, up = 0.04 })
+
+	member.mainPart = slab
+	member.stressParts = { slab }
+	return slab
+end
+
+--[[
+	STAHL ALS DOPPEL-T-TRAEGER
+	Ein echter Stahltraeger ist kein Balken, sondern ein "I": zwei breite
+	Gurte oben und unten, dazwischen ein duenner Steg. Genau so wird er hier
+	auch gebaut - aus drei Parts.
+
+	    ============   Obergurt
+	         ||         Steg
+	    ============   Untergurt
+]]
+local function buildSteelBeam(self, member, spec, newPart, length)
+	local half = spec.thickness / 2
+	local flange = newPart("Obergurt", Vector3.new(spec.width * 1.6, 0.22, length), spec.color, spec.material)
+	addVisual(member, flange, { mode = "span", up = half })
+
+	local lower = newPart("Untergurt", Vector3.new(spec.width * 1.6, 0.22, length), spec.color, spec.material)
+	addVisual(member, lower, { mode = "span", up = -half })
+
+	local web = newPart("Steg", Vector3.new(spec.width * 0.45, spec.thickness, length), spec.accentColor, spec.accentMaterial)
+	addVisual(member, web, { mode = "span", up = 0 })
+
+	member.mainPart = web
+	member.stressParts = { flange, lower, web }
+	return web
+end
+
+--[[
+	HOLZ ALS BOHLENBUENDEL
+	Drei Bohlen nebeneinander, an beiden Enden mit einem Stahlband
+	zusammengehalten. Die Bohlen sind minimal verschieden dick - dadurch
+	sieht das Bauteil nach Holz aus und nicht nach einem Klotz.
+]]
+local function buildWoodBeam(self, member, spec, newPart, length)
+	local planks = {}
+	for i = -1, 1 do
+		local plank = newPart("Bohle", Vector3.new(spec.width * 0.8, spec.thickness * (1 - math.abs(i) * 0.12), length), spec.color, spec.material)
+		addVisual(member, plank, { mode = "span", side = i * spec.width * 0.85 })
+		table.insert(planks, plank)
+	end
+
+	-- Stahlbaender an den Enden.
+	for endIndex = 1, 2 do
+		local band = newPart("Band", Vector3.new(spec.width * 2.9, spec.thickness * 1.25, 0.4), spec.accentColor, spec.accentMaterial)
+		addVisual(member, band, { mode = "end", endAt = endIndex })
+	end
+
+	member.mainPart = planks[2]
+	member.stressParts = planks
+	return planks[2]
+end
+
+--[[
+	SEIL UND KABEL MIT DURCHHANG
+	Ein straff gespanntes Seil sieht falsch aus - echte Seile haengen durch.
+	Deshalb besteht ein Seil hier aus fuenf kurzen Stuecken entlang einer
+	Parabel. Der Durchhang waechst mit der Laenge, bleibt aber gedeckelt,
+	damit ein langes Kabel nicht bis in die Schlucht durchhaengt.
+
+	Fuer die Kraefteberechnung ist der Durchhang ohne Bedeutung: dort zaehlt
+	nur die gerade Verbindung zwischen den beiden Knoten.
+]]
+local function buildCable(self, member, spec, newPart, length)
+	local segments = 5
+	local sag = math.clamp(length * 0.035, 0.15, 1.6)
+
+	for i = 1, segments do
+		local strand = newPart("Strang", Vector3.new(spec.width, spec.thickness, 1), spec.color, spec.material)
+		addVisual(member, strand, {
+			mode = "sag",
+			from = (i - 1) / segments,
+			to = i / segments,
+			sag = sag,
+		})
+		if i == 1 then
+			member.mainPart = strand
+		end
+	end
+
+	-- Klemmen an beiden Enden.
+	for endIndex = 1, 2 do
+		local clamp = newPart("Klemme", Vector3.new(0.75, 0.75, 0.9), spec.accentColor, spec.accentMaterial)
+		addVisual(member, clamp, { mode = "end", endAt = endIndex })
+	end
+
+	member.stressParts = { member.mainPart }
+	return member.mainPart
+end
+
+--[[
+	HYDRAULIKZYLINDER
+	Ein dicker Zylinder auf der einen Haelfte, eine duennere Kolbenstange auf
+	der anderen. Faehrt der Zylinder aus, wandern die Knoten auseinander - die
+	Stange schaut dann weiter heraus, weil sie ihren Anteil an der Gesamtlaenge
+	behaelt. Genau so sieht echte Hydraulik aus.
+
+	    [======#####]---->   eingefahren
+	    [======#########]->  ausgefahren
+]]
+local function buildHydraulic(self, member, spec, newPart, length)
+	local barrel = newPart("Zylinder", Vector3.new(spec.width, spec.thickness, 1), spec.color, spec.material)
+	addVisual(member, barrel, { mode = "part", from = 0, to = 0.55 })
+
+	local rod = newPart("Kolbenstange", Vector3.new(spec.width * 0.45, spec.thickness * 0.45, 1), spec.accentColor, spec.accentMaterial)
+	addVisual(member, rod, { mode = "part", from = 0.5, to = 1 })
+
+	for endIndex = 1, 2 do
+		local eye = newPart("Auge", Vector3.new(spec.width * 1.15, spec.thickness * 1.15, 0.6), spec.accentColor, spec.accentMaterial)
+		addVisual(member, eye, { mode = "end", endAt = endIndex })
+	end
+
+	member.mainPart = barrel
+	member.stressParts = { barrel, rod }
+	return barrel
+end
+
+--------------------------------------------------------------------------------
+-- Ein Bauteil sichtbar machen
+--------------------------------------------------------------------------------
+
+function Structure:createMemberInstances(member)
+	local spec = Materials.get(member.material)
+	local jointA = self:ensureJoint(member.ax, member.ay)
+	local jointB = self:ensureJoint(member.bx, member.by)
+	local posA = self:worldPosition(member.ax, member.ay)
+	local posB = self:worldPosition(member.bx, member.by)
+	local length = member.length
 
 	local model = Instance.new("Model")
 	model.Name = spec.key .. "_" .. member.id
@@ -247,93 +442,37 @@ function Structure:createMemberInstances(member)
 		part.TopSurface = Enum.SurfaceType.Smooth
 		part.BottomSurface = Enum.SurfaceType.Smooth
 		part:SetAttribute("MemberId", member.id)
-		part:SetAttribute("MemberKind", member.kind)
+		part:SetAttribute("MemberMaterial", member.material)
 		part.Parent = model
 		return part
 	end
 
-	----------------------------------------------------------------------------
-	-- Je nach Bauteiltyp anders zusammengesetzt
-	----------------------------------------------------------------------------
+	--[[
+		IST DIESES BAUTEIL FAHRBAHN?
 
-	if member.kind == "Beam" then
-		--[[
-			IST DIESER BALKEN FAHRBAHN ODER TRAGWERK?
+		Nur flach liegende Fahrbahnstuecke traegt das Fahrzeug. Ein steiles
+		Stueck Strasse ist eine Rampe, die zu steil ist - und alles andere
+		(Holz, Stahl, Seile) ist ohnehin nur Tragwerk.
 
-			Nur flach liegende Balken sind befahrbar. Ein steiler Balken ist
-			eine Strebe - und eine Strebe darf das Fahrzeug NICHT ausbremsen.
-			Wuerde sie es tun, koennte man seine Bruecke nicht aussteifen,
-			ohne sich selbst den Weg zu verbauen.
+		Tragwerk darf das Fahrzeug NICHT ausbremsen. Wuerde es das tun,
+		koennte man seine Bruecke nicht aussteifen, ohne sich selbst den Weg
+		zu verbauen. Deshalb bekommt nur die Fahrbahn eine Kollision.
+	]]
+	local rise = math.abs(posB.Y - posA.Y) / math.max(length, 1e-4)
+	member.isRoadway = spec.drivable and rise <= Config.Test.roadwayMaxRise
 
-			Deshalb bekommen steile Balken keine Kollision: das Fahrzeug
-			faehrt einfach hindurch. Tragen tun sie trotzdem voll mit - fuer
-			die Kraefteberechnung macht das keinen Unterschied.
-		]]
-		local rise = math.abs(posB.Y - posA.Y) / math.max(length, 1e-4)
-		member.isRoadway = rise <= Config.Test.roadwayMaxRise
-
-		-- Oben eine Fahrbahndecke, darunter ein schmalerer Stahltraeger.
-		local deckThickness = 0.3
-		local girderThickness = spec.thickness - deckThickness
-
-		local deck = newPart("Deck", Vector3.new(spec.width, deckThickness, length), spec.accentColor, spec.accentMaterial)
-		-- Die Oberkante der Decke liegt genau auf der Ankerlinie, damit die
-		-- Fahrbahn buendig an die Plattformen anschliesst.
-		deck.CanCollide = member.isRoadway
-		deck.CanQuery = member.isRoadway
-		if not member.isRoadway then
-			-- Streben sind schmaler: so sieht man ihnen an, dass man auf
-			-- ihnen nicht faehrt.
-			deck.Size = Vector3.new(spec.width * 0.35, deckThickness, length)
-		end
-		addVisual(member, deck, "span", -deckThickness / 2)
-
-		local girder = newPart(
-			"Girder",
-			Vector3.new(spec.width * 0.5, girderThickness, length),
-			spec.color,
-			spec.material
-		)
-		addVisual(member, girder, "span", -(deckThickness + girderThickness / 2))
-
-		member.mainPart = girder
-		member.stressParts = { girder }
-	elseif member.kind == "Cable" then
-		-- Seile sind nie befahrbar und stehen dem Fahrzeug nie im Weg.
-		member.isRoadway = false
-
-		-- Duenner Strang mit einer Klemme an jedem Ende.
-		local rope = newPart("Strand", Vector3.new(spec.width, spec.thickness, length), spec.color, spec.material)
-		addVisual(member, rope, "span", 0)
-
-		for endIndex = 1, 2 do
-			local clamp = newPart("Clamp", Vector3.new(0.7, 0.7, 0.8), spec.accentColor, spec.accentMaterial)
-			addVisual(member, clamp, "end", 0, endIndex)
-		end
-
-		member.mainPart = rope
-		member.stressParts = { rope }
+	if spec.drivable then
+		local slab = buildRoadway(self, member, spec, newPart, length)
+		slab.CanCollide = member.isRoadway
+		slab.CanQuery = member.isRoadway
+	elseif spec.hydraulic then
+		buildHydraulic(self, member, spec, newPart, length)
+	elseif not spec.rigid then
+		buildCable(self, member, spec, newPart, length)
+	elseif member.material == "Wood" then
+		buildWoodBeam(self, member, spec, newPart, length)
 	else
-		--[[
-			Stuetze: Saeule mit Sockel unten und Kopfplatte oben.
-			Stuetzen sind nie befahrbar und blockieren das Fahrzeug auch
-			nicht - eine Stuetze, die von der Fahrbahn nach oben gebaut wird,
-			stuende sonst mitten im Weg.
-		]]
-		member.isRoadway = false
-
-		local column = newPart("Column", Vector3.new(spec.width, spec.thickness, length), spec.color, spec.material)
-		column.CanCollide = false
-		column.CanQuery = false
-		addVisual(member, column, "span", 0)
-
-		for endIndex = 1, 2 do
-			local plate = newPart("Plate", Vector3.new(spec.width * 1.8, spec.thickness * 1.8, 0.8), spec.accentColor, spec.accentMaterial)
-			addVisual(member, plate, "end", 0, endIndex)
-		end
-
-		member.mainPart = column
-		member.stressParts = { column }
+		buildSteelBeam(self, member, spec, newPart, length)
 	end
 
 	----------------------------------------------------------------------------
@@ -358,16 +497,11 @@ function Structure:createMemberInstances(member)
 		constraint = rope
 	end
 	constraint.Name = "Constraint_" .. member.id
-	constraint.Attachment0 = nodeA.attachment
-	constraint.Attachment1 = nodeB.attachment
-	constraint.Parent = nodeA.part
-
-	----------------------------------------------------------------------------
-	-- Belastungsanzeige
-	----------------------------------------------------------------------------
+	constraint.Attachment0 = jointA.attachment
+	constraint.Attachment1 = jointB.attachment
+	constraint.Parent = jointA.part
 
 	member.label = self:createStressLabel(member)
-
 	member.constraint = constraint
 	member.broken = false
 	member.force = 0
@@ -379,6 +513,10 @@ end
 	Kleine Tafel ueber dem Bauteil, die im Test zeigt, wie stark es belastet ist.
 	Sie haengt am Hauptteil und wird von Roblox automatisch zu den Clients
 	uebertragen - dafuer braucht es kein eigenes RemoteEvent.
+
+	Sichtbar ist sie nur bei den am staerksten belasteten Bauteilen; wer sie
+	bei allen einblendet, sieht vor lauter Zahlen die Bruecke nicht mehr
+	(siehe Config.Test.maxStressLabels).
 ]]
 function Structure:createStressLabel(member)
 	local billboard = Instance.new("BillboardGui")
@@ -386,8 +524,8 @@ function Structure:createStressLabel(member)
 	billboard.Size = UDim2.fromOffset(78, 38)
 	billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.4, 0)
 	billboard.AlwaysOnTop = true
-	billboard.MaxDistance = 260
-	billboard.Enabled = self.labelsVisible
+	billboard.MaxDistance = Config.Test.labelMaxDistance
+	billboard.Enabled = false
 	billboard.Parent = member.mainPart
 
 	local frame = Instance.new("Frame")
@@ -402,7 +540,6 @@ function Structure:createStressLabel(member)
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = frame
 
-	-- Prozentzahl
 	local percent = Instance.new("TextLabel")
 	percent.Name = "Percent"
 	percent.Size = UDim2.new(1, 0, 0, 20)
@@ -414,7 +551,6 @@ function Structure:createStressLabel(member)
 	percent.Text = "0%"
 	percent.Parent = frame
 
-	-- Kraft in Newton, kleiner darunter
 	local newtons = Instance.new("TextLabel")
 	newtons.Name = "Newtons"
 	newtons.Size = UDim2.new(1, 0, 0, 12)
@@ -426,7 +562,6 @@ function Structure:createStressLabel(member)
 	newtons.Text = "0 N"
 	newtons.Parent = frame
 
-	-- Balken ganz unten als schnelle optische Anzeige
 	local barBackground = Instance.new("Frame")
 	barBackground.Name = "BarBg"
 	barBackground.Size = UDim2.new(1, -10, 0, 3)
@@ -447,6 +582,7 @@ function Structure:createStressLabel(member)
 		percent = percent,
 		newtons = newtons,
 		bar = bar,
+		visible = false,
 	}
 end
 
@@ -465,14 +601,17 @@ function Structure:destroyMemberInstances(member)
 	member.label = nil
 end
 
--- Setzt alle Parts eines Bauteils passend zu den aktuellen Knotenpositionen.
+--------------------------------------------------------------------------------
+-- Parts zu den aktuellen Knotenpositionen setzen
+--------------------------------------------------------------------------------
+
 function Structure:updateMemberVisual(member)
 	if not member.visuals then
 		return
 	end
 
-	local posA = self:nodePosition(member.a)
-	local posB = self:nodePosition(member.b)
+	local posA = self:jointPosition(member.keyA)
+	local posB = self:jointPosition(member.keyB)
 	local delta = posB - posA
 	local length = delta.Magnitude
 	if length < 0.05 then
@@ -481,19 +620,51 @@ function Structure:updateMemberVisual(member)
 
 	local direction = delta.Unit
 	local up = perpendicularUp(direction)
+	local side = Vector3.new(0, 0, 1)
 	local helper = lookUpVector(delta)
-	local midpoint = posA + delta / 2
 
 	for _, visual in member.visuals do
 		local part = visual.part
+		local offset = up * visual.up + side * visual.side
+
 		if visual.mode == "span" then
 			-- Ueber die ganze Laenge: nur die Laenge (Z) waechst mit.
+			local midpoint = posA + delta / 2 + offset
 			part.Size = Vector3.new(part.Size.X, part.Size.Y, length)
-			part.CFrame = CFrame.lookAt(midpoint + up * visual.up, midpoint + direction + up * visual.up, helper)
-		else
+			part.CFrame = CFrame.lookAt(midpoint, midpoint + direction, helper)
+		elseif visual.mode == "end" then
 			-- An einem Ende: feste Groesse, sitzt auf dem Knoten.
-			local anchorPoint = if visual.endAt == 1 then posA else posB
-			part.CFrame = CFrame.lookAt(anchorPoint + up * visual.up, anchorPoint + direction + up * visual.up, helper)
+			local anchorPoint = (if visual.endAt == 1 then posA else posB) + offset
+			part.CFrame = CFrame.lookAt(anchorPoint, anchorPoint + direction, helper)
+		elseif visual.mode == "part" then
+			-- Nur ein Abschnitt der Gesamtlaenge.
+			local from = posA + delta * visual.from + offset
+			local to = posA + delta * visual.to + offset
+			local piece = to - from
+			local pieceLength = piece.Magnitude
+			if pieceLength > 0.02 then
+				local middle = from + piece / 2
+				part.Size = Vector3.new(part.Size.X, part.Size.Y, pieceLength)
+				part.CFrame = CFrame.lookAt(middle, middle + piece.Unit, helper)
+			end
+		elseif visual.mode == "sag" then
+			--[[
+				Durchhaengendes Seilstueck. Die Parabel ist an beiden Enden
+				null und in der Mitte am tiefsten:  4 * t * (1 - t)
+			]]
+			local function pointAt(t: number): Vector3
+				local drop = visual.sag * 4 * t * (1 - t)
+				return posA + delta * t + offset - Vector3.new(0, drop, 0)
+			end
+			local from = pointAt(visual.from)
+			local to = pointAt(visual.to)
+			local piece = to - from
+			local pieceLength = piece.Magnitude
+			if pieceLength > 0.02 then
+				local middle = from + piece / 2
+				part.Size = Vector3.new(part.Size.X, part.Size.Y, pieceLength)
+				part.CFrame = CFrame.lookAt(middle, middle + piece.Unit, helper)
+			end
 		end
 	end
 end
@@ -502,17 +673,28 @@ end
 -- Belastungsanzeige
 --------------------------------------------------------------------------------
 
-function Structure:setStressLabelsVisible(visible: boolean)
-	self.labelsVisible = visible
+function Structure:hideAllStressLabels()
+	self.labelsVisible = false
 	for _, member in self.members do
-		if member.label then
-			member.label.gui.Enabled = visible
+		if member.label and member.label.visible then
+			member.label.gui.Enabled = false
+			member.label.visible = false
 		end
 	end
 end
 
 --[[
 	Traegt die aktuellen Kraefte in die Tafeln ein.
+
+	NUR DIE WICHTIGSTEN TAFELN WERDEN GEZEIGT
+	Frueher bekam jedes Bauteil eine Tafel. Bei vierzig Teilen war der
+	Bildschirm zugepflastert und man sah die Bruecke nicht mehr. Jetzt werden
+	die Bauteile nach Auslastung sortiert, und nur die vordersten bekommen
+	eine Tafel - und auch nur, wenn sie ueberhaupt nennenswert belastet sind.
+
+	Die FARBE am Bauteil bleibt immer sichtbar. Sie ist die Hauptinformation,
+	die Zahlen sind die Feinheit.
+
 	utilisationOf ist eine Funktion, die zu einem Bauteil die Auslastung
 	zwischen 0 und 1 liefert (kommt aus ForceEngine).
 ]]
@@ -521,26 +703,29 @@ function Structure:updateStressLabels(utilisationOf)
 		return
 	end
 
+	local ranked = {}
 	for _, member in self.members do
+		if member.label and not member.broken and not member.slack then
+			table.insert(ranked, { member = member, utilisation = utilisationOf(member) })
+		end
+	end
+
+	table.sort(ranked, function(a, b)
+		return a.utilisation > b.utilisation
+	end)
+
+	local shown: { [number]: boolean } = {}
+	local limit = math.min(#ranked, Config.Test.maxStressLabels)
+
+	for i = 1, limit do
+		local entry = ranked[i]
+		if entry.utilisation < Config.Test.minLabelUtilisation then
+			break
+		end
+
+		local member = entry.member
 		local label = member.label
-		if not label or member.broken then
-			continue
-		end
-
-		--[[
-			Ein durchhaengendes Seil traegt nichts. Eine Prozentzahl waere da
-			irrefuehrend - "0%" liest sich wie "viel Reserve", gemeint ist aber
-			"steht nutzlos herum".
-		]]
-		if member.slack then
-			label.percent.Text = "schlaff"
-			label.percent.TextColor3 = Color3.fromRGB(150, 155, 170)
-			label.newtons.Text = "traegt nichts"
-			label.bar.Size = UDim2.fromScale(0, 1)
-			continue
-		end
-
-		local utilisation = utilisationOf(member)
+		local utilisation = entry.utilisation
 		local color = Config.utilisationColor(utilisation)
 
 		label.percent.Text = string.format("%d%%", math.floor(utilisation * 100 + 0.5))
@@ -552,89 +737,197 @@ function Structure:updateStressLabels(utilisationOf)
 
 		label.bar.Size = UDim2.fromScale(math.clamp(utilisation, 0, 1), 1)
 		label.bar.BackgroundColor3 = color
+
+		if not label.visible then
+			label.gui.Enabled = true
+			label.visible = true
+		end
+		shown[member.id] = true
+	end
+
+	-- Alles, was diesmal nicht unter den vordersten war, wieder ausblenden.
+	for _, member in self.members do
+		local label = member.label
+		if label and label.visible and not shown[member.id] then
+			label.gui.Enabled = false
+			label.visible = false
+		end
+	end
+end
+
+function Structure:setStressLabelsActive(active: boolean)
+	self.labelsVisible = active
+	if not active then
+		self:hideAllStressLabels()
 	end
 end
 
 --------------------------------------------------------------------------------
--- Budget, Bauen und Entfernen
+-- Budget
 --------------------------------------------------------------------------------
 
+--[[
+	KOSTEN JE STUD - der wichtigste Unterschied zum frueheren Modell
+
+	Frueher kostete ein Bauteil einen Festpreis, egal wie lang es war. Beim
+	freien Bauen waere das unsinnig: jeder wuerde nur noch die laengsten
+	moeglichen Teile setzen, weil Laenge nichts kostet. Jetzt kostet jedes
+	Bauteil costPerStud mal Laenge, und das Budget steuert wirklich, wie viel
+	Material verbaut werden darf.
+]]
 function Structure:usedBudget(): number
 	local total = 0
 	for _, member in self.members do
-		total += Config.PartTypes[member.kind].cost
+		total += member.cost
 	end
 	return total
 end
 
+function Structure:remainingBudget(): number
+	return self.level.budget - self:usedBudget()
+end
+
+--------------------------------------------------------------------------------
+-- Bauen
+--------------------------------------------------------------------------------
+
 --[[
 	Prueft, ob ein Bauteil gesetzt werden darf.
 	Gibt zurueck: erlaubt (boolean), Begruendung (string)
+
+	Diese Funktion ist die einzige Stelle, an der ueber Bauen entschieden wird.
+	Der Client prueft dasselbe noch einmal fuer die Vorschau, aber verlassen
+	tut sich der Server ausschliesslich auf diese Pruefung hier: was der
+	Client schickt, ist ein WUNSCH, keine Tatsache.
 ]]
-function Structure:canPlace(kind: string, a: number, b: number): (boolean, string)
-	local spec = Config.PartTypes[kind]
+function Structure:canPlace(material: string, ax: number, ay: number, bx: number, by: number): (boolean, string)
+	local spec = Materials.get(material)
 	if not spec then
-		return false, "Unbekannter Bauteiltyp."
+		return false, "Unbekannter Baustoff."
 	end
 
-	if not self.level.allowsPart(kind) then
+	if not self.level.allowsMaterial(material) then
 		return false, spec.displayName .. " ist in diesem Level gesperrt."
 	end
 
-	local snapA = self.level.snapPoints[a]
-	local snapB = self.level.snapPoints[b]
-	if not snapA or not snapB then
-		return false, "Ankerpunkt gibt es nicht."
-	end
-	if a == b then
-		return false, "Bitte zwei verschiedene Ankerpunkte waehlen."
+	if #self.members >= Config.Build.maxMembers then
+		return false, string.format("Mehr als %d Bauteile gehen nicht.", Config.Build.maxMembers)
 	end
 
-	for _, member in self.members do
-		if (member.a == a and member.b == b) or (member.a == b and member.b == a) then
-			return false, "Hier steht schon ein Bauteil."
+	----------------------------------------------------------------------------
+	-- Auf dem Raster?
+	----------------------------------------------------------------------------
+
+	local grid = Config.Build.gridSize
+	for _, value in { ax, ay, bx, by } do
+		if math.abs(value - math.round(value / grid) * grid) > 0.01 then
+			return false, "Knoten muessen auf dem Raster liegen."
 		end
 	end
 
-	local delta = snapB.position - snapA.position
-	local length = delta.Magnitude
-	if length < spec.minLength then
+	if jointKey(ax, ay) == jointKey(bx, by) then
+		return false, "Anfang und Ende sind derselbe Punkt."
+	end
+
+	----------------------------------------------------------------------------
+	-- Laenge
+	----------------------------------------------------------------------------
+
+	local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+	if length < spec.minLength - 0.01 then
 		return false, string.format("%s ist zu kurz (mindestens %d Studs).", spec.displayName, spec.minLength)
 	end
-	if length > spec.maxLength then
+	if length > spec.maxLength + 0.01 then
 		return false, string.format("%s ist zu lang (hoechstens %d Studs).", spec.displayName, spec.maxLength)
 	end
 
-	if spec.verticalOnly and math.abs(delta.X) > 0.01 then
-		return false, spec.displayName .. " laesst sich nur senkrecht bauen."
+	----------------------------------------------------------------------------
+	-- Im Baubereich?
+	----------------------------------------------------------------------------
+
+	--[[
+		Anker duerfen AUSSERHALB des Baubereichs liegen - sie sind ja der
+		Anschluss ans Ufer. Alles andere muss drin sein, sonst koennte man
+		die Bruecke einfach neben dem Level entlangbauen.
+	]]
+	local area = self.level.buildArea
+	local function insideArea(x: number, y: number): boolean
+		if self.level.anchorAt(x, y) then
+			return true
+		end
+		return x >= area.minX - 0.01
+			and x <= area.maxX + 0.01
+			and y >= area.minY - 0.01
+			and y <= area.maxY + 0.01
 	end
 
-	-- Zwei feste Ankerpunkte zu verbinden bringt nichts und kostet nur Budget.
-	if snapA.fixed and snapB.fixed then
-		return false, "Beide Ankerpunkte sind schon fest verankert."
+	if not insideArea(ax, ay) or not insideArea(bx, by) then
+		return false, "Ausserhalb des Baubereichs."
 	end
 
-	if self:usedBudget() + spec.cost > self.level.budget then
-		return false, "Das Budget reicht nicht mehr."
+	----------------------------------------------------------------------------
+	-- Steckt das Bauteil im Berg?
+	----------------------------------------------------------------------------
+
+	if Terrain.segmentBlocked(self.level.terrain, ax, ay, bx, by) then
+		return false, "Das Bauteil laeuft durch den Felsen."
+	end
+
+	----------------------------------------------------------------------------
+	-- Steht hier schon dasselbe?
+	----------------------------------------------------------------------------
+
+	--[[
+		Zwei Bauteile auf denselben zwei Knoten sind ausdruecklich ERLAUBT -
+		eine Strasse mit einem Stahltraeger daneben zu verstaerken ist eine
+		der wichtigsten Techniken im Spiel. Verboten ist nur, ZWEIMAL DENSELBEN
+		Baustoff dorthin zu legen: das waere kein Bauen mehr, sondern nur noch
+		Budget verbrennen.
+	]]
+	local keyA, keyB = jointKey(ax, ay), jointKey(bx, by)
+	for _, member in self.members do
+		local sameEnds = (member.keyA == keyA and member.keyB == keyB)
+			or (member.keyA == keyB and member.keyB == keyA)
+		if sameEnds and member.material == material then
+			return false, "Hier liegt schon " .. spec.displayName .. "."
+		end
+	end
+
+	----------------------------------------------------------------------------
+	-- Budget
+	----------------------------------------------------------------------------
+
+	local cost = Materials.cost(material, length)
+	if self:usedBudget() + cost > self.level.budget then
+		return false, string.format("Das Budget reicht nicht (%d noetig, %d uebrig).", cost, self:remainingBudget())
 	end
 
 	return true, ""
 end
 
-function Structure:place(kind: string, a: number, b: number)
+function Structure:place(material: string, ax: number, ay: number, bx: number, by: number)
+	local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+
 	local member = {
 		id = self.nextMemberId,
-		kind = kind,
-		a = a,
-		b = b,
+		material = material,
+		ax = ax,
+		ay = ay,
+		bx = bx,
+		by = by,
+		keyA = jointKey(ax, ay),
+		keyB = jointKey(bx, by),
+		length = length,
+		cost = Materials.cost(material, length),
 		broken = false,
+		slack = false,
 		force = 0,
 	}
 	self.nextMemberId += 1
 	table.insert(self.members, member)
 
 	self:createMemberInstances(member)
-	self:refreshNodeMasses()
+	self:refreshJointMasses()
 	return member
 end
 
@@ -654,8 +947,8 @@ function Structure:remove(id: number): boolean
 	end
 	self:destroyMemberInstances(member)
 	table.remove(self.members, index)
-	self:cleanUnusedNodes()
-	self:refreshNodeMasses()
+	self:cleanUnusedJoints()
+	self:refreshJointMasses()
 	return true
 end
 
@@ -665,12 +958,65 @@ function Structure:breakMember(member)
 	if member.broken then
 		return
 	end
-	local position = (self:nodePosition(member.a) + self:nodePosition(member.b)) / 2
+	local position = (self:jointPosition(member.keyA) + self:jointPosition(member.keyB)) / 2
 	member.broken = true
 	member.force = 0
 	self:destroyMemberInstances(member)
 	LevelBuilder.playBreakEffect(self.folders.effects, position)
-	self:refreshNodeMasses()
+	self:refreshJointMasses()
+end
+
+--------------------------------------------------------------------------------
+-- Hydraulik
+--------------------------------------------------------------------------------
+
+--[[
+	Einen Hydraulikzylinder aus- oder einfahren.
+
+	factor = 1   eingefahren, also genau die gebaute Laenge
+	factor = 1.5 ausgefahren (Config.Hydraulics.extendFactor)
+
+	Bewegt wird ueber die Laenge des RodConstraint. Die Roblox-Physik zieht
+	die beiden Knoten dann selbst auseinander und nimmt alles mit, was daran
+	haengt - genau das ist der Sinn einer Klappbruecke.
+]]
+function Structure:setHydraulicExtension(member, factor: number)
+	if not member.constraint or member.broken then
+		return
+	end
+	local spec = Materials.get(member.material)
+	if not spec or not spec.hydraulic then
+		return
+	end
+	member.extension = factor
+	member.constraint.Length = member.length * factor
+end
+
+function Structure:hydraulicMembers(phase: number?)
+	local list = {}
+	for _, member in self.members do
+		local spec = Materials.get(member.material)
+		if spec and spec.hydraulic and not member.broken then
+			if phase == nil or (member.phase or 1) == phase then
+				table.insert(list, member)
+			end
+		end
+	end
+	return list
+end
+
+-- Welcher Phase ein Zylinder zugeordnet ist (1 bis Config.Hydraulics.phaseCount).
+function Structure:setMemberPhase(id: number, phase: number): boolean
+	local member = self:findMemberById(id)
+	if not member then
+		return false
+	end
+	local spec = Materials.get(member.material)
+	if not spec or not spec.hydraulic then
+		return false
+	end
+	member.phase = math.clamp(math.round(phase), 1, Config.Hydraulics.phaseCount)
+	return true
 end
 
 --------------------------------------------------------------------------------
@@ -682,17 +1028,19 @@ function Structure:rebuild()
 	for _, member in self.members do
 		self:destroyMemberInstances(member)
 	end
-	for index, node in self.nodes do
-		node.part:Destroy()
-		self.nodes[index] = nil
+	for key, joint in self.joints do
+		joint.part:Destroy()
+		self.joints[key] = nil
 	end
 
 	for _, member in self.members do
 		member.broken = false
+		member.slack = false
 		member.force = 0
+		member.extension = 1
 		self:createMemberInstances(member)
 	end
-	self:refreshNodeMasses()
+	self:refreshJointMasses()
 end
 
 -- Alles loeschen, auch den Bauplan.
@@ -700,9 +1048,9 @@ function Structure:clear()
 	for _, member in self.members do
 		self:destroyMemberInstances(member)
 	end
-	for index, node in self.nodes do
-		node.part:Destroy()
-		self.nodes[index] = nil
+	for key, joint in self.joints do
+		joint.part:Destroy()
+		self.joints[key] = nil
 	end
 	self.members = {}
 	self.nextMemberId = 1
@@ -714,14 +1062,14 @@ end
 	wenn sie eigentlich einstuerzen wuerde. Erst der Test loest die Bremse.
 ]]
 function Structure:setPhysicsEnabled(enabled: boolean)
-	for _, node in self.nodes do
-		if node.fixed then
-			node.part.Anchored = true
+	for _, joint in self.joints do
+		if joint.fixed then
+			joint.part.Anchored = true
 		else
-			node.part.Anchored = not enabled
+			joint.part.Anchored = not enabled
 			if enabled then
-				node.part.AssemblyLinearVelocity = Vector3.zero
-				node.part.AssemblyAngularVelocity = Vector3.zero
+				joint.part.AssemblyLinearVelocity = Vector3.zero
+				joint.part.AssemblyAngularVelocity = Vector3.zero
 			end
 		end
 	end
@@ -743,6 +1091,27 @@ function Structure:updateAllVisuals()
 			self:updateMemberVisual(member)
 		end
 	end
+end
+
+--[[
+	Der Bauplan als schlichte Tabelle - fuer das Speichern im Profil und fuer
+	die Uebertragung zum Client.
+]]
+function Structure:toPlan()
+	local out = {}
+	for _, member in self.members do
+		table.insert(out, {
+			id = member.id,
+			material = member.material,
+			ax = member.ax,
+			ay = member.ay,
+			bx = member.bx,
+			by = member.by,
+			cost = member.cost,
+			phase = member.phase,
+		})
+	end
+	return out
 end
 
 return Structure

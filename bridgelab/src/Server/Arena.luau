@@ -104,24 +104,35 @@ function Arena:buildState()
 		memberCount = #self.structure.members,
 
 		stable = self.stable,
-		unstableNode = self.unstableNode,
+		unstableJoint = self.unstableJoint,
 		message = self.message,
 		result = self.result,
 		testProgress = self.testProgress,
 
-		allowedParts = self.level.allowedParts,
+		materials = self.level.materials,
 		testSpeed = self.testSpeed,
 		vehicleCount = #self.level.vehicles,
-		deckCount = #self.level.decks,
 		unlockedHints = self.unlockedHints,
 		hintTotal = #self.level.hints,
 		freeHints = self.level.freeHints,
 
+		--[[
+			Der Client baut die Vorschau selbst und muss dafuer dieselben
+			Regeln kennen wie der Server: wo gebaut werden darf, wo die Anker
+			sitzen, wie das Gelaende verlaeuft. Entschieden wird trotzdem
+			ausschliesslich auf dem Server - das hier ist nur fuer die Anzeige.
+		]]
+		buildArea = self.level.buildArea,
+		anchors = self.level.anchors,
+		terrain = self.level.terrain,
+		waterY = self.level.waterY,
+		hasHydraulics = self.level.allowsMaterial("Hydraulic"),
+		phaseIndex = self.testPhase,
+
 		-- Die Kamera des Clients muss wissen, wo seine Arena steht.
 		originY = self.origin.Y,
 		bounds = self.level.bounds,
-		-- Bei ansteigender Fahrbahn blickt die Kamera auf die Mitte.
-		deckY = self.level.cameraDeckY,
+		deckY = self.level.focusY,
 	}
 end
 
@@ -169,9 +180,9 @@ function Arena:updateAnalysis()
 	self.forceEngine:applyColors(false)
 
 	local stable = not result.unstable
-	if stable ~= self.stable or result.worstNodeIndex ~= self.unstableNode then
+	if stable ~= self.stable or result.worstJointKey ~= self.unstableJoint then
 		self.stable = stable
-		self.unstableNode = result.worstNodeIndex
+		self.unstableJoint = result.worstJointKey
 		self:notify()
 	end
 end
@@ -181,17 +192,17 @@ end
 --------------------------------------------------------------------------------
 
 -- Rueckgabe: erfolgreich (boolean), Meldung fuer den Spieler (string)
-function Arena:placeMember(kind: string, a: number, b: number): (boolean, string)
+function Arena:placeMember(material: string, ax: number, ay: number, bx: number, by: number): (boolean, string)
 	if self.phase ~= "Build" then
 		return false, "Waehrend des Tests laesst sich nicht bauen."
 	end
 
-	local allowed, reason = self.structure:canPlace(kind, a, b)
+	local allowed, reason = self.structure:canPlace(material, ax, ay, bx, by)
 	if not allowed then
 		return false, reason
 	end
 
-	local member = self.structure:place(kind, a, b)
+	local member = self.structure:place(material, ax, ay, bx, by)
 	self.message = ""
 	self:updateAnalysis()
 	self:notify()
@@ -243,9 +254,11 @@ function Arena:startTest(speed: number, onComplete): (boolean, string)
 		elapsed = 0,
 		maxUtilisation = 0,
 		speed = self.testSpeed,
+		phase = 0,
 		vehiclesDone = 0,
 		vehicleCount = #self.level.vehicles,
 	}
+	self.testPhase = 0
 	self:notify()
 
 	self.testRun:start(self.testSpeed, function(progress)
@@ -275,6 +288,28 @@ end
 	mitten in der Fahrt. Der Server begrenzt den Wert selbst, damit ein
 	veraenderter Client kein unsinniges Tempo durchsetzen kann.
 ]]
+--[[
+	Hydraulik weiterschalten. Phase 0 heisst "alles eingefahren", jede weitere
+	Phase faehrt die Zylinder aus, die ihr zugeordnet sind.
+
+	Sinnvoll ist das nur waehrend des Tests: im Baumodus stehen alle Knoten
+	fest, da wuerde sich nichts bewegen.
+]]
+function Arena:setPhase(phase: number): (boolean, string)
+	if not self.testRun:isRunning() then
+		return false, "Die Hydraulik laesst sich nur waehrend des Tests schalten."
+	end
+
+	local wanted = math.clamp(math.round(phase), 0, Config.Hydraulics.phaseCount)
+	if wanted == self.testPhase then
+		return false, ""
+	end
+
+	self.testPhase = wanted
+	self.testRun:setPhase(wanted)
+	return true, ""
+end
+
 function Arena:setTestSpeed(speed: number)
 	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
 
@@ -319,7 +354,7 @@ function Arena:clearBuild()
 	self.testProgress = nil
 	self.message = ""
 	self.stable = true
-	self.unstableNode = nil
+	self.unstableJoint = nil
 	self:notify()
 end
 

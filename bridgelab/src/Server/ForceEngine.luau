@@ -19,6 +19,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
+local Materials = require(Shared.Materials)
 local TrussSolver = require(Shared.TrussSolver)
 
 local ForceEngine = {}
@@ -35,17 +36,13 @@ end
 -- Grenzwert eines Bauteils, abhaengig von der Belastungsrichtung
 --------------------------------------------------------------------------------
 
-function ForceEngine.limitFor(kind: string, force: number): number
-	local spec = Config.PartTypes[kind]
-	if force >= 0 then
-		return spec.maxTension
-	end
-	-- Druck: bei Seilen ist der Grenzwert 0, dort darf gar kein Druck entstehen.
-	return math.max(spec.maxCompression, 1e-6)
+-- Der Grenzwert steht jetzt bei den Baustoffen; hier nur noch durchgereicht.
+function ForceEngine.limitFor(material: string, force: number): number
+	return Materials.limitFor(material, force)
 end
 
 function ForceEngine.utilisation(member): number
-	local limit = ForceEngine.limitFor(member.kind, member.force)
+	local limit = Materials.limitFor(member.material, member.force)
 	return math.abs(member.force) / limit
 end
 
@@ -54,13 +51,13 @@ end
 --------------------------------------------------------------------------------
 
 --[[
-	vehicleLoads (optional): { [Ankerpunkt-Nummer] = Last in N, positiv = nach unten }
+	vehicleLoads (optional): { [Knotenschluessel] = Last in N, positiv = nach unten }
 
 	Rueckgabe:
 	{
 		solved         = boolean,
 		unstable       = boolean,   -- irgendein Knoten kann seine Last nicht abtragen
-		worstNodeIndex = number?,   -- Ankerpunkt-Nummer des schlimmsten Knotens
+		worstJointKey  = string?,   -- Schluessel des schlimmsten Knotens
 		maxUtilisation = number,
 	}
 ]]
@@ -69,36 +66,52 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 	local members = structure:activeMembers()
 
 	if #members == 0 then
-		return { solved = true, unstable = false, worstNodeIndex = nil, maxUtilisation = 0 }
+		return { solved = true, unstable = false, worstJointKey = nil, maxUtilisation = 0 }
 	end
 
 	----------------------------------------------------------------------------
-	-- 1. Knotenliste aufbauen (nur Ankerpunkte, an denen etwas haengt)
+	-- 1. Knotenliste aufbauen (nur Knoten, an denen etwas haengt)
 	----------------------------------------------------------------------------
 
-	local isUsed: { [number]: boolean } = {}
+	local isUsed: { [string]: boolean } = {}
 	for _, member in members do
-		isUsed[member.a] = true
-		isUsed[member.b] = true
+		isUsed[member.keyA] = true
+		isUsed[member.keyB] = true
 	end
+
+	--[[
+		Die Knoten liegen in einer Tabelle mit Zeichenketten als Schluessel, und
+		die hat keine feste Reihenfolge. Fuer den Rechner wird deshalb erst eine
+		SORTIERTE Liste gebaut.
+
+		Das ist kein Schoenheitsfehler: ohne feste Reihenfolge saehe die Matrix
+		bei jedem Aufruf anders aus, und die Kraefte wuerden von Bild zu Bild um
+		Kleinigkeiten schwanken. Bei Bauteilen dicht am Grenzwert entscheidet
+		das darueber, ob etwas bricht - dieselbe Bruecke wuerde mal halten und
+		mal nicht.
+	]]
+	local usedKeys = {}
+	for key in isUsed do
+		table.insert(usedKeys, key)
+	end
+	table.sort(usedKeys)
 
 	local solverNodes = {}
-	local snapToSolver: { [number]: number } = {}
-	local solverToSnap: { [number]: number } = {}
+	local keyToSolver: { [string]: number } = {}
+	local solverToKey: { [number]: string } = {}
 
-	-- In fester Reihenfolge durchgehen, damit das Ergebnis reproduzierbar ist.
-	for snapIndex = 1, #self.level.snapPoints do
-		if isUsed[snapIndex] then
-			local position = structure:nodePosition(snapIndex)
-			local snap = self.level.snapPoints[snapIndex]
+	for _, key in usedKeys do
+		local joint = structure.joints[key]
+		if joint then
+			local position = structure:jointPosition(key)
 			table.insert(solverNodes, {
-				x = position.X,
-				y = position.Y,
-				fixed = snap.fixed,
+				x = position.X - structure.origin.X,
+				y = position.Y - structure.origin.Y,
+				fixed = joint.fixed,
 			})
 			local solverIndex = #solverNodes
-			snapToSolver[snapIndex] = solverIndex
-			solverToSnap[solverIndex] = snapIndex
+			keyToSolver[key] = solverIndex
+			solverToKey[solverIndex] = key
 		end
 	end
 
@@ -108,10 +121,10 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 
 	local solverMembers = {}
 	for _, member in members do
-		local spec = Config.PartTypes[member.kind]
+		local spec = Materials.get(member.material)
 		table.insert(solverMembers, {
-			a = snapToSolver[member.a],
-			b = snapToSolver[member.b],
+			a = keyToSolver[member.keyA],
+			b = keyToSolver[member.keyB],
 			tensionOnly = not spec.rigid,
 		})
 	end
@@ -135,17 +148,16 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 
 	-- Eigengewicht: jedes Bauteil gibt die Haelfte seiner Masse an jedes Ende ab.
 	for _, member in members do
-		local spec = Config.PartTypes[member.kind]
-		local length = (structure:nodePosition(member.b) - structure:nodePosition(member.a)).Magnitude
-		local weight = length * spec.massPerStud * Config.Gravity
-		addLoad(snapToSolver[member.a], weight / 2)
-		addLoad(snapToSolver[member.b], weight / 2)
+		local spec = Materials.get(member.material)
+		local weight = member.length * spec.massPerStud * Config.Gravity
+		addLoad(keyToSolver[member.keyA], weight / 2)
+		addLoad(keyToSolver[member.keyB], weight / 2)
 	end
 
 	-- Last des Testfahrzeugs.
 	if vehicleLoads then
-		for snapIndex, newtons in vehicleLoads do
-			local solverIndex = snapToSolver[snapIndex]
+		for key, newtons in vehicleLoads do
+			local solverIndex = keyToSolver[key]
 			if solverIndex then
 				addLoad(solverIndex, newtons)
 			end
@@ -185,7 +197,7 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 	----------------------------------------------------------------------------
 
 	local unstable = false
-	local worstNodeIndex = nil
+	local worstJointKey = nil
 	local worstResidual = 0
 
 	for solverIndex, residual in result.residuals do
@@ -196,14 +208,14 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 		if residual > tolerance and residual > worstResidual then
 			unstable = true
 			worstResidual = residual
-			worstNodeIndex = solverToSnap[solverIndex]
+			worstJointKey = solverToKey[solverIndex]
 		end
 	end
 
 	return {
 		solved = result.solved,
 		unstable = unstable,
-		worstNodeIndex = worstNodeIndex,
+		worstJointKey = worstJointKey,
 		maxUtilisation = maxUtilisation,
 	}
 end
@@ -233,7 +245,7 @@ function ForceEngine:applyColors(showLoad: boolean)
 			continue
 		end
 
-		local spec = Config.PartTypes[member.kind]
+		local spec = Materials.get(member.material)
 		local utilisation = ForceEngine.utilisation(member)
 		local color
 

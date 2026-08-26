@@ -42,8 +42,32 @@
 
 local TrussSolver = {}
 
--- Kleines lambda fuer die Regularisierung (siehe Kommentar oben).
-local REGULARISATION = 1e-4
+--[[
+	Lambda fuer die Regularisierung (siehe Kommentar oben).
+
+	WARUM DIESE ZAHL SO KLEIN IST - ein teuer bezahlter Wert
+	Vorher stand hier 1e-4. Damit meldete der Rechner bei langen, flachen
+	Fachwerken "nicht stabil", obwohl jeder Knoten ordentlich ausgesteift war.
+
+	Der Grund: lambda unterdrueckt nicht nur echte Wackelstellen, sondern auch
+	WEICHE Verformungen. Ein 70 Studs langes und nur 10 Studs hohes Fachwerk
+	biegt sich als Ganzes leicht durch - eine solche weiche Richtung hat einen
+	kleinen Eigenwert. Ist lambda in derselben Groessenordnung, schluckt die
+	Regularisierung einen Teil der Last, und was sie schluckt, taucht als
+	Restkraft wieder auf. Aus einer weichen, aber voellig tragfaehigen Bruecke
+	wurde so eine angeblich instabile.
+
+	Eine ECHTE Wackelstelle hat dagegen den Eigenwert null. Dort greift jedes
+	lambda, auch ein winziges - die Restkraft bleibt in voller Hoehe stehen und
+	wird zuverlaessig erkannt. Kleiner ist hier also in beide Richtungen besser:
+	echte Fehler werden weiter gefunden, eingebildete verschwinden.
+
+	Ganz weglassen darf man lambda trotzdem nicht: bei doppelt gesetzten
+	Bauteilen auf denselben zwei Knoten ist das Gleichungssystem mehrdeutig,
+	und lambda entscheidet diese Mehrdeutigkeit sinnvoll - es teilt die Kraft
+	gleichmaessig auf beide auf.
+]]
+local REGULARISATION = 1e-8
 
 --------------------------------------------------------------------------------
 -- Gauss-Elimination mit Spaltenpivotisierung

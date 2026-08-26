@@ -244,23 +244,48 @@ end)
 -- Bauen
 --------------------------------------------------------------------------------
 
-remote.PlaceMember.OnServerEvent:Connect(function(player, kind, snapA, snapB)
+--[[
+	Der Client schickt jetzt KOORDINATEN statt Ankernummern - beim freien
+	Bauen gibt es keine feste Nummernliste mehr.
+
+	Damit kommen vier Zahlen vom Client, und jede davon muss geprueft werden:
+	Zahl, nicht NaN, nicht unendlich, und auf dem Raster. Ein veraenderter
+	Client koennte sonst Knoten an beliebigen Stellen erzeugen - etwa mitten
+	im Fels oder weit ausserhalb des Levels. Die eigentliche Entscheidung
+	faellt danach in Structure:canPlace.
+]]
+remote.PlaceMember.OnServerEvent:Connect(function(player, material, ax, ay, bx, by)
 	local arena = arenas[player]
 	if not arena then
 		return
 	end
-	-- Alles, was vom Client kommt, muss geprueft werden.
-	if type(kind) ~= "string" or type(snapA) ~= "number" or type(snapB) ~= "number" then
+	if type(material) ~= "string" then
 		return
 	end
-	if snapA ~= snapA or snapB ~= snapB then -- NaN abfangen
-		return
+
+	local coordinates = { ax, ay, bx, by }
+	for _, value in coordinates do
+		if type(value) ~= "number" or value ~= value or math.abs(value) == math.huge then
+			return
+		end
+		if math.abs(value) > 10000 then
+			return
+		end
 	end
+
 	if tooFast(player, "PlaceMember", 0.05) then
 		return
 	end
 
-	local ok, reason, hint = arena:placeMember(kind, math.floor(snapA), math.floor(snapB))
+	-- Auf das Raster runden, statt krumme Werte abzulehnen: winzige
+	-- Rundungsfehler aus der Bildschirmrechnung sollen kein Bauen verhindern.
+	local grid = Config.Build.gridSize
+	local function snap(value: number): number
+		return math.round(value / grid) * grid
+	end
+
+	local ok, reason, hint =
+		arena:placeMember(material, snap(ax), snap(ay), snap(bx), snap(by))
 	if not ok and reason ~= "" then
 		remote.Notice:FireClient(player, reason)
 	elseif ok and hint then
@@ -282,6 +307,33 @@ remote.RemoveMember.OnServerEvent:Connect(function(player, memberId)
 	end
 
 	local ok, reason = arena:removeMember(math.floor(memberId))
+	if not ok and reason ~= "" then
+		remote.Notice:FireClient(player, reason)
+	end
+end)
+
+--------------------------------------------------------------------------------
+-- Hydraulik
+--------------------------------------------------------------------------------
+
+--[[
+	Der Spieler schaltet die Zylinder waehrend des Tests weiter. Der Server
+	begrenzt die Phase selbst - ein veraenderter Client soll nicht auf eine
+	Phase schalten koennen, die es gar nicht gibt.
+]]
+remote.SetPhase.OnServerEvent:Connect(function(player, phase)
+	local arena = arenas[player]
+	if not arena then
+		return
+	end
+	if type(phase) ~= "number" or phase ~= phase then
+		return
+	end
+	if tooFast(player, "SetPhase", 0.15) then
+		return
+	end
+
+	local ok, reason = arena:setPhase(phase)
 	if not ok and reason ~= "" then
 		remote.Notice:FireClient(player, reason)
 	end
