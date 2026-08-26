@@ -223,7 +223,7 @@ function TestRun:spawnBoat()
 		return nil
 	end
 
-	local size = Vector3.new(boat.length or 18, boat.height or 14, 8)
+	local size = Vector3.new(boat.length or 18, boat.mastHeight or 20, 8)
 
 	local hull = Instance.new("Part")
 	hull.Name = "Schiff"
@@ -254,6 +254,8 @@ function TestRun:spawnBoat()
 		size = size,
 		x = boat.fromX,
 		direction = if boat.toX >= boat.fromX then 1 else -1,
+		-- Das Schiff wartet kurz, damit man vor dem Ablegen sieht, was kommt.
+		waitLeft = boat.startDelay or 0,
 		finished = false,
 	}
 end
@@ -265,8 +267,12 @@ function TestRun:updateBoat(dt: number)
 	end
 
 	local spec = boat.spec
-	local speed = spec.speed or 6
-	boat.x += speed * boat.direction * dt
+
+	if boat.waitLeft > 0 then
+		boat.waitLeft -= dt
+	else
+		boat.x += (spec.speed or 6) * boat.direction * dt
+	end
 
 	local waterY = self.level.waterY or 0
 	local z = self.level.z or 0
@@ -336,6 +342,15 @@ end
 function TestRun:boatIsBlocked(): boolean
 	local boat = self.boat
 	if not boat or boat.finished then
+		return false
+	end
+
+	--[[
+		Solange das Schiff noch am Ufer wartet, kann es auch nichts anstossen.
+		Ohne diese Abfrage waere ein Level unloesbar, bei dem die Bruecke am
+		Liegeplatz des Schiffes vorbeifuehrt.
+	]]
+	if boat.waitLeft > 0 then
 		return false
 	end
 

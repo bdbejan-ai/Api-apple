@@ -220,6 +220,49 @@ local function makeLevel(def)
 
 	level.freeHints = def.freeHints or (if def.difficulty <= 3 then 1 else 0)
 
+	----------------------------------------------------------------------------
+	-- Schiff: Angaben pruefen
+	----------------------------------------------------------------------------
+
+	--[[
+		WARUM HIER GEPRUEFT WIRD, STATT ERSATZWERTE ZU NEHMEN
+
+		Der Code las die Schiffsangaben mit Ersatzwerten - boat.length or 18.
+		Als das Feld im Level "width" hiess und im Code "length", fiel das
+		nirgends auf: es wurde einfach der Ersatzwert genommen. Das Schiff war
+		dann 18 statt 14 Studs lang, und die Bruecke stiess es an, obwohl der
+		Spieler alles richtig gemacht hatte.
+
+		Ein Ersatzwert ist gut gegen FEHLENDE Angaben, aber schlecht gegen
+		FALSCH BENANNTE: er verwandelt einen Tippfehler in stilles Fehlverhalten.
+		Deshalb wird hier beim Laden geprueft und notfalls laut geschimpft -
+		einmal beim Start, statt stundenlanger Suche im laufenden Spiel.
+	]]
+	if def.boat then
+		local required = { "fromX", "toX", "speed", "mastHeight", "length" }
+		for _, key in required do
+			if type(def.boat[key]) ~= "number" then
+				error(string.format(
+					"Level %s: das Schiff braucht die Angabe '%s' als Zahl.",
+					def.id, key
+				), 0)
+			end
+		end
+
+		local known = {
+			fromX = true, toX = true, speed = true, mastHeight = true,
+			length = true, clearance = true, startDelay = true,
+		}
+		for key in def.boat do
+			if not known[key] then
+				error(string.format(
+					"Level %s: das Schiff kennt die Angabe '%s' nicht. Tippfehler?",
+					def.id, key
+				), 0)
+			end
+		end
+	end
+
 	return level
 end
 
@@ -564,8 +607,9 @@ Levels.list = {
 			toX = 70,
 			speed = 9,
 			mastHeight = 22, -- so hoch muss der Durchgang frei sein
-			width = 14,
-			startDelay = 1.5,
+			length = 14, -- Laenge des Rumpfes in Fahrtrichtung
+			clearance = 1, -- Sicherheitsabstand rundherum
+			startDelay = 1.5, -- so lange wartet das Schiff nach dem Start
 		},
 
 		hints = {

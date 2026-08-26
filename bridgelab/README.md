@@ -27,18 +27,58 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 
 | | |
 |---|---|
-| **Level-Auswahl** | Sieben Level mit Vorschaubild, Schwierigkeitsgrad (1–5), Budget, Lückenbreite und Haken für geschaffte Level |
-| **Interaktive Anleitung** | Startet beim allerersten Spielstart automatisch. Neun Schritte, in denen man wirklich selbst baut. Texte passen sich dem Eingabegerät an |
+| **Freies Bauen** | Kein Ausmalbild aus vorgegebenen Punkten mehr: du baust frei auf einem 2‑Studs‑Raster. Nur die wenigen **Anker** eines Levels sind fest im Boden — alles dazwischen muss deine Konstruktion selbst tragen |
+| **Sieben Baustoffe** | Straße, Verstärkte Straße, Holz, Stahl, Seil, Kabel, Hydraulik. Jeder kostet **je Stud Länge** — ein langer Balken kostet mehr als ein kurzer |
+| **Zwölf Level in drei Welten** | Von einem schmalen Graben bis zur 100 Studs weiten Schlucht mit Felsnadel. Jedes ist nachweislich lösbar (siehe „Level prüfen") |
+| **Level-Auswahl** | Jede Karte zeichnet die **echte Geländeform** des Levels samt Ankerpunkten. Dazu Schwierigkeit (1–5), Budget, Spannweite und Haken für geschaffte Level |
+| **Interaktive Anleitung** | Startet beim allerersten Spielstart automatisch. Man baut wirklich selbst; die Texte passen sich dem Eingabegerät an |
 | **Seitenansicht** | Keine Spielfigur. Beliebig nah heranzoomen; herauszoomen nur so weit, bis das Level das Bild füllt |
 | **Tacho** | Schieberegler von 1 bis 14 Studs/s. Einstellbar vor dem Test **und mitten in der Fahrt**. Das Zeitlimit passt sich mit an |
-| **Belastungsanzeige** | Über jedem Bauteil steht während des Tests die Auslastung in Prozent und in Newton, dazu ein Farbbalken |
-| **Genaues Abreißen** | Das Bauteil unter dem Zeiger wird rot hervorgehoben, bevor man klickt — auch bei dünnen Seilen und sich kreuzenden Streben |
-| **Steile Rampe** | Level 4: die andere Seite liegt 16 Studs höher. Die Stützen werden nach rechts hin immer länger und schwerer |
-| **Gegenverkehr** | Level 5: zwei Fahrzeuge fahren aufeinander zu. In der Mitte liegen 2000 N auf wenigen Studs |
-| **Doppeldecker** | Level 6: zwei Fahrbahnen übereinander, auf jeder ein Fahrzeug. Nur Stützen überbrücken die 16 Studs dazwischen |
+| **Belastungsanzeige** | Die **Farbe** am Bauteil zeigt immer die Auslastung. Zahlentafeln bekommen nur die acht am stärksten belasteten Teile — sonst sieht man vor lauter Zahlen die Brücke nicht mehr |
+| **Hydraulik** | Zylinder fahren auf Knopfdruck aus und heben, was an ihnen hängt. Damit baut man Klappbrücken |
+| **Schiff** | In „Klappbrücke" muss ein Schiff unter der Brücke durch. Steht sie im Weg, ist der Test gescheitert — auch wenn nichts gebrochen ist |
+| **Sprung** | In „Der Sprung" gibt es nur **einen** Anker. Das Fahrzeug muss über die Lücke fliegen |
+| **Genaues Abreißen** | Das Bauteil unter dem Zeiger wird hervorgehoben, bevor man klickt — auch bei dünnen Seilen und sich kreuzenden Streben |
 | **Tipps** | Drei pro Level. Bei Schwierigkeit 1–3 ist der erste gratis, ab Schwierigkeit 4 kostet schon der erste Robux |
-| **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp-Gutscheine werden dauerhaft gespeichert |
+| **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp‑Gutscheine werden dauerhaft gespeichert |
 | **Mehrspieler** | Jeder Spieler bekommt seine eigene Arena und kann ein eigenes Level spielen |
+
+---
+
+## Die drei Sätze, die dich durch das ganze Spiel bringen
+
+**1. Dreiecke sind stabil, Vierecke kippen um.**
+Das ist der wichtigste Satz im Brückenbau. Ein Viereck aus vier Streben lässt
+sich zu einer Raute verschieben, ohne dass eine Strebe länger oder kürzer wird
+— es hält also nichts. Ein Dreieck kann das nicht.
+
+**2. Bricht die Straße, leg ein zweites Bauteil daneben.**
+Beim Fachwerk ist die Fahrbahn gleichzeitig der Untergurt und trägt die volle
+Gurtkraft. Straße hält aber nur 500 N. Setzt du auf **dieselben zwei Punkte**
+noch einen Stahlträger, teilen sich beide die Kraft:
+
+```
+vorher:   o====== Straße ======o        bei 500 N ist Schluss
+nachher:  o====== Straße ======o        zusammen
+          o======= Stahl ======o        bis 1000 N
+```
+
+Der **schwächere** der beiden bestimmt die Grenze: Straße (500) mit Stahl
+(1200) trägt zusammen 1000 N, nicht 1700. Nimmst du die Verstärkte Straße
+(1000 N), sind es 2000 N — der doppelte Preis je Stud kauft hier also
+wirklich die doppelte Tragfähigkeit.
+
+**3. Ist die Brücke zu weit gespannt, bau sie höher.**
+In den Gurten eines Fachwerks steckt ungefähr die Kraft
+
+```
+Kraft ≈ Gewicht × Spannweite / (4 × Bauhöhe)
+```
+
+Doppelte Bauhöhe heißt also **halbe** Kraft. Deshalb ist ein hohes Fachwerk
+fast immer billiger als ein niedriges aus stärkerem Material.
+
+---
 
 ---
 
@@ -223,14 +263,21 @@ sofort an.
 
 | | Maus + Tastatur | Touch | Gamepad |
 |---|---|---|---|
-| Ankerpunkt wählen | Linksklick | kurz tippen | **A** |
-| Abbrechen / entfernen | Rechtsklick | Abriss-Knopf, dann tippen | **B** / **X** |
+| **Bauteil ziehen** | linke Maustaste **halten** und ziehen | Finger aufsetzen und ziehen | **A** halten |
+| Bauteil setzen | Maustaste loslassen | Finger heben | **A** loslassen |
+| Bauteil entfernen | Rechtsklick darauf | Abriss‑Knopf, dann tippen | **B** |
 | Ansicht schieben | rechte Maustaste ziehen, oder WASD | **zwei** Finger ziehen | rechter Stick |
 | Zoomen | Mausrad | zwei Finger auf-/zuziehen | **LT** / **RT** |
 | Zeiger bewegen | Maus | Finger | linker Stick |
-| Bauteil 1/2/3 | Tasten `1` `2` `3` | Knöpfe unten | Knöpfe unten |
-| Abrissmodus | Taste `4` | Knopf „Abriss" | **X** |
+| Baustoff 1…7 | Tasten `1`–`7` | Leiste links | Leiste links |
+| Abrissmodus | Taste `X` | Knopf „Abriss" | **X** |
 | Tempo einstellen | Regler ziehen oder −/+ | Regler ziehen oder −/+ | Regler mit dem Zeiger |
+| Hydraulik schalten | Phasenknöpfe unten | Phasenknöpfe unten | Phasenknöpfe unten |
+
+**Warum wird zum Bauen gezogen und nicht zweimal geklickt?** Beim Ziehen
+siehst du die ganze Zeit, was entsteht, und ein Versehen brichst du ab, indem
+du zum Anfangspunkt zurückziehst. Ein zu kurzer Zug zählt gar nicht als
+Bauversuch — sonst entstünde bei jedem versehentlichen Klick ein Bauteil.
 
 **Warum bei Touch zwei Finger für die Kamera?** Ein Finger wird zum Bauen
 gebraucht. Würde ein Finger auch die Kamera schieben, könnte das Spiel nie
@@ -244,21 +291,24 @@ sicher unterscheiden, ob jemand bauen oder schauen will.
 bridgelab/
 ├── default.project.json      Rojo-Bauplan: welche Datei landet wo in Studio
 ├── tools/
-│   └── check_levels.luau     Prüfwerkzeug: sind die Level lösbar?
+│   ├── check_levels.luau     Prüfwerkzeug: sind die Level lösbar?
+│   └── check_code.py         findet Namensfehler zwischen den Dateien
 └── src/
     ├── Shared/               kennen Server UND Client
-    │   ├── Config.luau       ALLE Einstellungen: Bauteile, Physik, Preise
-    │   ├── Levels.luau       die sechs Level als reine Zahlen
+    │   ├── Config.luau       Einstellungen: Raster, Physik, Kamera, Preise
+    │   ├── Materials.luau    die sieben Baustoffe mit Grenzwerten und Preisen
+    │   ├── Terrain.luau      rechnet mit dem Geländeprofil (Höhe, Kollision)
+    │   ├── Levels.luau       die zwölf Level als reine Zahlen
     │   ├── Remotes.luau      legt die RemoteEvents an
     │   └── TrussSolver.luau  der Fachwerk-Rechner (reine Mathematik)
     │
     ├── Server/               läuft nur auf dem Server (nicht manipulierbar)
     │   ├── init.server.luau  Hauptskript: prüft alle Wünsche der Clients
     │   ├── Arena.luau        die Spielsitzung EINES Spielers
-    │   ├── LevelBuilder.luau baut Plattformen, Schlucht, Pylone, Ankerpunkte
+    │   ├── LevelBuilder.luau baut Gelände, Wasser, Anker, Zierrat
     │   ├── Structure.luau    verwaltet die gesetzten Bauteile
     │   ├── ForceEngine.luau  Bindeglied zum Fachwerk-Rechner
-    │   ├── TestRun.luau      der Belastungstest mit dem Fahrzeug
+    │   ├── TestRun.luau      Belastungstest, Hydraulik, Schiff, Sprung
     │   ├── PlayerData.luau   Fortschritt speichern (DataStore)
     │   └── Monetisation.luau Robux-Käufe
     │
@@ -273,6 +323,17 @@ bridgelab/
         └── TutorialGui.luau      die interaktive Anleitung
 ```
 
+### Warum `Levels.luau` von nichts abhängt
+
+`Levels.luau` benutzt bewusst **keine** Roblox-Typen: Größen stehen als
+`{ X = 8, Y = 4, Z = 5 }` statt als `Vector3`, Farben als `{ 198, 72, 58 }`
+statt als `Color3`. Der Server rechnet das beim Bauen um.
+
+Der Grund: nur so kann das Prüfskript in `tools/` die Datei direkt einlesen und
+**die echten Leveldaten** prüfen, statt eine Kopie zu pflegen. Genau so eine
+Kopie ist schon einmal auseinandergelaufen, und der Fehler fiel erst im Spiel
+auf.
+
 ### Die wichtigste Regel im Code
 
 **Der Client schickt nur Wünsche, der Server entscheidet.** Ein manipulierter
@@ -284,78 +345,98 @@ Server. Jede Zahl, die hereinkommt, wird geprüft, bevor sie benutzt wird.
 
 ## Eigene Level bauen
 
-In `src/Shared/Levels.luau` einen Eintrag kopieren und die Zahlen ändern. Die
-Ankerpunkte entstehen automatisch.
+In `src/Shared/Levels.luau` einen Eintrag kopieren und die Zahlen ändern.
 
-### Zwei Fallen, die ein Level unlösbar machen
+### Das Gelände ist ein Linienzug
 
-Beide sind mir beim Bauen selbst passiert — deshalb stehen sie hier:
-
-1. **Die obere Reihe zu hoch ansetzen.** `upperY - deckY` darf höchstens 10
-   Studs betragen (die maximale Balkenlänge). Sonst kommt man mit keinem Balken
-   dorthin, und die Reihe ist nutzlos.
-
-2. **Die Schlucht zu tief machen.** `deckY - groundY` darf höchstens 40 Studs
-   betragen (die maximale Stützenlänge). Stützen vom Schluchtgrund sind der
-   einzige Weg, senkrechte Last wirklich abzutragen. Ist der Grund unerreichbar,
-   ist das Level nicht lösbar.
-
-> **Warum ist das so?** Ein Fachwerk zwischen Fahrbahn und oberer Reihe wäre die
-> Alternative — aber bei nur 8 Studs Bauhöhe entstehen in den Gurten Kräfte weit
-> über 500 N, und der Balken bricht. Eine Hängebrücke funktioniert in diesem
-> Modell ebenfalls nicht: Ein gerader Obergurt aus gelenkig gelagerten Stäben
-> kann senkrechte Lasten nicht abtragen.
-
-### Mehrere Fahrbahnen und mehrere Fahrzeuge
-
-Ein Level kann mehr als eine Fahrbahnhöhe haben und mehr als ein Testfahrzeug.
-Bestanden ist der Test erst, wenn **alle** Fahrzeuge angekommen sind.
+Ein Level beschreibt sein Gelände als Liste von Stützstellen, zwischen denen
+geradlinig verbunden wird. Zwei Punkte mit **demselben x** bilden eine
+senkrechte Kante — so entstehen Kliffs.
 
 ```lua
--- Zwei Ebenen übereinander (Level 5)
-decks = { { y = 40 }, { y = 56 } },
-vehicles = {
-    { deck = 1, direction = 1 },
-    { deck = 2, direction = 1, mass = 600 },
-},
-
--- Gegenverkehr auf einer Ebene (Level 4)
-vehicles = {
-    { deck = 1, direction = 1 },
-    { deck = 1, direction = -1 },
+terrain = {
+    { x = -80, y = 30 },   -- linkes Plateau
+    { x = -12, y = 30 },
+    { x = -12, y =  0 },   -- senkrecht hinunter (gleiches x!)
+    { x =  12, y =  0 },   -- Schluchtgrund
+    { x =  12, y = 30 },   -- senkrecht hinauf
+    { x =  80, y = 30 },   -- rechtes Plateau
 },
 ```
 
-`direction = 1` fährt nach rechts, `-1` nach links. `mass` ist optional und
-überschreibt das Gewicht aus `vehicle.mass`. Bei Gegenverkehr braucht jedes
-Fahrzeug zusätzlich eine eigene `lane` (seitlicher Versatz), sonst fahren sie
-frontal ineinander.
-
-### Ansteigende Fahrbahn
-
-Eine Fahrbahn darf schräg verlaufen. `rightY` gibt die Höhe am rechten Rand an:
+### Anker sind die eigentliche Aufgabe
 
 ```lua
-decks = { { y = 40, rightY = 56 } },   -- steigt über die Lücke um 16 Studs
-upperOffset = 8,                        -- obere Reihe läuft parallel mit
+anchors = {
+    { x = -12, y = 30 },
+    { x =  12, y = 30 },
+},
 ```
 
-Zwischen den beiden Rändern wird gleichmäßig überblendet, außerhalb der Lücke
-bleibt es flach. Die obere Ankerreihe läuft dann **parallel** zur Fahrbahn —
-wäre sie waagerecht, läge sie am tiefen Ende außerhalb der Balkenreichweite.
+**Nur hier** kann die Konstruktion Last in den Boden abgeben. Alles dazwischen
+muss sie selbst tragen. Wie viele Anker es gibt und wie weit sie auseinander
+liegen, entscheidet über die Schwierigkeit weit mehr als das Budget.
 
-Achte darauf, dass die Balken schräg gemessen werden: bei 16 Studs Steigung auf
-48 Studs Länge ist ein Feld von 8 Studs waagerecht rund 8,4 Studs lang.
+Ein zusätzlicher Anker mitten in der Schlucht — auf einer Felsnadel oder einem
+Vorsprung — halbiert die Spannweite und **viertelt** damit ungefähr die
+Gurtkraft. Genau so werden die großen Level lösbar.
 
-> Zwischen zwei Fahrbahnen kommt man nur mit **Stützen** hoch, sobald der
-> Abstand größer als 10 Studs ist — die maximale Balkenlänge. Genau das macht
-> den Doppeldecker zur eigenen Aufgabe.
+### Drei Regeln, die ein Level sonst unlösbar machen
+
+Alle drei sind mir beim Bauen selbst passiert:
+
+1. **Alle Zahlen müssen gerade sein.** Das Raster ist 2 Studs weit. Ein Anker
+   bei `x = 35` wird beim Bauen auf 36 gerundet — und dort ist kein Anker mehr.
+   Die Brücke hängt dann an nichts, und der Rechner meldet völlig zu Recht
+   „instabil". Das Prüfskript fängt das inzwischen vorab ab.
+
+2. **Die Spannweite muss zum Fahrzeug passen.** Es gilt ungefähr
+
+   ```
+   größte Spannweite ≈ 4 × Bauhöhe × Grenzwert / Fahrzeuggewicht
+   ```
+
+   Ein Kleinwagen (420 N) über ein Holzfachwerk (550 N) mit 10 Studs Bauhöhe
+   schafft also rund 52 Studs. Ein Lastwagen (1600 N) käme dort auf 14.
+
+3. **Nicht zwei schwere Fahrzeuge auf eine freie Spannweite.** Zwei Lastwagen,
+   die sich in der Mitte begegnen, ergeben 3200 N an einer Stelle — daran
+   scheitert jede Bauform. Entweder leichtere Fahrzeuge nehmen oder einen
+   Pfeiler in die Mitte stellen.
+
+### Fahrzeuge
+
+```lua
+vehicles = {
+    { kind = "Car", fromX = -64, toX = 64, lane = -2.6 },
+    { kind = "Car", fromX =  64, toX = -64, lane = 2.6 },
+},
+```
+
+`kind` ist einer von `MiniCar` (420 N), `Van` (650 N), `Car` (900 N),
+`Truck` (1600 N). Bei Gegenverkehr braucht jedes Fahrzeug eine eigene `lane`
+(seitlicher Versatz), sonst fahren sie frontal ineinander. Bestanden ist der
+Test erst, wenn **alle** angekommen sind.
+
+### Schiff und Sprung
+
+```lua
+boat = { fromX = -70, toX = 70, speed = 9, mastHeight = 22, length = 14 },
+requiresJump = true,
+```
+
+Beim Schiff prüft der Server, ob ein Bauteil in den Durchfahrtsbereich ragt —
+dann ist der Test gescheitert, auch wenn nichts gebrochen ist. Die Angaben
+werden beim Laden geprüft: ein Tippfehler im Feldnamen bricht sofort mit einer
+klaren Meldung ab, statt still einen Ersatzwert zu nehmen.
 
 ### Level prüfen, bevor du sie spielst
 
-Im Ordner `tools/` liegt ein Prüfskript. Es baut mehrere Standard-Brückenformen,
-lässt das Fahrzeug rechnerisch darüberfahren und meldet Kosten und höchste
-Auslastung — ohne dass Roblox überhaupt laufen muss.
+Im Ordner `tools/` liegt ein Prüfskript. Es liest **die echten Leveldaten** aus
+`Levels.luau`, baut mehrere Standard-Brückenformen (Fachwerk, verstärktes
+Fachwerk, Kreuzverband, Bogen, Hängebrücke, jeweils mit und ohne Pfeiler),
+lässt die Fahrzeuge rechnerisch darüberfahren und meldet Kosten und höchste
+Auslastung — ohne dass Roblox laufen muss.
 
 Dafür brauchst du das Luau-Programm von
 <https://github.com/luau-lang/luau/releases> (Datei `luau-ubuntu.zip`,
@@ -369,17 +450,25 @@ luau check_levels.luau
 Ausgabe pro Level, zum Beispiel:
 
 ```
-Level1   Budget 200   Luecke 40   Fahrbahn y=40  Boden y=20  oben y=48
-   Stuetzen (8er Fahrbahn)   Kosten 110/200  max  89%  LOESUNG [Pillar]
-   => LOESBAR ueber 'Stuetzen (8er Fahrbahn)' fuer 110 (45% Budget uebrig)
+W1L1  Der erste Graben
+   Budget 800   Spannweite 24   Anker 2   Fahrzeuge 1
+   Fachwerk Wood/Road h6 p8   17 Teile  Kosten 582/800  max 100%  LOESUNG
+   => LOESBAR ueber 'Fachwerk Wood/Road h6 p8' fuer 582 (27% Budget uebrig)
 ```
 
-Wenn dort `NICHT LOESBAR` steht, schlägt das Skript ein passendes Budget vor.
-Trägst du neue Level ein, musst du sie auch in der `LEVELS`-Tabelle **im
-Prüfskript** ergänzen — es liest `Levels.luau` nicht selbst aus.
+Hält keine Form, meldet das Skript den **knappsten Versuch** mit Ort und Kraft
+des überlasteten Bauteils — daran sieht man sofort, ob der Obergurt, eine
+Diagonale oder die Fahrbahn nachgibt und was am Level zu ändern ist. Hält eine
+Form, ist sie aber zu teuer, schlägt es ein passendes Budget vor.
 
-**Alle sieben mitgelieferten Level sind damit geprüft** und haben zwischen 18 %
-und 45 % Budgetreserve gegenüber der günstigsten funktionierenden Lösung.
+Das Skript liest `Levels.luau` **selbst** aus — du musst neue Level nirgends
+doppelt eintragen. (Früher gab es eine Kopie der Zahlen im Prüfskript, und
+genau die ist einmal auseinandergelaufen.)
+
+**Alle zwölf mitgelieferten Level sind damit geprüft** und haben zwischen 9 %
+und 27 % Budgetreserve gegenüber der günstigsten funktionierenden Lösung.
+„Der Sprung" ist von Hand entworfen — dort gibt es keine durchgehende Fahrbahn,
+die sich mit Standardformen prüfen ließe.
 
 ### Den Code prüfen
 
@@ -392,6 +481,8 @@ laufenden Spiel auffallen würden:
 - RemoteEvents, bei denen ein Ende fehlt (nur Sender oder nur Empfänger)
 - Rückruf-Felder (`onXyz`), die nie verdrahtet wurden
 - Bedienelemente, die die Anleitung hervorheben will, aber nicht existieren
+- Ordnernamen, die zwischen LevelBuilder, Server und Client auseinanderlaufen
+- Felder, die der Code aus den Leveldaten liest, die es dort aber nicht gibt
 
 ```bash
 python3 tools/check_code.py
@@ -418,33 +509,49 @@ Lösung gewählt. Hier die vollständige Liste:
 ### Physik und Balance
 
 1. **Einheiten mit g = 1.** Eine Masse von 1000 erzeugt genau 1000 N. Dadurch
-   passen die vorgegebenen Grenzwerte (500 / 300 / 800 N) direkt zur
-   Fahrzeugmasse: ein einzelnes Bauteil kann das Fahrzeug nie allein tragen.
+   lassen sich Fahrzeuggewicht und Bauteilgrenzwerte direkt vergleichen.
 2. **Zwei getrennte Physiken.** Die Roblox-Engine ist nur fürs Aussehen
    zuständig (Durchbiegen, Einsturz). Ob ein Bauteil bricht, entscheidet
    ausschließlich der eigene Fachwerk-Rechner auf dem Server.
 3. **Gelenkige Stäbe, kein Biegen.** Jedes Bauteil kann nur längs gezogen oder
    gedrückt werden. Deshalb trägt sich eine schnurgerade Fahrbahn nicht selbst —
    genau das ist die Rätselaufgabe.
-4. **Reichweite geändert.** Seil und Stütze reichen jetzt 40 statt 26 Studs.
-   Mit 26 waren vier der sechs Level nachweislich unlösbar.
-5. **Fahrgeschwindigkeit 3,2 statt 8 Studs/s**, damit man die Belastungszahlen
+4. **Kosten je Stud statt Festpreis.** Beim freien Bauen wäre ein Festpreis
+   unsinnig — jeder würde nur noch die längsten möglichen Teile setzen, weil
+   Länge nichts kostet.
+5. **Holz (550 N) ist stärker als Straße (500 N).** Vorher war es mit 400 N
+   schwächer, und das war verkehrt herum gedacht: beim Fachwerk ist die
+   Fahrbahn der Untergurt und der Obergurt darüber trägt genauso viel. War der
+   Tragbaustoff schwächer als die Fahrbahn, riss immer zuerst der Obergurt —
+   Holz war damit für seinen eigentlichen Zweck unbrauchbar.
+6. **Die Schwierigkeit kommt aus Fahrzeug und Spannweite**, nicht aus
+   heimlich angehobenen Grenzwerten. Welt 1 fährt einen Kleinwagen (420 N),
+   damit Holzfachwerke dort überhaupt tragen können; das Finale einen
+   Lastwagen (1600 N).
+7. **Fahrgeschwindigkeit 3,5 statt 8 Studs/s**, damit man die Belastungszahlen
    lesen kann. Die Zeitlimits sind entsprechend großzügig.
-6. **Bauteile brechen erst nach 0,6 s Schonfrist**, sonst zerstört der Ruck
+8. **Bauteile brechen erst nach 0,6 s Schonfrist**, sonst zerstört der Ruck
    beim Lösen der Verankerung sofort etwas.
-7. **Nur flach liegende Balken sind Fahrbahn.** Steigt ein Balken stärker als
+9. **Nur flach liegende Fahrbahnstücke sind befahrbar.** Steigt ein Balken stärker als
    etwa 30 Grad, gilt er als Strebe: das Fahrzeug fährt hindurch, statt
    dagegenzustoßen. Sonst könnte man seine Brücke nicht aussteifen, ohne sich
    selbst den Weg zu verbauen. Getragen wird trotzdem voll mit — für die
    Kräfteberechnung ändert sich nichts. Der Schwellwert steht in
    `Config.Test.roadwayMaxRise`.
-8. **Stützen und Seile blockieren nie.** Eine Stütze, die von der Fahrbahn
-   nach oben gebaut wird, stünde sonst mitten im Weg.
+10. **Tragwerk blockiert nie.** Eine Strebe, die von der Fahrbahn nach oben
+    gebaut wird, stünde sonst mitten im Weg.
+11. **Die Regularisierung im Fachwerk-Rechner ist 1e-8, nicht 1e-4.** Mit dem
+    größeren Wert meldete der Rechner lange, flache Fachwerke als „instabil",
+    obwohl jeder Knoten ordentlich ausgesteift war: die Regularisierung
+    unterdrückt nicht nur echte Wackelstellen, sondern auch weiche
+    Durchbiegungen, und was sie schluckt, taucht als Restkraft wieder auf.
+    Eine echte Wackelstelle hat den Eigenwert null und wird auch mit 1e-8
+    zuverlässig erkannt.
 
 ### Spielaufbau
 
-9. **Eine eigene Arena pro Spieler**, senkrecht gestapelt im Abstand von 500
-   Studs. Nötig, weil jeder ein eigenes Level wählen darf.
+12. **Eine eigene Arena pro Spieler**, senkrecht gestapelt im Abstand von 600
+    Studs. Nötig, weil jeder ein eigenes Level wählen darf.
 10. **Keine Spielerfigur.** `CharacterAutoLoads` ist aus, die Kamera ist fest
    auf Seitenansicht gestellt.
 11. **Der Bauplan überlebt den Test.** Bricht etwas, bleibt der Plan erhalten —
@@ -479,6 +586,16 @@ Lösung gewählt. Hier die vollständige Liste:
 
 20. **Ein gemeinsamer „Zeigepunkt"** für alle drei Eingabearten. Deshalb gibt
     es die Trefferlogik nur einmal.
+22. **Der Zeigepunkt wird mit der Bauebene geschnitten**, statt den nächsten
+    Ankerpunkt zu suchen. Das trifft immer, unabhängig von Kamera und Zoom, und
+    kann von nichts verdeckt werden.
+23. **Die Oberfläche ist in vier Zonen aufgeteilt** (Kopf, Baustoffleiste
+    links, rechte Spalte, Fußleiste), und die Plätze werden an genau einer
+    Stelle vergeben. Vorher lagen die Fenster an festen Bildschirmpunkten und
+    überlagerten sich auf schmalen Bildschirmen.
+24. **Nur die acht am stärksten belasteten Bauteile bekommen eine Zahlentafel.**
+    Bei vierzig Teilen war der Bildschirm sonst zugepflastert. Die Farbe am
+    Bauteil bleibt immer sichtbar — sie ist die Hauptinformation.
 21. **Zwei Finger für die Kamera** auf Touch (Begründung oben).
 22. **Die Anleitung startet automatisch beim ersten Mal in Level 1** und ist
     danach über das Menü wieder erreichbar.
@@ -495,24 +612,29 @@ Lösung gewählt. Hier die vollständige Liste:
 Ehrlich gesagt, was noch fehlt oder wacklig ist:
 
 - **Nicht in Roblox getestet.** Ich konnte den Code hier nicht in Studio
-  ausführen. Geprüft ist: alle 20 Dateien kompilieren mit dem echten
-  Luau-Compiler, und die Lösbarkeit aller Level wurde mit dem echten
-  Fachwerk-Rechner nachgerechnet. Was das *nicht* abdeckt, sind Laufzeitfehler,
-  die erst mit echten Roblox-Objekten auftreten — falsch platzierte Fenster,
-  eine Kamera, die woanders steht als gedacht, ähnliches. Rechne damit, dass
-  beim ersten Start noch Kleinigkeiten zu richten sind, und schick mir die
-  Fehlermeldungen aus **VIEW → Output**.
-- **Die Fußleiste kann auf sehr schmalen Bildschirmen eng werden.** Die Knöpfe
-  skalieren mit, aber unter etwa 600 Pixel Breite wird es gedrängt.
+  ausführen. Geprüft ist: alle Dateien kompilieren mit dem echten
+  Luau-Compiler, die Lösbarkeit aller zwölf Level wurde mit dem echten
+  Fachwerk-Rechner nachgerechnet, und `tools/check_code.py` findet
+  Namensfehler zwischen den Dateien. Was das *nicht* abdeckt, sind
+  Laufzeitfehler, die erst mit echten Roblox-Objekten auftreten — falsch
+  platzierte Fenster, eine Kamera, die woanders steht als gedacht, ähnliches.
+  Rechne damit, dass beim ersten Start noch Kleinigkeiten zu richten sind, und
+  schick mir die Fehlermeldungen aus **VIEW → Output**.
+- **Die Baustoffleiste braucht Höhe.** Sieben Baustoffe übereinander brauchen
+  rund 450 Pixel. Auf einem sehr flachen Fenster wird die Leiste abgeschnitten;
+  sie wird dann gekürzt, statt in die Fußleiste zu ragen.
 - **Der Gamepad-Zeiger** ist selbstgebaut (ein Ring, den der linke Stick
   bewegt). Roblox bietet dafür nichts Fertiges, wenn es keine Spielfigur gibt.
-- **Seile hängen nicht durch.** Ein schlaffes Seil wird weiterhin als gerade
-  Linie gezeichnet. Echtes Durchhängen bräuchte mehrere Teilstücke pro Seil.
-- **`allowedParts` ist eingebaut, aber ungenutzt.** Man kann damit einzelne
-  Bauteile pro Level sperren. Ich habe es nicht verwendet, weil jedes Level
-  ohne Stützen unlösbar wäre — siehe den Kasten unter „Eigene Level bauen".
-- **Der Fluss ist reine Optik.** Er kollidiert mit nichts; Stützen dürfen
-  mitten hindurch. Echtes Wasser mit Auftrieb würde die Kräfteberechnung
-  verfälschen.
-- **Der Fluss hat keine Physik** — kein Auftrieb, keine Strömung.
+- **Das Durchhängen der Seile ist reine Optik.** Ein Seil wird aus fünf
+  Teilstücken entlang einer Parabel gezeichnet; für die Kräfteberechnung zählt
+  weiterhin nur die gerade Verbindung zwischen den beiden Knoten.
+- **Das Wasser ist reine Optik.** Kein Auftrieb, keine Strömung; Bauteile
+  dürfen mitten hindurch. Echtes Wasser würde die Kräfteberechnung verfälschen.
+- **Das Sprunglevel ist nicht rechnerisch geprüft.** Dort gibt es keine
+  durchgehende Fahrbahn, die sich mit Standardformen prüfen ließe — es ist von
+  Hand entworfen und braucht echtes Probespielen.
+- **Der Fachwerk-Rechner wächst mit der dritten Potenz der Bauteilzahl.**
+  Deshalb sind höchstens 140 Bauteile je Spieler erlaubt
+  (`Config.Build.maxMembers`). Bei sechzehn Spielern gleichzeitig ist das die
+  eigentliche Grenze des Servers.
 - **Keine Bestenliste, keine Sterne-Wertung, kein Level-Editor.**

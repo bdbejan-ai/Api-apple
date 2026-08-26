@@ -155,7 +155,59 @@ for path in client_text:
             continue
         note(f'{path.stem}: sucht Ordner "{name}", den der LevelBuilder nicht anlegt')
 
-# --- 7: doppelte Kommentarbloecke ---------------------------------------------
+# --- 7: Felder der Leveldaten -------------------------------------------------
+
+# Der Code liest Felder aus den Leveldaten - level.maxDropStuds, boat.mastHeight
+# und so weiter. Steht ein Feld unter einem anderen Namen in Levels.luau, faellt
+# das erst auf, wenn genau dieses Level gespielt wird. Beim Schiff war es
+# "width" gegen "length" und "mastHeight" gegen "height".
+#
+# Geprueft wird nur "level.<feld>". Ein "boat.<feld>" ist in TestRun das
+# LAUFENDE Schiff mit Rumpf und Mast, nicht die Leveldaten - das mitzupruefen
+# haette nur Fehlalarm gegeben.
+#
+# Uebersprungen werden Felder mit Ersatzwert ("level.z or 0"): die sind
+# absichtlich freiwillig.
+levels_text = (SRC / "Shared" / "Levels.luau").read_text(encoding="utf-8")
+level_fields = set(re.findall(r"^\s*(\w+)\s*=", levels_text, re.M))
+level_fields |= set(re.findall(r"level\.(\w+)\s*=", levels_text))
+level_fields |= set(re.findall(r"function level\.(\w+)", levels_text))
+
+for path in list((SRC / "Server").rglob("*.luau")) + list((SRC / "Client").rglob("*.luau")):
+    text = path.read_text(encoding="utf-8")
+    seen = set()
+    for m in re.finditer(r"\b(?:self\.)?level\.(\w+)", text):
+        field = m.group(1)
+        if field in seen or field in level_fields:
+            continue
+        # Ersatzwert direkt dahinter? Dann ist das Feld freiwillig.
+        rest = text[m.end():m.end() + 12]
+        if rest.lstrip().startswith("or "):
+            continue
+        seen.add(field)
+        note(f'{path.stem}: liest level.{field}, das es in Levels.luau nicht gibt')
+
+# Die Felder des Schiffes gesondert: sie stehen in einer Untertabelle und
+# heissen deshalb im Code "spec.<feld>", nicht "level.<feld>".
+boat_keys = set()
+if "boat = {" in levels_text:
+    block = levels_text[levels_text.index("boat = {"):]
+    block = block[:block.index("\n\t\t},")]
+    boat_keys = set(re.findall(r"^\s*(\w+)\s*=", block, re.M))
+
+testrun = (SRC / "Server" / "TestRun.luau").read_text(encoding="utf-8")
+if boat_keys and "function TestRun:spawnBoat" in testrun:
+    region = testrun[testrun.index("function TestRun:spawnBoat"):testrun.index("-- Hydraulik")]
+    for m in re.finditer(r"\bspec\.(\w+)", region):
+        field = m.group(1)
+        if field in boat_keys:
+            continue
+        rest = region[m.end():m.end() + 12]
+        if rest.lstrip().startswith("or "):
+            continue
+        note(f'TestRun: liest vom Schiff das Feld "{field}", das in Levels.luau fehlt')
+
+# --- 8: doppelte Kommentarbloecke ---------------------------------------------
 
 for f, t in texts.items():
     blocks = [" ".join(b.split()) for b in re.findall(r"--\[\[(.*?)\]\]", t, re.S)]
