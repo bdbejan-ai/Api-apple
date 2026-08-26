@@ -140,11 +140,25 @@ local STEPS = {
 	},
 
 	{
+		title = "Das Tempo bestimmst du",
+		text = function()
+			return "Ueber der Fussleiste sitzt der Tacho. Damit stellst du ein, wie schnell "
+				.. "das Fahrzeug faehrt - von 1 bis 14 Studs pro Sekunde.\n\n"
+				.. "LANGSAM ist zum Lernen besser: du siehst in Ruhe, welches Bauteil rot wird.\n"
+				.. "SCHNELL geht zackiger, das Fahrzeug schlaegt aber haerter auf.\n\n"
+				.. "Du darfst ihn auch mitten in der Fahrt noch verstellen. Zeit verlierst du "
+				.. "durch langsames Fahren nicht - das Zeitlimit passt sich an."
+		end,
+		mode = "button",
+		highlight = "SpeedPanel",
+	},
+
+	{
 		title = "Der Belastungstest",
 		text = function()
 			return "Wenn du fertig bist, druecke TEST STARTEN.\n\n"
-				.. "Der Test laeuft absichtlich langsam ab. Ueber jedem Bauteil siehst du dabei, "
-				.. "wie stark es gerade belastet ist - in Prozent und in Newton.\n\n"
+				.. "Ueber jedem Bauteil siehst du dann, wie stark es gerade belastet ist - "
+				.. "in Prozent und in Newton. Gruen heisst viel Reserve, rot heisst: es reisst gleich.\n\n"
 				.. "Starte jetzt einen Test. Es macht nichts, wenn die Bruecke noch nicht haelt."
 		end,
 		mode = "event",

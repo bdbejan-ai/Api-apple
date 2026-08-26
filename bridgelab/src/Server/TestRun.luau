@@ -96,8 +96,9 @@ function TestRun:spawnVehicle(spec)
 
 	-- Nach links fahrende Fahrzeuge werden gedreht, damit das Fahrerhaus vorn ist.
 	local facing = if spec.direction > 0 then CFrame.identity else CFrame.Angles(0, math.pi, 0)
-	body.CFrame = CFrame.new(self.origin + Vector3.new(spec.startX, spec.deckY + size.Y / 2 + 0.25, self.level.z))
-		* facing
+	body.CFrame = CFrame.new(
+		self.origin + Vector3.new(spec.startX, spec.deckY + size.Y / 2 + 0.25, self.level.z + (spec.laneZ or 0))
+	) * facing
 	body.Parent = self.folders.vehicle
 
 	-- --- Deko: Fahrerhaus ----------------------------------------------------
@@ -192,7 +193,9 @@ function TestRun:computeVehicleLoads(): { [number]: number }
 		for i = 1, 3 do
 			local t = (i - 1) / 2
 			local sampleX = position.X - halfLength + t * spec.size.X
-			local origin = Vector3.new(sampleX, position.Y, self.origin.Z + self.level.z)
+			-- Auf der eigenen Fahrspur nach unten tasten, nicht in der Mitte:
+			-- bei Gegenverkehr faehrt jedes Fahrzeug seitlich versetzt.
+			local origin = Vector3.new(sampleX, position.Y, position.Z)
 
 			local hit = workspace:Raycast(origin, Vector3.new(0, -(spec.size.Y / 2 + 4), 0), self.raycastParams)
 			if hit and hit.Instance then

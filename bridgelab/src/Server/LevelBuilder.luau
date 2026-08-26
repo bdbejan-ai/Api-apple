@@ -156,25 +156,30 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 			local centerX = if side < 0 then level.gapLeftX - halfLength else level.gapRightX + halfLength
 
 			--[[
-				Liegt diese Fahrbahn hoeher als die unterste, braucht sie ein
-				Widerlager: einen Betonblock, der die Strasse traegt. Ohne ihn
-				schwebte die Fahrbahn und das Fahrzeug haette keinen Startplatz.
+				Liegt diese Fahrbahn hoeher als die unterste, bekommt sie ein
+				Widerlager - zwei Betonwaende, die sie optisch tragen.
+
+				Warum zwei Waende und kein voller Block? Ein voller Block wuerde
+				die Strasse der Ebene DARUNTER einmauern. Die Waende stehen
+				deshalb seitlich neben der Fahrspur, die Mitte bleibt frei.
+
+				Statisch braucht es sie ohnehin nicht: alle Teile der Umgebung
+				sind verankert, das Fahrzeug steht auf dem Strassenstueck selbst.
 			]]
 			if index > 1 then
 				local below = level.decks[index - 1].y
 				local height = deck.y - below
-				local block = makePart(
-					"Abutment",
-					Vector3.new(level.platformLength * 0.55, height, depth * 0.5),
-					origin + Vector3.new(
-						centerX + side * level.platformLength * 0.22,
-						below + height / 2,
-						z
-					),
-					terrain
-				)
-				block.Color = Color3.fromRGB(150, 145, 136)
-				block.Material = Enum.Material.Concrete
+				for _, wallZ in { -depth * 0.26, depth * 0.26 } do
+					local wall = makePart(
+						"Abutment",
+						Vector3.new(level.platformLength, height, depth * 0.16),
+						origin + Vector3.new(centerX, below + height / 2, z + wallZ),
+						terrain
+					)
+					wall.Color = Color3.fromRGB(150, 145, 136)
+					wall.Material = Enum.Material.Concrete
+					wall.CanCollide = false
+				end
 			end
 
 			local road = makePart(
@@ -308,19 +313,24 @@ function LevelBuilder.build(level, origin: Vector3, parent: Instance)
 	----------------------------------------------------------------------------
 
 	for _, vehicle in level.vehicles do
+		-- Auf die Fahrspur des jeweiligen Fahrzeugs setzen. Bei Gegenverkehr
+		-- liegen Start und Ziel sonst uebereinander.
+		local lane = vehicle.laneZ or 0
+		local width = if lane ~= 0 then 3.6 else 8
+
 		local start = makeDecor(
 			"StartMarker",
-			Vector3.new(1.2, 0.4, 8),
-			origin + Vector3.new(vehicle.startX, vehicle.deckY + 0.45, z),
+			Vector3.new(1.2, 0.4, width),
+			origin + Vector3.new(vehicle.startX, vehicle.deckY + 0.45, z + lane),
 			decor
 		)
-		start.Color = Color3.fromRGB(235, 235, 235)
+		start.Color = if vehicle.color then vehicle.color else Color3.fromRGB(235, 235, 235)
 		start.Material = Enum.Material.Neon
 
 		local finish = makeDecor(
 			"FinishZone",
-			Vector3.new(1.6, 9, 12),
-			origin + Vector3.new(vehicle.finishX, vehicle.deckY + 4.5, z),
+			Vector3.new(1.6, 9, if lane ~= 0 then 5 else 12),
+			origin + Vector3.new(vehicle.finishX, vehicle.deckY + 4.5, z + lane),
 			decor
 		)
 		finish.Color = Color3.fromRGB(74, 208, 118)

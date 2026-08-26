@@ -22,6 +22,7 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
+local Levels = require(Shared.Levels)
 
 local Device = require(script.Parent.Device)
 local Theme = require(script.Parent.Theme)
@@ -48,7 +49,15 @@ function BuildHud.new()
 	self.onMenu = nil
 	self.onHint = nil
 	self.onRetry = nil
+	self.onNextLevel = nil
 	self.onSpeedChanged = nil
+
+	--[[
+		Der linke Knopf im Ergebnisfenster hat zwei Bedeutungen: nach einem
+		Misserfolg "weiter bauen", nach einem Erfolg "naechstes Level".
+	]]
+	self.resultPrimaryMode = "retry"
+	self.nextLevelId = nil
 
 	-- Am Tacho eingestellte Fahrgeschwindigkeit.
 	self.speed = Config.Test.defaultSpeed
@@ -707,7 +716,9 @@ function BuildHud:buildResultPanel()
 	})
 	retry.Selectable = true
 	retry.Activated:Connect(function()
-		if self.onRetry then
+		if self.resultPrimaryMode == "next" and self.onNextLevel and self.nextLevelId then
+			self.onNextLevel(self.nextLevelId)
+		elseif self.onRetry then
 			self.onRetry()
 		end
 	end)
@@ -890,6 +901,16 @@ end
 function BuildHud:update(state)
 	self.state = state
 
+	-- Welches Level kaeme als naechstes? Fuer den Knopf im Ergebnisfenster.
+	self.nextLevelId = nil
+	for index, level in Levels.list do
+		if level.id == state.levelId then
+			local following = Levels.list[index + 1]
+			self.nextLevelId = if following then following.id else nil
+			break
+		end
+	end
+
 	----------------------------------------------------------------------------
 	-- Kopfzeile
 	----------------------------------------------------------------------------
@@ -1015,11 +1036,23 @@ function BuildHud:updateResultPanel(result)
 	if result.success then
 		self.resultTitle.Text = "Geschafft!"
 		self.resultTitle.TextColor3 = Theme.colors.success
-		self.retryButton.Text = "Noch einmal bauen"
+
+		-- Nach einem Erfolg direkt weiterspielen duerfen, statt erst ins Menue.
+		if self.nextLevelId then
+			self.resultPrimaryMode = "next"
+			self.retryButton.Text = "Naechstes Level"
+			Theme.paint(self.retryButton, Theme.colors.success, Color3.fromRGB(10, 30, 16))
+		else
+			self.resultPrimaryMode = "retry"
+			self.retryButton.Text = "Noch einmal bauen"
+			Theme.paint(self.retryButton, Theme.colors.accent, Color3.fromRGB(8, 18, 34))
+		end
 	else
 		self.resultTitle.Text = "Nicht bestanden"
 		self.resultTitle.TextColor3 = Theme.colors.danger
+		self.resultPrimaryMode = "retry"
 		self.retryButton.Text = "Weiter bauen"
+		Theme.paint(self.retryButton, Theme.colors.accent, Color3.fromRGB(8, 18, 34))
 	end
 	self.resultReason.Text = result.reason or ""
 

@@ -293,6 +293,10 @@ hud.onRetry = function()
 	remote.ResetLevel:FireServer(false)
 end
 
+hud.onNextLevel = function(levelId)
+	startLevel(levelId)
+end
+
 hud.onMenu = function()
 	remote.LeaveLevel:FireServer()
 	showMenu()
@@ -414,6 +418,13 @@ remote.StateChanged.OnClientEvent:Connect(function(state)
 		if state.phase == "Build" and state.levelId == "Level1" then
 			task.delay(0.6, function()
 				if not tutorial:isActive() and app.screen == "Playing" then
+					--[[
+						Zuruecksetzen, bevor die Anleitung startet: sonst gilt
+						der Schritt "Ansicht bewegen" sofort als erledigt, wenn
+						der Spieler vorher schon einmal gescrollt hat.
+					]]
+					camera.hasPanned = false
+					camera.hasZoomed = false
 					tutorial:start()
 				end
 			end)

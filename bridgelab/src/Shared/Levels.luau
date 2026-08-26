@@ -144,8 +144,17 @@ local function makeLevel(def)
 			startX = if direction > 0 then outsideLeft else outsideRight,
 			finishX = if direction > 0 then outsideRight else outsideLeft,
 			mass = entry.mass or def.vehicle.mass,
-			size = def.vehicle.size,
+			size = entry.size or def.vehicle.size,
 			color = entry.color,
+			--[[
+				Seitlicher Versatz auf der Fahrbahn ("Fahrspur").
+				Bei Gegenverkehr MUSS er gesetzt sein: sonst fahren beide
+				Fahrzeuge auf derselben Linie frontal ineinander, blockieren
+				sich gegenseitig und der Test laeuft ins Zeitlimit.
+				Auf die Kraefteberechnung hat der Versatz keinen Einfluss -
+				die rechnet ohnehin nur in der Ebene X/Y.
+			]]
+			laneZ = entry.lane or 0,
 		}
 	end
 
@@ -286,15 +295,20 @@ Levels.list = {
 		upperY = 52,
 		groundY = 16,
 
-		vehicle = { mass = 1000, size = Vector3.new(8, 4, 6) },
+		-- Schmaler als sonst, damit zwei Fahrzeuge nebeneinander passen.
+		vehicle = { mass = 1000, size = Vector3.new(8, 4, 3.4) },
 
 		--[[
 			Zwei Fahrzeuge fahren aufeinander zu. In der Mitte begegnen sie
 			sich - dort liegen dann 2000 N auf wenigen Studs Fahrbahn.
+
+			Jedes bekommt seine eigene Fahrspur (lane), sonst waere die
+			Begegnung ein Frontalzusammenstoss statt einer Belastungsprobe.
+			Die Fahrbahn ist 8 Studs breit, also zwei Spuren zu je 4.
 		]]
 		vehicles = {
-			{ deck = 1, direction = 1, color = Color3.fromRGB(198, 72, 58) },
-			{ deck = 1, direction = -1, color = Color3.fromRGB(64, 118, 206) },
+			{ deck = 1, direction = 1, lane = -2, color = Color3.fromRGB(198, 72, 58) },
+			{ deck = 1, direction = -1, lane = 2, color = Color3.fromRGB(64, 118, 206) },
 		},
 
 		hints = {
