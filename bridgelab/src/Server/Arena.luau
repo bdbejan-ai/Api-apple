@@ -56,6 +56,7 @@ function Arena.new(player: Player, level, slotIndex: number, parentFolder: Insta
 	self.stable = true
 	self.unstableJoint = nil
 	self.testPhase = 0
+	self.needsLevelInfo = true
 	self.message = ""
 	self.result = nil
 	self.testProgress = nil
@@ -93,8 +94,45 @@ end
 -- Zustand fuer den Client
 --------------------------------------------------------------------------------
 
-function Arena:buildState()
+--[[
+	DIE SCHWEREN LEVELDATEN GEHEN NUR EINMAL UEBER DIE LEITUNG
+
+	Der Client braucht Gelaende, Anker und Baubereich, um die Bauvorschau
+	selbst pruefen zu koennen - sonst wuerde sie erst gruen oder rot, wenn die
+	Antwort vom Server da ist, und das ist nach dem Loslassen zu spaet.
+
+	Diese Angaben aendern sich waehrend eines Levels aber NIE. Sie in jeden
+	Zustandsbericht zu packen waere teuer: der Bericht geht bei jedem gesetzten
+	Bauteil raus, und das Gelaendeprofil der grossen Schlucht hat zehn Punkte
+	plus vier Anker. Bei sechzehn Spielern, die zuegig bauen, waere das
+	dauerndes Senden derselben unveraenderten Zahlen.
+
+	Deshalb bekommt nur der ERSTE Bericht nach dem Levelstart sie mit.
+]]
+function Arena:levelInfo()
 	return {
+		buildArea = self.level.buildArea,
+		anchors = self.level.anchors,
+		terrain = self.level.terrain,
+		waterY = self.level.waterY,
+		z = self.level.z or 0,
+	}
+end
+
+function Arena:buildState()
+	--[[
+		Beim ersten Bericht sind die Leveldaten dabei, danach nicht mehr.
+		Der Client merkt sie sich; sein enterLevel laeuft ohnehin nur einmal
+		je Level.
+	]]
+	local info = nil
+	if self.needsLevelInfo then
+		self.needsLevelInfo = false
+		info = self:levelInfo()
+	end
+
+	return {
+		levelInfo = info,
 		levelId = self.level.id,
 		levelName = self.level.displayName,
 		difficulty = self.level.difficulty,
@@ -117,16 +155,6 @@ function Arena:buildState()
 		hintTotal = #self.level.hints,
 		freeHints = self.level.freeHints,
 
-		--[[
-			Der Client baut die Vorschau selbst und muss dafuer dieselben
-			Regeln kennen wie der Server: wo gebaut werden darf, wo die Anker
-			sitzen, wie das Gelaende verlaeuft. Entschieden wird trotzdem
-			ausschliesslich auf dem Server - das hier ist nur fuer die Anzeige.
-		]]
-		buildArea = self.level.buildArea,
-		anchors = self.level.anchors,
-		terrain = self.level.terrain,
-		waterY = self.level.waterY,
 		hasHydraulics = self.level.allowsMaterial("Hydraulic"),
 		phaseIndex = self.testPhase,
 

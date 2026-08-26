@@ -337,15 +337,15 @@ Levels.list = {
 		hints = {
 			"Vierzig Studs sind zu weit fuer ein einzelnes Dreieck. Es braucht eine Kette davon - ein Fachwerk.",
 			"Bau die Fahrbahn in Feldern von 8 Studs. Ueber jedem Feldknoten eine senkrechte Strebe nach oben, oben ein durchgehender Gurt, dazwischen Diagonalen.",
-			"Je hoeher das Fachwerk, desto geringer die Kraft in den Gurten. Zehn bis zwoelf Studs Bauhoehe sind ein guter Wert.",
+			"Reisst der Obergurt, lege ein ZWEITES Holz genau daneben - auf dieselben beiden Knoten. Beide teilen sich dann die Kraft.",
 		},
 	}),
 
 	makeLevel({
 		id = "W1L3",
 		world = "Grundlagen",
-		displayName = "Haengepartie",
-		subtitle = "Der Grund ist unerreichbar. Von oben abhaengen.",
+		displayName = "Zwei Vorspruenge",
+		subtitle = "Der Grund ist unerreichbar. Nutze die Vorspruenge.",
 		difficulty = 3,
 		budget = 2900,
 		maxDropStuds = 16,
@@ -374,9 +374,9 @@ Levels.list = {
 		vehicles = { { kind = "MiniCar", fromX = -60, toX = 60 } },
 
 		hints = {
-			"Die beiden hohen Anker auf den Felsschultern sind der Schluessel. Von dort laesst sich die Fahrbahn abhaengen.",
-			"Seile koennen nur ziehen. Sie muessen deshalb immer von OBEN nach unten laufen, nie waagerecht und nie von unten.",
-			"Loesung: eine Kette aus Holz zwischen den beiden hohen Ankern als Tragseil, davon Seile senkrecht hinunter zur Fahrbahn.",
+			"Zweiundfuenfzig Studs am Stueck sind zu weit fuer Holz. Sieh dir die beiden Felsvorspruenge unter der Fahrbahn an.",
+			"Auf jedem Vorsprung sitzt ein Anker. Von dort laesst sich ein Pfeiler nach oben bauen, der die Fahrbahn abstuetzt.",
+			"Ein Pfeiler aus einer einzelnen Stange knickt seitlich weg. Bau ihn als Dreieck: zwei Schenkel, die sich oben zur Fahrbahn hin oeffnen.",
 		},
 	}),
 
@@ -407,9 +407,9 @@ Levels.list = {
 		vehicles = { { kind = "MiniCar", fromX = -60, toX = 60 } },
 
 		hints = {
-			"Hier faehrt nur ein leichter Lieferwagen. Die Bruecke darf also duenner sein als in Level 2.",
-			"Holz kostet 4 je Stud, Strasse 8. Baue nur so viel Fahrbahn wie noetig und den Rest aus Holz.",
-			"Ein flacheres Fachwerk spart Material an den Streben, kostet aber mehr Kraft in den Gurten. Such den Punkt dazwischen.",
+			"Der Graben ist derselbe wie im ersten Level - nur das Budget ist knapp. Es geht also nicht ums Koennen, sondern ums Sparen.",
+			"Holz kostet 5 je Stud, Strasse 8. Jedes Stueck Strasse, das du weglaesst, spart bares Geld - aber die Fahrbahn muss durchgehend sein.",
+			"Ein flacheres Fachwerk spart Material an den Streben, kostet aber mehr Kraft in den Gurten. Such den Punkt dazwischen - sechs Studs Bauhoehe reichen hier.",
 		},
 	}),
 
@@ -444,9 +444,9 @@ Levels.list = {
 		vehicles = { { kind = "Van", fromX = -70, toX = 70 } },
 
 		hints = {
-			"Holz haelt 400 N, Stahl 1200. Bei dieser Spannweite entstehen in den Gurten weit ueber 400 N - Holz reisst dort sofort.",
+			"Holz haelt 550 N, Stahl 1200. Bei dieser Spannweite entstehen in den Gurten weit ueber 550 N - Holz reisst dort sofort.",
 			"Die Kraft im Gurt ist ungefaehr Last mal Spannweite geteilt durch das Vierfache der Bauhoehe. Mehr Bauhoehe ist billiger als mehr Material.",
-			"Loesung: Fahrbahn aus Strasse, Ober- und Untergurt sowie Diagonalen aus Stahl, Bauhoehe etwa 14 Studs.",
+			"Loesung: Fahrbahn aus Strasse mit Stahl daneben verstaerkt, Obergurt doppelt, beide Diagonalen je Feld, Bauhoehe etwa zehn Studs.",
 		},
 	}),
 
@@ -523,17 +523,17 @@ Levels.list = {
 		},
 
 		hints = {
-			"Zwei Lastwagen zu je 1700 N treffen sich in der Mitte. Dort liegen dann 3400 N auf wenigen Studs Fahrbahn.",
-			"Normale Strasse haelt 500 N. Im mittleren Bereich reicht das nicht - dort gehoert verstaerkte Strasse hin.",
-			"Verstaerke nur die Mitte. Verstaerkte Strasse kostet fast das Doppelte; an den Raendern waere sie verschwendet.",
+			"Zwei Autos zu je 900 N treffen sich in der Mitte. Dort liegen dann 1800 N auf wenigen Studs Fahrbahn.",
+			"Die Felsnadel mitten in der Schlucht traegt zwei Anker. Ein Pfeiler von dort halbiert die Spannweite - und viertelt damit fast die Gurtkraft.",
+			"Loesung: ein Fachwerk ueber die ganze Breite, dazu ein Pfeiler von der Felsnadel hinauf zur Fahrbahnmitte. Fahrbahn aus verstaerkter Strasse.",
 		},
 	}),
 
 	makeLevel({
 		id = "W2L8",
 		world = "Werkstoffe",
-		displayName = "Der Bogen",
-		subtitle = "Anker tief unten an den Felswaenden.",
+		displayName = "Kreuz und quer",
+		subtitle = "Eine Diagonale je Feld reicht hier nicht mehr.",
 		difficulty = 4,
 		budget = 5200,
 		maxDropStuds = 18,
@@ -561,9 +561,9 @@ Levels.list = {
 		vehicles = { { kind = "Car", fromX = -64, toX = 64 } },
 
 		hints = {
-			"Die beiden tiefen Anker am Fuss der Felswand sind kein Zufall. Von dort laesst sich ein Bogen aufspannen.",
-			"Ein Bogen traegt durch DRUCK. Er braucht also Stahl oder Holz, kein Seil - ein Seil wuerde sofort durchhaengen.",
-			"Loesung: ein Bogen aus Stahl von Anker zu Anker unten, darauf senkrechte Stuetzen nach oben zur Fahrbahn. Der Bogen nimmt fast die ganze Last auf.",
+			"Ein Fachwerk mit nur EINER Diagonale je Feld hat genau einen Weg, auf dem die Auflagerkraft vom Anker nach oben gelangt. Diese eine Diagonale traegt dann alles allein.",
+			"Setze in JEDES Feld beide Diagonalen - ein liegendes Kreuz. Dann teilen sich zwei Bauteile diese Kraft, und die groesste Einzelkraft halbiert sich.",
+			"Loesung: Fahrbahn aus Strasse mit Stahl daneben verstaerkt, doppelter Obergurt, beide Diagonalen je Feld, Bauhoehe acht Studs.",
 		},
 	}),
 
@@ -732,7 +732,7 @@ Levels.list = {
 
 		hints = {
 			"Hundert Studs am Stueck traegt nichts. Die Felsnadel in der Mitte ist deine Rettung - von dort laesst sich ein Mittelpfeiler bauen.",
-			"Teile die Aufgabe: zwei Spannweiten von je fuenfzig Studs sind viel leichter als eine von hundert. Und fuenfzig Studs kennst du schon aus Level 5.",
+			"Teile die Aufgabe: zwei Spannweiten von je fuenfzig Studs sind viel leichter als eine von hundert - die Gurtkraft faellt dabei auf ein Viertel.",
 			"Der Mittelpfeiler traegt beide Haelften. Baue ihn aus Stahl und stelle ihn breit auf beide Anker der Felsnadel, damit er nicht kippt.",
 		},
 	}),

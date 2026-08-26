@@ -207,7 +207,23 @@ if boat_keys and "function TestRun:spawnBoat" in testrun:
             continue
         note(f'TestRun: liest vom Schiff das Feld "{field}", das in Levels.luau fehlt')
 
-# --- 8: doppelte Kommentarbloecke ---------------------------------------------
+# --- 8: unbenutzte Einstellungen ----------------------------------------------
+
+# Nach einem Umbau bleiben gern Einstellungen stehen, die niemand mehr liest -
+# etwa "snapToleranceNear", nachdem das Anpeilen von Ankerpunkten durch
+# Rasterrundung ersetzt wurde. Sie sind nicht falsch, aber irrefuehrend: wer
+# daran dreht, wundert sich, dass nichts passiert.
+config_text = (SRC / "Shared" / "Config.luau").read_text(encoding="utf-8")
+other = "\n".join(
+    t for f, t in texts.items() if f.name != "Config.luau"
+)
+
+for m in re.finditer(r"^\t(\w+)\s*=", config_text, re.M):
+    key = m.group(1)
+    if key not in other:
+        note(f'Config: "{key}" wird nirgends benutzt')
+
+# --- 9: doppelte Kommentarbloecke ---------------------------------------------
 
 for f, t in texts.items():
     blocks = [" ".join(b.split()) for b in re.findall(r"--\[\[(.*?)\]\]", t, re.S)]

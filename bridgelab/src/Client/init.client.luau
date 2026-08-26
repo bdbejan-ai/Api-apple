@@ -233,12 +233,18 @@ local function enterLevel(state)
 			pruefen zu koennen - sonst wuerde sie erst gruen oder rot, wenn
 			die Antwort vom Server da ist, und das ist nach dem Loslassen.
 		]]
+		--[[
+			Die Gelaendedaten kommen nur im ERSTEN Bericht nach dem Levelstart
+			mit (siehe Arena:buildState). Genau diesen Bericht hat enterLevel
+			in der Hand, deshalb passt das zusammen.
+		]]
+		local info = state.levelInfo or {}
 		controller:setLevel({
-			buildArea = state.buildArea,
-			anchors = state.anchors,
-			terrain = state.terrain,
+			buildArea = info.buildArea,
+			anchors = info.anchors,
+			terrain = info.terrain,
 			materials = state.materials,
-			z = 0,
+			z = info.z or 0,
 		}, state.originY or 0)
 		controller:setArena(folder)
 		controller:setEnabled(true)

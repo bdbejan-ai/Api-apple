@@ -50,12 +50,11 @@ Config.Build = {
 	]]
 	gridSize = 2,
 
-	-- Wie nah der Zeiger an einem Rasterpunkt sein muss, in Studs quer zum
-	-- Sichtstrahl. Waechst mit der Entfernung mit.
-	snapToleranceNear = 1.6,
-	snapToleranceFar = 6,
-
-	-- Kuerzestes Ziehen, das ueberhaupt als Bauversuch zaehlt (in Studs).
+	--[[
+		Kuerzestes Ziehen, das ueberhaupt als Bauversuch zaehlt (in Studs).
+		Ohne diese Schwelle entstuende bei jedem versehentlichen Klick ein
+		winziges Bauteil oder eine Fehlermeldung.
+	]]
 	minDragLength = 1.5,
 
 	--[[
@@ -65,8 +64,15 @@ Config.Build = {
 	]]
 	maxMembers = 140,
 
-	-- Groesse der sichtbaren Rasterpunkte und der Knotenbleche.
-	gridDotSize = 0.28,
+	--[[
+		Groesse der Knotenkugeln.
+
+		Es gibt bewusst KEINE sichtbaren Rasterpunkte in der Welt: ein
+		Baubereich von 120 mal 90 Studs hat auf dem 2-Studs-Raster ueber 2700
+		Punkte. So viele Parts je Spieler wuerden den Server erdruecken, und zu
+		sehen waere ein grauer Nebel. Der Client zeigt stattdessen nur den
+		einen Punkt an, auf den gerade gerastert wird.
+	]]
 	jointSize = 1.1,
 }
 

@@ -478,7 +478,7 @@ end
 	Ein Druckbogen von den tiefen Ankern zu den tiefen Ankern, darauf
 	senkrechte Stuetzen bis zur Fahrbahn.
 ]]
-local function archPlan(level, deckMat, archMat, panel)
+local function archPlan(level, deckMat, archMat, panel, reinforce)
 	local da, db = deckAnchors(level)
 	local la, lb = lowAnchors(level)
 	if not da or not db or not la or not lb then
@@ -493,7 +493,18 @@ local function archPlan(level, deckMat, archMat, panel)
 	local span = db.x - da.x
 	local segments = math.max(4, math.round(span / panel))
 
-	plan:chain(deckMat, line(da.x, da.y, db.x, db.y, segments))
+	local deckLine = line(da.x, da.y, db.x, db.y, segments)
+	plan.deckPoints = deckLine
+	plan:chain(deckMat, deckLine)
+	--[[
+		Die Fahrbahn wird genauso verstaerkt wie beim Fachwerk. Ohne das war
+		der Vergleich unfair: die Fachwerke traten alle mit verstaerkter
+		Fahrbahn an, der Bogen mit blanker Strasse - und ist dann natuerlich
+		an der Strasse gescheitert, nicht am Bogen.
+	]]
+	if reinforce then
+		plan:chain(archMat, deckLine)
+	end
 
 	-- Parabelbogen von la nach lb, Scheitel knapp unter der Fahrbahn
 	local crown = math.min(da.y, db.y) - 6
@@ -508,11 +519,50 @@ local function archPlan(level, deckMat, archMat, panel)
 	end
 	plan:chain(archMat, arch)
 
-	-- Stuetzen vom Bogen hoch zur Fahrbahn
+	--[[
+		Stuetzen vom Bogen hoch zur Fahrbahn.
+
+		Nahe den Kaempfern ist der Bogen noch tief, die Stuetze dort also lang -
+		bei 52 Studs Spannweite rund 20 Studs, und Stahl darf nur 16. Genau
+		daran ist der ganze Bogen gescheitert: eine einzige zu lange Stuetze
+		hat den Plan ungueltig gemacht, und in der Ausgabe tauchte nie ein
+		Bogen auf. Deshalb werden lange Stuetzen jetzt gestueckelt.
+	]]
 	local deck = line(da.x, da.y, db.x, db.y, segments)
+	local maxPiece = MAT[archMat].maxLen * 0.85
+
 	for i = 2, segments do
-		if deck[i][2] - arch[i][2] > 1.5 then
-			plan:add(archMat, arch[i][1], arch[i][2], deck[i][1], deck[i][2])
+		local rise = deck[i][2] - arch[i][2]
+		if rise > 1.5 then
+			local pieces = math.max(1, math.ceil(rise / maxPiece))
+			local previousY = arch[i][2]
+			for k = 1, pieces do
+				local y = arch[i][2] + rise * (k / pieces)
+				y = math.round(y / GRID) * GRID
+				if y > previousY then
+					plan:add(archMat, arch[i][1], previousY, deck[i][1], y)
+					previousY = y
+				end
+			end
+		end
+	end
+
+	--[[
+		DIE FAHRBAHN MUSS AUSGESTEIFT WERDEN
+
+		Ein Bogen traegt eine gleichmaessig verteilte Last hervorragend - aber
+		ein Fahrzeug ist eine EINZELLAST, und die wandert. Steht sie zwischen
+		zwei Stuetzen, will sich der Bogen dort eindruecken und an anderer
+		Stelle heben. Ohne etwas, das dagegenhaelt, entstehen riesige Kraefte.
+
+		Deshalb bekommt jedes Feld eine Diagonale zwischen Fahrbahn und Bogen.
+		Damit wird aus Bogen, Stuetzen und Fahrbahn ein durchgehendes Fachwerk,
+		und die wandernde Last verteilt sich auf mehrere Felder. Echte
+		Bogenbruecken haben aus genau diesem Grund einen Versteifungstraeger.
+	]]
+	for i = 2, segments - 1 do
+		if deck[i][2] - arch[i][2] > 1.5 and deck[i + 1][2] - arch[i + 1][2] > 1.5 then
+			plan:tryAdd(archMat, deck[i][1], deck[i][2], arch[i + 1][1], arch[i + 1][2])
 		end
 	end
 
@@ -844,8 +894,17 @@ local function candidatesFor(level)
 	end
 	end
 
-	for _, panel in { 8, 10 } do
-		try(string.format("Bogen %s p%d", strong, panel), archPlan(level, deckMat, strong, panel))
+	for _, deckMat in deckMats do
+		for _, panel in { 6, 8, 10 } do
+			try(
+				string.format("Bogen %s/%s p%d", strong, deckMat, panel),
+				archPlan(level, deckMat, strong, panel, false)
+			)
+			try(
+				string.format("Bogen %s/%s p%d verstaerkt", strong, deckMat, panel),
+				archPlan(level, deckMat, strong, panel, true)
+			)
+		end
 	end
 
 	local cableMat = if level.allowsMaterial("Cable") then "Cable" else "Rope"
@@ -907,6 +966,13 @@ if gridProblems > 0 then
 	print(string.format("\n%d Rasterfehler gefunden - bitte zuerst beheben.\n", gridProblems))
 end
 
+--[[
+	Ein einzelnes Level pruefen:  luau check_levels.luau W2L8
+	Ohne Angabe werden alle geprueft. Der ganze Durchlauf dauert Minuten -
+	beim Nachjustieren eines einzelnen Levels ist das eine Menge Wartezeit.
+]]
+local only = ...
+
 print(string.rep("=", 82))
 print("BRIDGELAB - LOESBARKEITSPRUEFUNG (freies Bauen)")
 print(string.rep("=", 82))
@@ -914,6 +980,10 @@ print(string.rep("=", 82))
 local allSolvable = true
 
 for _, level in Levels.list do
+	if only and level.id ~= only then
+		continue
+	end
+
 	local span = 0
 	local a, b = deckAnchors(level)
 	if a and b then
@@ -937,18 +1007,60 @@ for _, level in Levels.list do
 	end
 
 	local list, rejected = candidatesFor(level)
-	if #list == 0 then
-		print("   !! keine Standardform baubar. Gruende:")
+
+	--[[
+		Verworfene Bauformen werden IMMER gemeldet, nicht nur wenn gar nichts
+		baubar war. Sonst verschwindet der interessanteste Fall stillschweigend:
+		eine Bauform, die das Level eigentlich nahelegt, laesst sich gar nicht
+		erst aufbauen. Im Level "Der Bogen" ist mir genau das passiert - in der
+		Ausgabe stand einfach nie ein Bogen, und es sah aus, als haette er
+		nicht gehalten.
+	]]
+	if #rejected > 0 then
 		local seen = {}
+		local lines = {}
 		for _, reason in rejected do
-			if not seen[reason] then
-				seen[reason] = true
-				print("      - " .. reason)
+			-- Nur die Bauform vor dem Doppelpunkt, nicht jede Zahlenvariante.
+			local shape = string.match(reason, "^(%a+)") or reason
+			local why = string.match(reason, ": (.+)$") or reason
+			local key = shape .. "|" .. why
+			if not seen[key] then
+				seen[key] = true
+				table.insert(lines, string.format("   %-22s nicht baubar: %s", shape, why))
 			end
+		end
+		table.sort(lines)
+		for _, line in lines do
+			print(line)
 		end
 	end
 
 	local best, bestOver = nil, nil
+
+	--[[
+		Fuer jede BAUFORM wird getrennt das beste Ergebnis gemerkt.
+
+		Ohne das beantwortet die Ausgabe nur "geht es ueberhaupt?". Beim
+		Levelentwurf ist aber die viel wichtigere Frage: geht es auch auf dem
+		Weg, den das Level nahelegt? Ein Level namens "Der Bogen", das sich am
+		Ende nur mit einem gewoehnlichen Fachwerk loesen laesst, fuehrt den
+		Spieler in die Irre - und genau das faellt sonst niemandem auf.
+	]]
+	local families = {}
+	local familyOrder = {}
+
+	local function familyOf(name: string): string
+		if string.find(name, "Bogen", 1, true) then
+			return "Bogen"
+		elseif string.find(name, "Haengebruecke", 1, true) then
+			return "Haengebruecke"
+		elseif string.find(name, "+Pfeiler", 1, true) then
+			return "mit Pfeiler"
+		elseif string.find(name, "Verstaerkt", 1, true) then
+			return "verstaerktes Fachwerk"
+		end
+		return "Fachwerk"
+	end
 
 	--[[
 		Auch der KNAPPESTE Fehlversuch wird ausgegeben. Sonst meldet das Skript
@@ -1002,6 +1114,27 @@ for _, level in Levels.list do
 			closest = { worst = worst, line = line }
 		end
 
+		local family = familyOf(c.name)
+		local entry = families[family]
+		if not entry then
+			entry = { worst = math.huge }
+			families[family] = entry
+			table.insert(familyOrder, family)
+		end
+		--[[
+			Innerhalb einer Bauform zaehlt zuerst, DASS sie haelt, und erst
+			danach der Preis. Eine haltende teure Form ist eine Auskunft, eine
+			billige gebrochene ist keine.
+		]]
+		local better = if entry.holds == holds then price < (entry.price or math.huge) else holds
+		if better or entry.worst == math.huge then
+			entry.holds = holds
+			entry.price = price
+			entry.worst = worst
+			entry.name = c.name
+			entry.material = mat
+		end
+
 		-- Nur die interessanten Zeilen ausgeben, sonst wird es unlesbar.
 		if holds or worst < 1.6 then
 			print(line)
@@ -1011,6 +1144,26 @@ for _, level in Levels.list do
 	if not best and not bestOver and closest then
 		print(closest.line .. "   <- knappester Versuch")
 	end
+	----------------------------------------------------------------------------
+	-- Uebersicht nach Bauform
+	----------------------------------------------------------------------------
+
+	table.sort(familyOrder)
+	for _, family in familyOrder do
+		local entry = families[family]
+		if entry.holds then
+			print(string.format(
+				"   %-22s haelt bei %5.0f%% fuer %5d  (%s)",
+				family, entry.worst * 100, entry.price, entry.name
+			))
+		else
+			print(string.format(
+				"   %-22s haelt NICHT, bestenfalls %5.0f%%  (%s)",
+				family, entry.worst * 100, entry.name
+			))
+		end
+	end
+
 	if skipped > 0 and not best then
 		print(string.format("   (%d Formen uebersprungen, weil ueber dem doppelten Budget)", skipped))
 	end

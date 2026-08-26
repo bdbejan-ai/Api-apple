@@ -630,6 +630,16 @@ Ehrlich gesagt, was noch fehlt oder wacklig ist:
   weiterhin nur die gerade Verbindung zwischen den beiden Knoten.
 - **Das Wasser ist reine Optik.** Kein Auftrieb, keine Strömung; Bauteile
   dürfen mitten hindurch. Echtes Wasser würde die Kräfteberechnung verfälschen.
+- **Bögen und Hängebrücken tragen in diesem Modell nicht.** Beides ist gebaut
+  und wird vom Prüfskript mitgetestet, aber beides scheitert an derselben
+  Sache: Ein Bogen ist nur für eine **gleichmäßig verteilte** Last die richtige
+  Form. Ein Fahrzeug ist eine **Einzellast, die wandert** — steht sie zwischen
+  zwei Stützen, will sich der Bogen dort eindrücken und anderswo heben. Echte
+  Bogenbrücken haben deshalb einen Versteifungsträger; in einem Modell aus rein
+  gelenkigen Stäben reicht auch der nicht. Das Prüfskript meldet das inzwischen
+  ausdrücklich (`Bogen  haelt NICHT, bestenfalls 268%`), statt die Bauform
+  stillschweigend wegzulassen — deshalb heißt das ehemalige Level „Der Bogen"
+  jetzt „Kreuz und quer" und bringt einem den Kreuzverband bei.
 - **Das Sprunglevel ist nicht rechnerisch geprüft.** Dort gibt es keine
   durchgehende Fahrbahn, die sich mit Standardformen prüfen ließe — es ist von
   Hand entworfen und braucht echtes Probespielen.
