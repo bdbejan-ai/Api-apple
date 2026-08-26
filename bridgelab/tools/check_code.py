@@ -118,6 +118,24 @@ for m in re.finditer(r'highlight\s*=\s*"([^"]+)"', tutorial):
     if f'"{name}"' not in hud_source and not generated:
         note(f'Anleitung hebt "{name}" hervor - im HUD gibt es das nicht')
 
+# --- 5b: Ereignisse der Anleitung ---------------------------------------------
+
+# Ein Schritt der Anleitung wartet auf ein Ereignis. Feuert es niemand, bleibt
+# die Anleitung fuer immer stehen - und weil sie beim allerersten Spielstart
+# laeuft, kaeme kein neuer Spieler je ins Spiel. Genau das war mit
+# "memberPlaced" der Fall, nachdem das Bauen auf Ziehen umgestellt wurde.
+awaited = set(re.findall(r'event\s*=\s*"(\w+)"', tutorial))
+fired = set()
+for path in SRC.rglob("*.luau"):
+    fired |= set(re.findall(r'notify\("(\w+)"', path.read_text(encoding="utf-8")))
+
+for event in sorted(awaited - fired):
+    note(f'Anleitung wartet auf "{event}", aber niemand meldet es - sie bliebe dort stehen')
+
+# Umgekehrt ist harmlos, aber ein Hinweis auf eine Umbenennung.
+for event in sorted(fired - awaited):
+    note(f'"{event}" wird gemeldet, aber kein Schritt der Anleitung wartet darauf')
+
 # --- 6: Ordnernamen der Arena -------------------------------------------------
 
 # Der LevelBuilder legt die Ordner an; Server und Client suchen sie darin

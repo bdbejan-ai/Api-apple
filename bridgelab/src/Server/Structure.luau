@@ -1181,25 +1181,4 @@ function Structure:updateAllVisuals()
 	end
 end
 
---[[
-	Der Bauplan als schlichte Tabelle - fuer das Speichern im Profil und fuer
-	die Uebertragung zum Client.
-]]
-function Structure:toPlan()
-	local out = {}
-	for _, member in self.members do
-		table.insert(out, {
-			id = member.id,
-			material = member.material,
-			ax = member.ax,
-			ay = member.ay,
-			bx = member.bx,
-			by = member.by,
-			cost = member.cost,
-			phase = member.phase,
-		})
-	end
-	return out
-end
-
 return Structure

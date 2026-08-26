@@ -427,6 +427,21 @@ remote.StateChanged.OnClientEvent:Connect(function(state)
 		enterLevel(state)
 	end
 
+	--[[
+		Hat der Server gerade ein Bauteil angenommen?
+
+		Der Client weiss das nicht von selbst: er schickt nur einen WUNSCH,
+		und ob daraus ein Bauteil wird, entscheidet der Server. Sichtbar wird
+		es allein daran, dass die Bauteilzahl im naechsten Bericht groesser
+		ist. Die Anleitung wartet auf genau dieses Ereignis - ohne das blieb
+		sie beim Schritt "Loslassen setzt das Bauteil" fuer immer stehen.
+	]]
+	if previous and previous.levelId == state.levelId then
+		if (state.memberCount or 0) > (previous.memberCount or 0) then
+			tutorial:notify("memberPlaced")
+		end
+	end
+
 	hud:update(state)
 	controller:setPhase(state.phase)
 	controller:setUnstableJoint(if state.stable then nil else state.unstableJoint)
