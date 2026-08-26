@@ -362,6 +362,25 @@ Prüfskript** ergänzen — es liest `Levels.luau` nicht selbst aus.
 **Alle sechs mitgelieferten Level sind damit geprüft** und haben zwischen 18 %
 und 45 % Budgetreserve gegenüber der günstigsten funktionierenden Lösung.
 
+### Den Code prüfen
+
+Daneben liegt `tools/check_code.py`. Es findet die Fehler, die der Luau-Compiler
+**nicht** sieht, weil sie syntaktisch korrekt sind — und die deshalb erst im
+laufenden Spiel auffallen würden:
+
+- Aufrufe von Methoden, die es nicht gibt (Tippfehler)
+- Felder, die benutzt, aber nie gesetzt werden → `attempt to index nil`
+- RemoteEvents, bei denen ein Ende fehlt (nur Sender oder nur Empfänger)
+- Rückruf-Felder (`onXyz`), die nie verdrahtet wurden
+- Bedienelemente, die die Anleitung hervorheben will, aber nicht existieren
+
+```bash
+python3 tools/check_code.py
+```
+
+Braucht Python 3 (unter Windows aus dem Microsoft Store oder von python.org).
+Lohnt sich immer dann, wenn du selbst größere Umbauten gemacht hast.
+
 ### Umbenennen
 
 „BridgeLab" steht an vier Stellen: `default.project.json` (`name`), die

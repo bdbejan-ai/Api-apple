@@ -134,11 +134,8 @@ function CameraController:setMenuView()
 	self.focus = Vector3.new(0, 40, 0)
 	self.distance = Config.Camera.defaultDistance
 
-	--[[
-		Zoomgrenzen. Heranzoomen darf man beliebig weit; das Herauszoomen
-		begrenzt setArena() auf genau die Entfernung, bei der das Level das
-		Bild ausfuellt - weiter waere nur noch leere Umgebung zu sehen.
-	]]
+	-- Ohne Level gibt es nichts, woran sich der Zoom ausrichten koennte:
+	-- hier gelten wieder die weiten Standardgrenzen aus der Config.
 	self.minDistance = Config.Camera.minDistance
 	self.maxDistance = Config.Camera.maxDistance
 end

@@ -266,9 +266,19 @@ end
 ]]
 function Arena:setTestSpeed(speed: number)
 	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
+
 	if self.testRun:isRunning() then
 		self.testRun:setSpeed(self.testSpeed)
+		--[[
+			Waehrend der Fahrt NICHT eigens melden: der Fortschrittsbericht
+			des Tests traegt die Geschwindigkeit ohnehin mit, und zwar fuenfmal
+			pro Sekunde. Wuerden wir hier zusaetzlich senden, ginge beim Ziehen
+			am Regler zwanzigmal pro Sekunde der komplette Spielzustand ueber
+			die Leitung.
+		]]
+		return
 	end
+
 	self:notify()
 end
 
