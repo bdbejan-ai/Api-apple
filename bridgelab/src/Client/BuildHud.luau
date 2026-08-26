@@ -1424,8 +1424,40 @@ function BuildHud:applyScale()
 	-- Tacho: unten rechts, aber LINKS neben den Knoepfen der Fussleiste
 	----------------------------------------------------------------------------
 
-	self.speedPanel.Position = UDim2.new(1, -(296 + 272 + inset + gap), 1, -(bottomHeight + inset - 14))
-	self.speedPanel.Size = UDim2.fromOffset(296, 64)
+	--[[
+		Der Tacho bekommt, was zwischen den Phasenknoepfen und den Knoepfen
+		rechts uebrig bleibt - hoechstens 296 Pixel, mindestens 170.
+
+		Feste 296 Pixel gingen auf einem breiten Bildschirm gut auf. Auf einem
+		Handy quer, in einem Level MIT Hydraulik, kamen 360 Pixel Phasen, 296
+		Tacho und 272 fuer Tipp und Test zusammen - mehr, als das Geraet hat.
+		Der Tacho waere unter den Phasenknoepfen gelandet.
+	]]
+	local buttonsRight = 272
+	local phaseCount = Config.Hydraulics.phaseCount + 1
+	local phaseWidth = if self.phaseBox.Visible then phaseCount * 58 + 12 else 0
+	local free = viewport.X - inset * 2 - phaseWidth - buttonsRight - gap * 2
+	local speedWidth = math.clamp(free, 170, 296)
+
+	self.speedPanel.Position = UDim2.new(1, -(speedWidth + buttonsRight + inset + gap), 1, -(bottomHeight + inset - 14))
+	self.speedPanel.Size = UDim2.fromOffset(speedWidth, 64)
+
+	--[[
+		Wird es trotzdem zu eng, muessen die Phasenknoepfe schrumpfen. Sie
+		zeigen nur "Ein" und Ziffern, das vertraegt weniger Breite als der
+		Regler, an dem man ziehen koennen muss.
+	]]
+	if self.phaseBox.Visible then
+		local narrow = free < 170
+		local step = if narrow then 42 else 58
+		local width = if narrow then 38 else 52
+		for phase, button in self.phaseButtons do
+			button.Position = UDim2.fromOffset(phase * step, 22)
+			button.Size = UDim2.fromOffset(width, 38)
+		end
+		self.phaseBox.Size = UDim2.fromOffset(step * phaseCount + 12, 64)
+		self.phaseCaption.Visible = not narrow
+	end
 
 	----------------------------------------------------------------------------
 	-- Statuszeile mittig ueber der Fussleiste
