@@ -43,6 +43,7 @@ function LevelSelectGui.new()
 
 	-- Rueckmeldungen nach aussen
 	self.onLevelChosen = nil
+	self.onSchool = nil
 	self.onTutorialRequested = nil
 
 	self:build()
@@ -143,6 +144,27 @@ function LevelSelectGui:build()
 	})
 
 	-- Knopf: Anleitung noch einmal ansehen
+	--[[
+		Die Bauschule steht NEBEN der Anleitung, nicht darin. Beide erklaeren
+		etwas anderes: die Anleitung die Bedienung, die Bauschule die Statik.
+		Wer schon bedienen kann, aber nicht weiterkommt, braucht genau das
+		zweite - und muesste sonst die ganze Anleitung noch einmal ansehen.
+	]]
+	local schoolButton = Theme.button(header, "SchoolButton", {
+		size = UDim2.fromOffset(150, 34),
+		position = UDim2.new(1, -324, 0, 26),
+		text = I18n.t("school.open"),
+		textSize = 13,
+		color = Theme.colors.panelLight,
+	})
+	schoolButton.Selectable = true
+	schoolButton.Activated:Connect(function()
+		if self.onSchool then
+			self.onSchool()
+		end
+	end)
+	self.schoolButton = schoolButton
+
 	local tutorialButton = Theme.button(header, "TutorialButton", {
 		size = UDim2.fromOffset(210, 38),
 		position = UDim2.new(1, -238, 0, 62),

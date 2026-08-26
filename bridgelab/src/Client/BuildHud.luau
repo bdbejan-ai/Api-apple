@@ -80,6 +80,7 @@ function BuildHud.new()
 	self.onPhaseChanged = nil
 	self.onBuildPhaseChanged = nil
 	self.onBlueprint = nil
+	self.onSchool = nil
 
 	--[[
 		Der linke Knopf im Ergebnisfenster hat zwei Bedeutungen: nach einem
@@ -1045,6 +1046,33 @@ function BuildHud:buildResultPanel()
 		end
 	end)
 	self.resultMenuButton = toMenu
+
+	--[[
+		DIE BAUSCHULE GENAU DANN ANBIETEN, WENN SIE GEBRAUCHT WIRD
+
+		Nach einem gescheiterten Test will man wissen, WARUM es nicht gehalten
+		hat - das ist der Moment, in dem die vier Bilder etwas nuetzen. Nach
+		einem geschafften Test waere derselbe Knopf nur im Weg, deshalb ist er
+		dann nicht da.
+
+		Er sitzt zwischen den beiden anderen und ist bewusst unauffaellig: er
+		soll ein Angebot sein, kein Vorwurf.
+	]]
+	local school = Theme.button(panel, "School", {
+		size = UDim2.fromOffset(150, 42),
+		position = UDim2.new(0.5, -75, 0, 146),
+		text = I18n.t("school.open"),
+		textSize = 14,
+		color = Theme.colors.panelLight,
+	})
+	school.Selectable = true
+	school.Visible = false
+	school.Activated:Connect(function()
+		if self.onSchool then
+			self.onSchool()
+		end
+	end)
+	self.resultSchoolButton = school
 end
 
 --------------------------------------------------------------------------------
@@ -1335,6 +1363,7 @@ end
 function BuildHud:updateResultPanel(result)
 	if result.success then
 		self.resultTitle.Text = I18n.t("result.success")
+		self.resultSchoolButton.Visible = false
 		self.resultTitle.TextColor3 = Theme.colors.success
 
 		-- Nach einem Erfolg direkt weiterspielen duerfen, statt erst ins Menue.
@@ -1349,6 +1378,7 @@ function BuildHud:updateResultPanel(result)
 		end
 	else
 		self.resultTitle.Text = I18n.t("hud.notPassed")
+		self.resultSchoolButton.Visible = true
 		self.resultTitle.TextColor3 = Theme.colors.danger
 		self.resultPrimaryMode = "retry"
 		self.retryButton.Text = I18n.t("result.retry")

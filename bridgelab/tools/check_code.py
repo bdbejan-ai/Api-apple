@@ -316,13 +316,33 @@ for m in re.finditer(r'^add\("([^"]+)",\s*\n?\s*"((?:[^"\\]|\\.)*)",\s*\n?\s*"((
 for m in re.finditer(r'^add\("([^"]+)"', i18n_text, re.M):
     defined.setdefault(m.group(1), None)
 
+# Manche Fenster speichern einen BASISSCHLUESSEL und haengen beim Anzeigen
+# ".title" bzw. ".text" an (Anleitung, Bauschule). Deren "key = ..." darf man
+# nicht direkt nachschlagen - der Basisschluessel selbst steht nie in I18n.
+# Erkannt werden solche Dateien daran, dass sie genau das tun.
+suffix_files = {}
+for path in SRC.rglob("*.luau"):
+    text = path.read_text(encoding="utf-8")
+    suffixes = set(re.findall(r'(?:key|\.key)\s*\.\.\s*"\.(\w+)"', text))
+    if suffixes:
+        suffix_files[path] = sorted(suffixes)
+
 used = set()
 for path in SRC.rglob("*.luau"):
-    if path.name in ("I18n.luau", "TutorialGui.luau"):
+    if path.name == "I18n.luau" or path in suffix_files:
         continue
     text = path.read_text(encoding="utf-8")
     used |= set(re.findall(r'I18n\.t\("([^"]+)"', text))
     used |= set(re.findall(r'key = "([a-z][\w.]*\.[\w.]+)"', text))
+
+# Bei den Basisschluessel-Dateien stattdessen jede Endung einzeln pruefen.
+for path, suffixes in suffix_files.items():
+    text = path.read_text(encoding="utf-8")
+    used |= set(re.findall(r'I18n\.t\("([^"]+)"', text))
+    for base in sorted(set(re.findall(r'key = "([a-z][\w.]*)"', text))):
+        for suffix in suffixes:
+            if f"{base}.{suffix}" not in defined:
+                note(f'{path.stem}: "{base}.{suffix}" fehlt in I18n.luau')
 
 # Schluessel, die zur Laufzeit zusammengesetzt werden ("world." .. name), enden
 # im Quelltext auf einem Punkt. Die lassen sich so nicht pruefen.
@@ -330,13 +350,6 @@ used = {key for key in used if not key.endswith(".")}
 
 for key in sorted(used - set(defined)):
     note(f'Sprachschluessel "{key}" wird benutzt, steht aber nicht in I18n.luau')
-
-# Die Anleitung haengt an ihren Schluessel ".title" und ".text" an.
-tutorial_text = (SRC / "Client" / "TutorialGui.luau").read_text(encoding="utf-8")
-for base in sorted(set(re.findall(r'key = "(tut\.\w+)"', tutorial_text))):
-    for suffix in ("title", "text"):
-        if f"{base}.{suffix}" not in defined:
-            note(f'Anleitung: "{base}.{suffix}" fehlt in I18n.luau')
 
 # Jede Welt, die in den Leveldaten vorkommt, braucht einen Namen.
 for world in sorted(set(re.findall(r'world = "([^"]+)"', levels_text))):

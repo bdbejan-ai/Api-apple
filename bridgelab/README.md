@@ -16,7 +16,8 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 3. [Die manuellen Schritte in Roblox Studio](#die-manuellen-schritte-in-roblox-studio)
 4. [Robux-Tipps einrichten](#robux-tipps-einrichten)
 5. [Steuerung](#steuerung)
-6. [Welche Datei macht was](#welche-datei-macht-was)
+6. [Sprachen](#sprachen)
+7. [Welche Datei macht was](#welche-datei-macht-was)
 7. [Eigene Level bauen](#eigene-level-bauen)
 8. [Getroffene Annahmen](#getroffene-annahmen)
 9. [Bekannte Grenzen](#bekannte-grenzen)
@@ -31,7 +32,10 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 | **Sieben Baustoffe** | Straße, Verstärkte Straße, Holz, Stahl, Seil, Kabel, Hydraulik. Jeder kostet **je Stud Länge** — ein langer Balken kostet mehr als ein kurzer |
 | **Zwölf Level in drei Welten** | Von einem schmalen Graben bis zur 100 Studs weiten Schlucht mit Felsnadel. Jedes ist nachweislich lösbar (siehe „Level prüfen") |
 | **Level-Auswahl** | Jede Karte zeichnet die **echte Geländeform** des Levels samt Ankerpunkten. Dazu Schwierigkeit (1–5), Budget, Spannweite und Haken für geschaffte Level |
+| **Zwei Sprachen** | Deutsch und Englisch. Die Sprache kommt automatisch aus der Kontoeinstellung des Spielers; ist sie unbekannt, wird Englisch genommen |
 | **Interaktive Anleitung** | Startet beim allerersten Spielstart automatisch. Man baut wirklich selbst; die Texte passen sich dem Eingabegerät an |
+| **Bauvorlage** | Der Knopf VORLAGE blendet eine blasse Zeichnung eines gewöhnlichen Fachwerks ein, passend zum Level. Sie ist **keine** Lösung und baut nichts — sie zeigt nur die Form |
+| **Bauschule** | Vier Zeichnungen, die erklären, *warum* eine Brücke hält: Dreiecke, Fachwerk, Verdoppeln, Bauhöhe. Erreichbar aus dem Menü und nach jedem gescheiterten Test |
 | **Seitenansicht** | Keine Spielfigur. Beliebig nah heranzoomen; herauszoomen nur so weit, bis das Level das Bild füllt |
 | **Tacho** | Schieberegler von 1 bis 14 Studs/s. Einstellbar vor dem Test **und mitten in der Fahrt**. Das Zeitlimit passt sich mit an |
 | **Belastungsanzeige** | Die **Farbe** am Bauteil zeigt immer die Auslastung. Zahlentafeln bekommen nur die acht am stärksten belasteten Teile — sonst sieht man vor lauter Zahlen die Brücke nicht mehr |
@@ -42,6 +46,42 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 | **Tipps** | Drei pro Level. Bei Schwierigkeit 1–3 ist der erste gratis, ab Schwierigkeit 4 kostet schon der erste Robux |
 | **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp‑Gutscheine werden dauerhaft gespeichert |
 | **Mehrspieler** | Jeder Spieler bekommt seine eigene Arena und kann ein eigenes Level spielen |
+
+---
+
+## Sprachen
+
+Das Spiel spricht **Deutsch und Englisch**. Welche Sprache ein Spieler sieht,
+entscheidet seine Roblox-Kontoeinstellung; kennt das Spiel sie nicht, nimmt es
+Englisch — damit kommen die meisten wenigstens zurecht.
+
+Alle Texte stehen in **einer** Datei: `src/Shared/I18n.luau`. Im Code steht nur
+noch ein Schlüssel:
+
+```lua
+label.Text = I18n.t("hud.budget", used, total)
+```
+
+**Eine dritte Sprache dazuzunehmen** heißt: in `I18n.luau` die Sprache in
+`I18n.languages` eintragen und bei jedem `add(...)` eine Spalte ergänzen. Keine
+andere Datei muss angefasst werden. Fehlt ein Text, kommt der englische — nie
+ein leeres Feld.
+
+**Der Server kennt die Sprache nicht** und muss sie auch nicht kennen. Er
+schickt keine fertigen Sätze, sondern Schlüssel mit Werten:
+
+```lua
+{ key = "notice.tooLong", args = { "material.Steel.name", 16 } }
+```
+
+Übersetzt wird erst beim Spieler. Dadurch bekommen zwei Spieler in derselben
+Runde dieselbe Meldung jeweils in *ihrer* Sprache. Auch eingesetzte Werte dürfen
+Schlüssel sein — ein Baustoffname ist ja selbst übersetzbar.
+
+`tools/check_code.py` prüft mit, dass jeder benutzte Schlüssel existiert, dass
+jedes Level Namen und Tipptexte hat und dass die Platzhalter (`%d`, `%s`) in
+allen Sprachen übereinstimmen. Stünde in einer Sprache `%s`, wo in der anderen
+`%d` steht, landete der Wert an der falschen Stelle.
 
 ---
 
@@ -271,6 +311,7 @@ sofort an.
 | Zeiger bewegen | Maus | Finger | linker Stick |
 | Baustoff 1…7 | Tasten `1`–`7` | Leiste links | Leiste links |
 | Abrissmodus | Taste `X` | Knopf „Abriss" | **X** |
+| Bauvorlage zeigen | Knopf „Vorlage" | Knopf „Vorlage" | Knopf „Vorlage" |
 | Tempo einstellen | Regler ziehen oder −/+ | Regler ziehen oder −/+ | Regler mit dem Zeiger |
 | Hydraulik-Phase | Phasenknöpfe unten | Phasenknöpfe unten | Phasenknöpfe unten |
 
@@ -306,6 +347,8 @@ bridgelab/
     │   ├── Materials.luau    die sieben Baustoffe mit Grenzwerten und Preisen
     │   ├── Terrain.luau      rechnet mit dem Geländeprofil (Höhe, Kollision)
     │   ├── Levels.luau       die zwölf Level als reine Zahlen
+    │   ├── I18n.luau         ALLE Texte, deutsch und englisch
+    │   ├── Blueprint.luau    erzeugt die Bauvorlage zu einem Level
     │   ├── Remotes.luau      legt die RemoteEvents an
     │   └── TrussSolver.luau  der Fachwerk-Rechner (reine Mathematik)
     │
@@ -327,6 +370,7 @@ bridgelab/
         ├── BuildController.luau  Bau-Interaktion für alle drei Geräte
         ├── LevelSelectGui.luau   das Startmenü
         ├── BuildHud.luau         Oberfläche im Spiel
+        ├── BuildingSchool.luau   die vier Zeichnungen der Bauschule
         └── TutorialGui.luau      die interaktive Anleitung
 ```
 

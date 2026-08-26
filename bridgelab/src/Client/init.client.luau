@@ -32,6 +32,7 @@ local BuildController = require(script.BuildController)
 local LevelSelectGui = require(script.LevelSelectGui)
 local BuildHud = require(script.BuildHud)
 local TutorialGui = require(script.TutorialGui)
+local BuildingSchool = require(script.BuildingSchool)
 
 local player = Players.LocalPlayer
 
@@ -180,6 +181,7 @@ local controller = BuildController.new()
 local levelSelect = LevelSelectGui.new()
 local hud = BuildHud.new()
 local tutorial = TutorialGui.new()
+local school = BuildingSchool.new()
 
 -- Die Anleitung darf Knoepfe im HUD hervorheben.
 tutorial.hud = hud
@@ -308,6 +310,14 @@ local function startLevel(levelId: string)
 	remote.SelectLevel:FireServer(levelId)
 end
 
+--[[
+	Die Bauschule zeigt die vier Bilder, mit denen sich jedes Level loesen
+	laesst. Sie ist reine Anzeige - der Server erfaehrt davon nichts.
+]]
+levelSelect.onSchool = function()
+	school:show()
+end
+
 levelSelect.onLevelChosen = function(levelId)
 	startLevel(levelId)
 end
@@ -351,6 +361,11 @@ end
 	Vorlage ein- und ausblenden. Sie ist reine Anzeige auf dem Client - der
 	Server erfaehrt davon nichts, weil sich am Spielstand nichts aendert.
 ]]
+-- Aus dem Ergebnisfenster heraus, nach einem gescheiterten Test.
+hud.onSchool = function()
+	school:show()
+end
+
 hud.onBlueprint = function()
 	local visible = controller:toggleBlueprint()
 	hud:setBlueprintActive(visible, controller:hasBlueprint())

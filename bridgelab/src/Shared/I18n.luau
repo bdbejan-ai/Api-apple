@@ -680,4 +680,37 @@ add("tut.tryIt", "▸ Probiere es aus, dann geht es weiter",
 	"▸ Try it out, then we continue")
 
 
+--------------------------------------------------------------------------------
+-- Bauschule
+--------------------------------------------------------------------------------
+
+add("school.title", "Bauschule", "Bridge school")
+add("school.intro", "Vier Bilder, mit denen sich jedes Level loesen laesst.",
+	"Four pictures that will get you through every level.")
+add("school.open", "Bauschule", "Bridge school")
+
+add("school.triangles.title", "Dreiecke halten, Vierecke nicht",
+	"Triangles hold, rectangles do not")
+add("school.triangles.text",
+	"Ein Viereck laesst sich zur Raute verschieben, ohne dass ein einziges Bauteil laenger oder kuerzer wird - es haelt also nichts. Ein Dreieck kann das nicht. Deshalb besteht jede Bruecke aus lauter Dreiecken.",
+	"A rectangle can be pushed over into a diamond without any part getting longer or shorter - so nothing holds it. A triangle cannot do that. This is why every bridge is made of triangles.")
+
+add("school.truss.title", "So sieht ein Fachwerk aus", "This is what a truss looks like")
+add("school.truss.text",
+	"Unten die Fahrbahn, oben ein Gurt, dazwischen senkrechte Pfosten und schraege Diagonalen. Die Diagonalen sind das Wichtigste: erst sie machen aus den Vierecken Dreiecke.",
+	"The roadway at the bottom, a chord along the top, vertical posts and slanted diagonals in between. The diagonals matter most: they are what turns the rectangles into triangles.")
+
+add("school.doubling.title", "Bricht ein Teil? Ein zweites daneben",
+	"A part breaking? Put a second one beside it")
+add("school.doubling.text",
+	"Zwei Bauteile auf denselben zwei Knoten teilen sich die Kraft - jedes traegt nur noch die Haelfte. Besonders wichtig bei der Fahrbahn: sie ist beim Fachwerk gleichzeitig der Untergurt und haelt allein nur 500 N.",
+	"Two parts on the same two joints share the force - each carries only half. This matters most for the roadway: in a truss it doubles as the bottom chord, and on its own it only holds 500 N.")
+
+add("school.depth.title", "Hoeher bauen heisst weniger Kraft",
+	"Building taller means less force")
+add("school.depth.text",
+	"Die Kraft in den Gurten ist ungefaehr Gewicht mal Spannweite geteilt durch das Vierfache der Bauhoehe. Doppelte Bauhoehe heisst also HALBE Kraft. Ein hohes Fachwerk ist fast immer billiger als ein niedriges aus staerkerem Material.",
+	"Chord force is roughly weight times span divided by four times the depth. So twice the depth means HALF the force. A tall truss is almost always cheaper than a shallow one built from stronger material.")
+
+
 return I18n
