@@ -118,6 +118,47 @@ for m in re.finditer(r'highlight\s*=\s*"([^"]+)"', tutorial):
     if f'"{name}"' not in hud_source and not generated:
         note(f'Anleitung hebt "{name}" hervor - im HUD gibt es das nicht')
 
+# --- 4b: Anzahl der Werte bei RemoteEvents ------------------------------------
+
+# Der Client feuert "PlaceMember" mit sechs Werten, der Server nimmt sechs
+# entgegen. Passt das nicht zusammen, kommt beim Server stillschweigend nil an -
+# kein Fehler, keine Meldung, es funktioniert nur nicht. Beim Umstellen auf
+# Koordinaten und spaeter beim Ergaenzen der Hydraulikphase war das jedes Mal
+# eine Stelle, die man leicht vergisst.
+
+
+def count_arguments(text: str) -> int:
+    """Zaehlt die Werte einer Argumentliste, ohne Klammern zu verwechseln."""
+    depth, count = 0, (1 if text.strip() else 0)
+    for char in text:
+        if char in "({[":
+            depth += 1
+        elif char in ")}]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            count += 1
+    return count
+
+
+sent: dict[str, int] = {}
+for path in SRC.rglob("*.luau"):
+    text = path.read_text(encoding="utf-8")
+    for m in re.finditer(r"remote\.(\w+):FireServer\(([^\n]*)\)", text):
+        # Erster Wert ist die Nutzlast, der Spieler kommt beim Server dazu.
+        sent[m.group(1)] = max(sent.get(m.group(1), 0), count_arguments(m.group(2)))
+
+server_text = (SRC / "Server" / "init.server.luau").read_text(encoding="utf-8")
+for m in re.finditer(r"remote\.(\w+)\.OnServerEvent:Connect\(function\(([^)]*)\)", server_text):
+    name, params = m.group(1), m.group(2)
+    # "player" ist immer dabei und zaehlt nicht zur Nutzlast.
+    taken = max(count_arguments(params) - 1, 0)
+    given = sent.get(name)
+    if given is not None and given > taken:
+        note(
+            f'RemoteEvent "{name}": der Client schickt {given} Werte, '
+            f"der Server nimmt nur {taken} entgegen"
+        )
+
 # --- 5b: Ereignisse der Anleitung ---------------------------------------------
 
 # Ein Schritt der Anleitung wartet auf ein Ereignis. Feuert es niemand, bleibt
