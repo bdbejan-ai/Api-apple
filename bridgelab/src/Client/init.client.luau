@@ -280,10 +280,15 @@ end
 -- Knoepfe des HUD
 --------------------------------------------------------------------------------
 
+--[[
+	Nur weitergeben, nicht selbst anzeigen: selectMaterial meldet die Auswahl
+	ueber onSelectionChanged zurueck, und DORT werden Leiste und Anleitung
+	benachrichtigt. Wer es hier zusaetzlich taete, haette zwei Stellen, die
+	dasselbe tun - und genau dabei ist mir hier ein Fehler unterlaufen: nach
+	dem Umbenennen des Parameters stand hier noch der alte Name, war also nil.
+]]
 hud.onSelectMaterial = function(key)
 	controller:selectMaterial(key)
-	hud:setSelected(kind)
-	tutorial:notify("partSelected", kind)
 end
 
 hud.onRemoveMode = function()

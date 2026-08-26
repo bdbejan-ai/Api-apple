@@ -490,6 +490,13 @@ laufenden Spiel auffallen würden:
 - Bedienelemente, die die Anleitung hervorheben will, aber nicht existieren
 - Ordnernamen, die zwischen LevelBuilder, Server und Client auseinanderlaufen
 - Felder, die der Code aus den Leveldaten liest, die es dort aber nicht gibt
+- Einstellungen in `Config.luau`, die niemand mehr liest
+- **Namen, die nirgends deklariert sind** — etwa ein Parameter, der beim
+  Umbenennen an einer Stelle stehen geblieben ist. Das ist der heimtückischste
+  Fall: In Luau ist ein unbekannter Name einfach `nil`, die Datei übersetzt
+  sauber, und erst im Spiel arbeitet eine Funktion stillschweigend mit `nil`.
+  Dafür ruft das Skript `luau-analyze` auf, falls es installiert ist (dasselbe
+  ZIP wie `luau` selbst); sonst überspringt es den Schritt.
 
 ```bash
 python3 tools/check_code.py

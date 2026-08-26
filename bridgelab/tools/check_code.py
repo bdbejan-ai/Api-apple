@@ -223,7 +223,43 @@ for m in re.finditer(r"^\t(\w+)\s*=", config_text, re.M):
     if key not in other:
         note(f'Config: "{key}" wird nirgends benutzt')
 
-# --- 9: doppelte Kommentarbloecke ---------------------------------------------
+# --- 9: unbekannte Namen (luau-analyze) ---------------------------------------
+
+# luau-analyze findet Namen, die nirgends deklariert sind - etwa einen
+# Parameter, der beim Umbenennen an einer Stelle stehen geblieben ist. Der
+# Compiler sieht das nicht: in Luau ist ein unbekannter Name einfach nil, und
+# die Datei uebersetzt sauber. Erst im Spiel faellt auf, dass eine Funktion
+# stillschweigend mit nil arbeitet. Genau so ein Fall war hud.onSelectMaterial.
+#
+# Ist luau-analyze nicht installiert, wird der Schritt einfach uebersprungen -
+# die Pruefung soll auch ohne laufen.
+import shutil
+import subprocess
+
+# Roblox-Typen und -Globale kennt das Werkzeug ausserhalb von Studio nicht.
+# Sie zu melden waere reines Rauschen, in dem echte Funde untergehen.
+ROBLOX_GLOBALS = {
+    "Color3", "Vector3", "Vector2", "Instance", "Enum", "UDim2", "UDim",
+    "CFrame", "game", "workspace", "script", "Random", "NumberRange",
+    "NumberSequence", "NumberSequenceKeypoint", "ColorSequence",
+    "ColorSequenceKeypoint", "PhysicalProperties", "task", "Ray",
+    "RaycastParams", "TweenInfo", "DateTime", "BrickColor", "warn", "os",
+}
+
+if shutil.which("luau-analyze"):
+    result = subprocess.run(
+        ["luau-analyze", str(SRC)],
+        capture_output=True, text=True,
+    )
+    for line in (result.stdout + result.stderr).splitlines():
+        m = re.search(r"Unknown global '([A-Za-z0-9_]+)'", line)
+        if m and m.group(1) not in ROBLOX_GLOBALS:
+            where = line.split(":")[0]
+            note(f"{where}: unbekannter Name '{m.group(1)}' - Tippfehler oder Umbenennung?")
+else:
+    print("   (luau-analyze nicht gefunden - Schritt 9 uebersprungen)")
+
+# --- 10: doppelte Kommentarbloecke --------------------------------------------
 
 for f, t in texts.items():
     blocks = [" ".join(b.split()) for b in re.findall(r"--\[\[(.*?)\]\]", t, re.S)]
