@@ -304,6 +304,13 @@ hud.onPhaseChanged = function(phase)
 	remote.SetPhase:FireServer(phase)
 end
 
+-- Beim Bauen bestimmen dieselben Knoepfe, zu welcher Phase ein neuer
+-- Zylinder gehoert. Das bleibt auf dem Client - der Server bekommt die
+-- Phase erst mit dem fertigen Bauwunsch.
+hud.onBuildPhaseChanged = function(phase)
+	controller:setBuildPhase(phase)
+end
+
 hud.onReset = function()
 	remote.ResetLevel:FireServer(false)
 end
@@ -333,8 +340,8 @@ end
 -- Bau-Steuerung
 --------------------------------------------------------------------------------
 
-controller.onPlaceRequest = function(material, ax, ay, bx, by)
-	remote.PlaceMember:FireServer(material, ax, ay, bx, by)
+controller.onPlaceRequest = function(material, ax, ay, bx, by, phase)
+	remote.PlaceMember:FireServer(material, ax, ay, bx, by, phase)
 end
 
 controller.onRemoveRequest = function(memberId)

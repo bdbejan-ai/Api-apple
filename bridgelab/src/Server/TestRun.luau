@@ -391,6 +391,16 @@ function TestRun:setPhase(phase: number)
 end
 
 function TestRun:updateHydraulics(dt: number)
+	--[[
+		Die allermeisten Bruecken haben gar keine Hydraulik. hydraulicMembers()
+		legt aber jedes Mal eine neue Tabelle an - bei sechzig Bildern je
+		Sekunde und sechzehn Arenen waere das dauerndes Aufraeumen fuer nichts.
+		Deshalb wird einmal beim Start gemerkt, ob es ueberhaupt Zylinder gibt.
+	]]
+	if not self.hasHydraulics then
+		return
+	end
+
 	local extend = Config.Hydraulics.extendFactor
 	local rate = (extend - 1) / math.max(Config.Hydraulics.travelSeconds, 0.05)
 
@@ -745,7 +755,9 @@ function TestRun:start(speed: number, onProgress, onFinished)
 	self.phase = 0
 
 	-- Alle Zylinder beginnen eingefahren.
-	for _, member in self.structure:hydraulicMembers() do
+	local cylinders = self.structure:hydraulicMembers()
+	self.hasHydraulics = #cylinders > 0
+	for _, member in cylinders do
 		self.structure:setHydraulicExtension(member, 1)
 	end
 

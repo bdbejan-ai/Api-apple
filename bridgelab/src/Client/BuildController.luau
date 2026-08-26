@@ -102,6 +102,8 @@ function BuildController.new()
 	self.camera = workspace.CurrentCamera
 
 	self.selectedMaterial = "Road"
+	-- Welcher Hydraulikphase ein neuer Zylinder angehoert (siehe BuildHud).
+	self.buildPhase = 1
 	self.removeMode = false
 	self.phase = "Idle" -- "Idle" (kein Level) | "Build" | "Test" | "Result"
 	self.enabled = false
@@ -121,7 +123,7 @@ function BuildController.new()
 	self.activeTouch = nil
 
 	-- Rueckmeldungen nach aussen (werden von init.client gesetzt)
-	self.onPlaceRequest = nil -- (material, ax, ay, bx, by)
+	self.onPlaceRequest = nil -- (material, ax, ay, bx, by, phase)
 	self.onRemoveRequest = nil -- (memberId)
 	self.onSelectionChanged = nil -- (material oder "Remove")
 	self.onDragChanged = nil -- (true/false) - fuer die Anleitung
@@ -603,7 +605,7 @@ function BuildController:endDrag()
 	end
 
 	if self.onPlaceRequest then
-		self.onPlaceRequest(self.selectedMaterial, start.x, start.y, x, y)
+		self.onPlaceRequest(self.selectedMaterial, start.x, start.y, x, y, self.buildPhase)
 	end
 end
 
@@ -779,6 +781,11 @@ function BuildController:toggleRemoveMode()
 	else
 		self:selectRemoveMode()
 	end
+end
+
+-- Phase fuer neue Hydraulikzylinder (vom HUD gesetzt).
+function BuildController:setBuildPhase(phase: number)
+	self.buildPhase = math.clamp(math.round(phase), 1, Config.Hydraulics.phaseCount)
 end
 
 function BuildController:setPhase(phase: string)

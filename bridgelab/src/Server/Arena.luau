@@ -221,7 +221,7 @@ end
 --------------------------------------------------------------------------------
 
 -- Rueckgabe: erfolgreich (boolean), Meldung fuer den Spieler (string)
-function Arena:placeMember(material: string, ax: number, ay: number, bx: number, by: number): (boolean, string)
+function Arena:placeMember(material: string, ax: number, ay: number, bx: number, by: number, phase: number?): (boolean, string)
 	if self.phase ~= "Build" then
 		return false, "Waehrend des Tests laesst sich nicht bauen."
 	end
@@ -231,7 +231,7 @@ function Arena:placeMember(material: string, ax: number, ay: number, bx: number,
 		return false, reason
 	end
 
-	local member = self.structure:place(material, ax, ay, bx, by)
+	local member = self.structure:place(material, ax, ay, bx, by, phase)
 	self.message = ""
 	self:updateAnalysis()
 	self:notify()

@@ -254,7 +254,7 @@ end)
 	im Fels oder weit ausserhalb des Levels. Die eigentliche Entscheidung
 	faellt danach in Structure:canPlace.
 ]]
-remote.PlaceMember.OnServerEvent:Connect(function(player, material, ax, ay, bx, by)
+remote.PlaceMember.OnServerEvent:Connect(function(player, material, ax, ay, bx, by, phase)
 	local arena = arenas[player]
 	if not arena then
 		return
@@ -284,8 +284,18 @@ remote.PlaceMember.OnServerEvent:Connect(function(player, material, ax, ay, bx, 
 		return math.round(value / grid) * grid
 	end
 
+	--[[
+		Die Phase gilt nur fuer Hydraulikzylinder und wird auf den erlaubten
+		Bereich gestutzt. Fehlt sie oder ist sie Unsinn, wird Phase 1 genommen -
+		das ist die Phase, in der ohnehin die meisten Zylinder liegen.
+	]]
+	local wantedPhase = 1
+	if type(phase) == "number" and phase == phase then
+		wantedPhase = math.clamp(math.round(phase), 1, Config.Hydraulics.phaseCount)
+	end
+
 	local ok, reason, hint =
-		arena:placeMember(material, snap(ax), snap(ay), snap(bx), snap(by))
+		arena:placeMember(material, snap(ax), snap(ay), snap(bx), snap(by), wantedPhase)
 	if not ok and reason ~= "" then
 		remote.Notice:FireClient(player, reason)
 	elseif ok and hint then

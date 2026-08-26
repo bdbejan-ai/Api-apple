@@ -272,7 +272,14 @@ sofort an.
 | Baustoff 1…7 | Tasten `1`–`7` | Leiste links | Leiste links |
 | Abrissmodus | Taste `X` | Knopf „Abriss" | **X** |
 | Tempo einstellen | Regler ziehen oder −/+ | Regler ziehen oder −/+ | Regler mit dem Zeiger |
-| Hydraulik schalten | Phasenknöpfe unten | Phasenknöpfe unten | Phasenknöpfe unten |
+| Hydraulik-Phase | Phasenknöpfe unten | Phasenknöpfe unten | Phasenknöpfe unten |
+
+**Die Phasenknöpfe haben zwei Bedeutungen.** Beim Bauen legen sie fest, zu
+welcher Phase der **nächste** Zylinder gehört; im Test lösen sie diese Phase
+aus. „Ein" (Phase 0) heißt „alles eingefahren" und gibt es nur im Test. So kann
+man etwa beide Brückenhälften in Phase 1 legen und sie mit einem Druck
+gemeinsam hochklappen — oder sie auf Phase 1 und 2 verteilen und nacheinander
+öffnen.
 
 **Warum wird zum Bauen gezogen und nicht zweimal geklickt?** Beim Ziehen
 siehst du die ganze Zeit, was entsteht, und ein Versehen brichst du ab, indem

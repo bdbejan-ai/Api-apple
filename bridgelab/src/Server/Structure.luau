@@ -905,8 +905,9 @@ function Structure:canPlace(material: string, ax: number, ay: number, bx: number
 	return true, ""
 end
 
-function Structure:place(material: string, ax: number, ay: number, bx: number, by: number)
+function Structure:place(material: string, ax: number, ay: number, bx: number, by: number, phase: number?)
 	local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+	local spec = Materials.get(material)
 
 	local member = {
 		id = self.nextMemberId,
@@ -922,6 +923,16 @@ function Structure:place(material: string, ax: number, ay: number, bx: number, b
 		broken = false,
 		slack = false,
 		force = 0,
+
+		--[[
+			Die Phase merkt sich nur ein Zylinder. Bei allen anderen Baustoffen
+			bliebe sie ein Feld, das nie jemand liest - und das beim Suchen
+			nach Fehlern nur ablenkt.
+		]]
+		phase = if spec and spec.hydraulic
+			then math.clamp(math.round(phase or 1), 1, Config.Hydraulics.phaseCount)
+			else nil,
+		extension = 1,
 	}
 	self.nextMemberId += 1
 	table.insert(self.members, member)

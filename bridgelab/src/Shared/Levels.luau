@@ -615,7 +615,7 @@ Levels.list = {
 		hints = {
 			"Das Schiff faehrt zuerst. Erst wenn es durch ist, darf die Bruecke wieder zu sein.",
 			"Ein Hydraulikzylinder faehrt in seiner Phase auf das Anderthalbfache seiner Baulaenge aus. Damit laesst sich ein Fahrbahnstueck hochklappen.",
-			"Baue die Fahrbahn in zwei Haelften, die sich in der Mitte treffen. Unter jeder Haelfte ein Zylinder in Phase 1 - der hebt sie an, wenn das Schiff kommt.",
+			"Baue die Fahrbahn in zwei Haelften, die sich in der Mitte treffen. Unter jede Haelfte einen Zylinder. Waehle vor dem Bauen unten die Phase - beide in Phase 1, dann heben sie gemeinsam.",
 		},
 	}),
 

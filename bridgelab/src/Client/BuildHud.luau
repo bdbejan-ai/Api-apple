@@ -60,6 +60,7 @@ function BuildHud.new()
 	self.phaseButtons = {}
 	self.selected = "Road"
 	self.phase = 0
+	self.buildPhase = 1
 	self.state = nil
 	self.hintOpen = false
 	self.noticeToken = 0
@@ -76,6 +77,7 @@ function BuildHud.new()
 	self.onNextLevel = nil
 	self.onSpeedChanged = nil
 	self.onPhaseChanged = nil
+	self.onBuildPhaseChanged = nil
 
 	--[[
 		Der linke Knopf im Ergebnisfenster hat zwei Bedeutungen: nach einem
@@ -377,9 +379,18 @@ function BuildHud:buildBottomBar()
 	----------------------------------------------------------------------------
 
 	--[[
-		Die Phasenknoepfe erscheinen nur in Levels mit Hydraulik. Phase 0
-		heisst "alles eingefahren"; jeder weitere Knopf faehrt die Zylinder
-		aus, die dieser Phase zugeordnet sind.
+		Die Phasenknoepfe erscheinen nur in Levels mit Hydraulik und haben
+		je nach Spielabschnitt ZWEI Bedeutungen:
+
+		  beim Bauen   welcher Phase der naechste Zylinder angehoert
+		  im Test      welche Phase gerade geschaltet ist
+
+		Das ist kein Trick, sondern dieselbe Frage aus zwei Richtungen: beim
+		Bauen legt man fest, wann ein Zylinder ausfahren soll, im Test loest
+		man es aus. Zwei getrennte Bedienelemente dafuer waeren nur doppelt.
+
+		"Ein" (Phase 0) gibt es nur im Test - beim Bauen muss jeder Zylinder
+		zu einer echten Phase gehoeren, sonst wuerde er nie ausfahren.
 	]]
 	local phaseBox = Instance.new("Frame")
 	phaseBox.Name = "Phases"
@@ -390,8 +401,8 @@ function BuildHud:buildBottomBar()
 	phaseBox.Parent = bar
 	self.phaseBox = phaseBox
 
-	Theme.label(phaseBox, "Caption", {
-		size = UDim2.fromOffset(64, 16),
+	self.phaseCaption = Theme.label(phaseBox, "Caption", {
+		size = UDim2.fromOffset(240, 16),
 		position = UDim2.fromOffset(2, 2),
 		text = "Hydraulik",
 		textSize = 12,
@@ -409,8 +420,13 @@ function BuildHud:buildBottomBar()
 		})
 		button.Selectable = true
 		button.Activated:Connect(function()
-			if self.onPhaseChanged then
-				self.onPhaseChanged(phase)
+			local running = self.state ~= nil and self.state.phase == "Test"
+			if running then
+				if self.onPhaseChanged then
+					self.onPhaseChanged(phase)
+				end
+			elseif phase > 0 then
+				self:setBuildPhase(phase)
 			end
 		end)
 		self.phaseButtons[phase] = button
@@ -458,16 +474,33 @@ function BuildHud:refreshPhases(state)
 		return
 	end
 
-	local active = state.phaseIndex or 0
 	local running = state.phase == "Test"
+	local active = if running then (state.phaseIndex or 0) else self.buildPhase
+
+	self.phaseCaption.Text = if running
+		then "Hydraulik - jetzt schalten"
+		else "Hydraulik - Phase fuer neue Zylinder"
 
 	for phase, button in self.phaseButtons do
 		local isActive = phase == active
 		button.BackgroundColor3 = if isActive then Theme.colors.accent else Theme.colors.panelLight
 		button.TextColor3 = if isActive then Color3.fromRGB(14, 20, 30) else Theme.colors.text
-		-- Geschaltet wird nur waehrend der Fahrt: im Baumodus steht alles fest.
-		button.AutoButtonColor = running
-		button.TextTransparency = if running then 0 else 0.45
+
+		-- "Ein" bedeutet "alles eingefahren" und ergibt beim Bauen keinen Sinn.
+		local usable = running or phase > 0
+		button.AutoButtonColor = usable
+		button.TextTransparency = if usable then 0 else 0.5
+	end
+end
+
+-- Beim Bauen: welcher Phase der naechste Zylinder angehoeren soll.
+function BuildHud:setBuildPhase(phase: number)
+	self.buildPhase = math.clamp(phase, 1, Config.Hydraulics.phaseCount)
+	if self.onBuildPhaseChanged then
+		self.onBuildPhaseChanged(self.buildPhase)
+	end
+	if self.state then
+		self:refreshPhases(self.state)
 	end
 end
 
