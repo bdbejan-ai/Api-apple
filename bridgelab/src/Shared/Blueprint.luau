@@ -143,23 +143,77 @@ function Blueprint.forLevel(level)
 		Felder als noetig kosten nur Material, weniger sind gar nicht baubar.
 	]]
 	local segments = math.max(2, math.ceil(span / math.min(deckSpec.maxLength, 8)))
-	local panel = span / segments
+
+	----------------------------------------------------------------------------
+	-- Bauhoehe so waehlen, dass WIRKLICH jedes Teil hineinpasst
+	----------------------------------------------------------------------------
 
 	--[[
-		Die Bauhoehe ist so gross wie moeglich - je hoeher das Fachwerk, desto
-		weniger Kraft steckt in seinen Gurten. Begrenzt wird sie durch die
-		DIAGONALE: sie ist das laengste Bauteil im ganzen Fachwerk.
+		HIER LAG EIN SCHWERER FEHLER
 
-		    Diagonale = Wurzel(Feldbreite^2 + Bauhoehe^2) <= erlaubte Laenge
+		Frueher wurde die Bauhoehe aus der DURCHSCHNITTLICHEN Feldbreite
+		ausgerechnet. Die Knoten werden aber aufs 2-Studs-Raster gerundet, und
+		dabei wird ein Feld breiter als der Durchschnitt: bei 52 Studs auf 7
+		Felder sind es im Mittel 7,4 Studs, nach dem Runden aber abwechselnd 6
+		und 8.
 
-		Aufgeloest nach der Bauhoehe und mit etwas Luft nach unten, damit das
-		Runden aufs Raster sie nicht doch noch ueber die Grenze schiebt.
+		Die Diagonale ueber dem breitesten Feld wurde damit 16,1 Studs lang -
+		einen Zehntel zu viel fuer Stahl. Sie fiel weg, und mit ihr vier
+		weitere. Uebrig blieb ein Fachwerk mit Luecken, das gar nicht stehen
+		KANN: es hatte weniger Bauteile als Gleichungen.
+
+		Wer diese Vorlage sorgfaeltig nachbaute, bekam eine Bruecke, die
+		zusammenfiel - und konnte nicht wissen, warum. Genau das soll eine
+		Vorlage nie tun.
+
+		Deshalb werden die Knoten jetzt ZUERST gerundet, dann die breiteste
+		Luecke gesucht, und erst daraus die Bauhoehe bestimmt.
 	]]
-	local longest = webSpec.maxLength * 0.94
-	local maxDepth = math.sqrt(math.max(longest * longest - panel * panel, 1))
-	local depth = snap(math.clamp(maxDepth, 4, 14))
+	local deck, top = {}, {}
+	for i = 0, segments do
+		local t = i / segments
+		deck[i + 1] = {
+			snap(a.x + span * t),
+			snap(a.y + (b.y - a.y) * t),
+		}
+	end
+
+	local widestPanel = 0
+	for i = 1, segments do
+		local dx = deck[i + 1][1] - deck[i][1]
+		local dy = deck[i + 1][2] - deck[i][2]
+		widestPanel = math.max(widestPanel, math.sqrt(dx * dx + dy * dy))
+	end
+
+	--[[
+		Die Diagonale ueber dem BREITESTEN Feld ist das laengste Bauteil im
+		ganzen Fachwerk. Nach ihr richtet sich die Bauhoehe:
+
+		    Wurzel(breitestes Feld^2 + Bauhoehe^2) <= erlaubte Laenge
+
+		Danach wird auf das Raster abgerundet - aufrunden koennte die Grenze
+		wieder ueberschreiten.
+	]]
+	local longest = math.min(webSpec.maxLength, 16)
+	local room = longest * longest - widestPanel * widestPanel
+	if room <= 1 then
+		-- Selbst ohne Bauhoehe passt keine Diagonale: hier hilft keine Vorlage.
+		return nil
+	end
+
+	local grid = Config.Build.gridSize
+	local depth = math.floor(math.sqrt(room) / grid) * grid
+	depth = math.clamp(depth, 4, 14)
+
+	-- Auch der Pfosten darf nicht laenger als erlaubt werden.
+	depth = math.min(depth, math.floor(longest / grid) * grid)
+
+	for i = 1, segments + 1 do
+		top[i] = { deck[i][1], deck[i][2] + depth }
+	end
 
 	local out = {}
+	local dropped = false
 
 	local function add(ax: number, ay: number, bx: number, by: number, material: string)
 		-- Was durch den Felsen liefe, kann auch niemand nachbauen.
@@ -179,13 +233,21 @@ function Blueprint.forLevel(level)
 			Solche Stuecke werden weggelassen und einmal gemeldet, damit es
 			beim Entwickeln auffaellt statt beim Spieler.
 		]]
+		--[[
+			Ein weggelassenes Teil macht die ganze Vorlage wertlos: ein
+			Fachwerk mit Luecke steht nicht. Die Bauhoehe ist oben so gewaehlt,
+			dass das nicht mehr vorkommen KANN - passiert es doch, ist das ein
+			Fehler im Programm und keine Kleinigkeit.
+		]]
 		local spec = Materials.get(material)
 		local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
 		if spec and (length > spec.maxLength + 0.01 or length < spec.minLength - 0.01) then
 			warn(string.format(
-				"[BridgeLab] Vorlage fuer %s: %s waere %.1f Studs (erlaubt %d bis %d) - weggelassen",
+				"[BridgeLab] FEHLER in der Vorlage fuer %s: %s waere %.1f Studs "
+					.. "(erlaubt %d bis %d). Die Vorlage ist damit unvollstaendig.",
 				level.id, material, length, spec.minLength, spec.maxLength
 			))
+			dropped = true
 			return
 		end
 
@@ -195,15 +257,6 @@ function Blueprint.forLevel(level)
 	----------------------------------------------------------------------------
 	-- Fahrbahn, Obergurt, Pfosten, Diagonalen
 	----------------------------------------------------------------------------
-
-	local deck, top = {}, {}
-	for i = 0, segments do
-		local t = i / segments
-		local x = snap(a.x + span * t)
-		local y = snap(a.y + (b.y - a.y) * t)
-		deck[i + 1] = { x, y }
-		top[i + 1] = { x, y + depth }
-	end
 
 	for i = 1, segments do
 		add(deck[i][1], deck[i][2], deck[i + 1][1], deck[i + 1][2], deckKey)
@@ -223,7 +276,12 @@ function Blueprint.forLevel(level)
 		end
 	end
 
-	if #out == 0 then
+	--[[
+		Lieber gar keine Vorlage als eine unvollstaendige. Eine Vorlage mit
+		Luecken faellt beim Nachbauen zusammen, und der Spieler sucht den
+		Fehler bei sich.
+	]]
+	if #out == 0 or dropped then
 		return nil
 	end
 	return out

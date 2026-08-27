@@ -434,7 +434,7 @@ Levels.list = {
 		id = "W1L4",
 		world = "Grundlagen",
 		difficulty = 3,
-		budget = 640,
+		budget = 700,
 		maxDropStuds = 14,
 
 		terrain = {

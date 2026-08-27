@@ -13,7 +13,8 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 
 1. [Was das Spiel kann](#was-das-spiel-kann)
 2. [Installation](#installation)
-3. [Die manuellen Schritte in Roblox Studio](#die-manuellen-schritte-in-roblox-studio)
+3. [Wenn du nicht weiterkommst](#wenn-du-nicht-weiterkommst)
+4. [Die manuellen Schritte in Roblox Studio](#die-manuellen-schritte-in-roblox-studio)
 4. [Robux-Tipps einrichten](#robux-tipps-einrichten)
 5. [Steuerung](#steuerung)
 6. [Sprachen](#sprachen)
@@ -85,17 +86,19 @@ allen Sprachen übereinstimmen. Stünde in einer Sprache `%s`, wo in der anderen
 
 ---
 
-## Die drei Sätze, die dich durch das ganze Spiel bringen
+## Die vier Sätze, die dich durch das ganze Spiel bringen
+
+Dieselben vier stehen im Spiel unter **Bauschule** — dort als Zeichnungen.
 
 **1. Dreiecke sind stabil, Vierecke kippen um.**
-Das ist der wichtigste Satz im Brückenbau. Ein Viereck aus vier Streben lässt
-sich zu einer Raute verschieben, ohne dass eine Strebe länger oder kürzer wird
-— es hält also nichts. Ein Dreieck kann das nicht.
+Ein Viereck aus vier Streben lässt sich zu einer Raute verschieben, ohne dass
+eine Strebe länger oder kürzer wird — es hält also nichts. Ein Dreieck kann das
+nicht.
 
 **2. Bricht die Straße, leg ein zweites Bauteil daneben.**
 Beim Fachwerk ist die Fahrbahn gleichzeitig der Untergurt und trägt die volle
 Gurtkraft. Straße hält aber nur 500 N. Setzt du auf **dieselben zwei Punkte**
-noch einen Stahlträger, teilen sich beide die Kraft:
+noch einen Träger, teilen sich beide die Kraft:
 
 ```
 vorher:   o====== Straße ======o        bei 500 N ist Schluss
@@ -105,18 +108,47 @@ nachher:  o====== Straße ======o        zusammen
 
 Der **schwächere** der beiden bestimmt die Grenze: Straße (500) mit Stahl
 (1200) trägt zusammen 1000 N, nicht 1700. Nimmst du die Verstärkte Straße
-(1000 N), sind es 2000 N — der doppelte Preis je Stud kauft hier also
-wirklich die doppelte Tragfähigkeit.
+(1000 N), sind es 2000 N.
 
-**3. Ist die Brücke zu weit gespannt, bau sie höher.**
-In den Gurten eines Fachwerks steckt ungefähr die Kraft
+**3. Nimm dafür ein Kabel, nicht Stahl.**
+Der Untergurt steht unter **Zug** — und Zug ist genau das, was ein Kabel kann.
+Ein Kabel kostet 5 je Stud, Stahl 10. In mehreren Levels ist die Kabel-Variante
+deshalb die *günstigste* Lösung überhaupt.
+
+Umgekehrt heißt das: oben am Obergurt sind Seile **nutzlos**. Dort herrscht
+Druck, und ein Seil, das drücken müsste, hängt einfach durch und trägt gar
+nichts.
+
+**4. Ist die Brücke zu weit gespannt, bau sie höher.**
+In den Gurten steckt ungefähr die Kraft
 
 ```
 Kraft ≈ Gewicht × Spannweite / (4 × Bauhöhe)
 ```
 
-Doppelte Bauhöhe heißt also **halbe** Kraft. Deshalb ist ein hohes Fachwerk
-fast immer billiger als ein niedriges aus stärkerem Material.
+Doppelte Bauhöhe heißt **halbe** Kraft. Ein hohes Fachwerk ist fast immer
+billiger als ein niedriges aus stärkerem Material.
+
+---
+
+## Wenn du nicht weiterkommst
+
+Das Spiel hilft an drei Stellen, und alle drei sind gratis:
+
+| | |
+|---|---|
+| **Vorlage** (Knopf in der Fußleiste) | Blendet die Grundform eines Fachwerks ein, passend zum Level. In Level 1 trägt sie genau so, wie sie daliegt (73 % Auslastung — nachgerechnet); ab Level 2 musst du sie verstärken. Sie baut nichts — du ziehst weiter jedes Bauteil selbst |
+| **Nach einem gescheiterten Test** | Das Ergebnisfenster sagt nicht nur, *dass* etwas gerissen ist, sondern **was du dagegen tun kannst** — je nachdem, ob die Fahrbahn, der Obergurt, eine Diagonale oder ein Pfosten nachgegeben hat |
+| **Bauschule** | Die fünf Zeichnungen oben, im Menü und im Ergebnisfenster erreichbar |
+
+**So sieht die Lernkurve aus, wenn du gar nichts weißt:** In Level 1 baust du
+die Vorlage nach und bestehst. In Level 2 tust du dasselbe, und der Obergurt
+reißt bei 113 % — das Ergebnisfenster sagt dir dann, dass genau er nachgegeben
+hat und dass ein zweites Bauteil daneben die Kraft halbiert. Du setzt es, und es
+hält. Ab da kennst du die Technik.
+
+Erst danach kommen die **Tipps**, die Robux kosten können. Jedes Level ist auch
+ohne sie lösbar — nachgerechnet, nicht geschätzt.
 
 ---
 
@@ -688,6 +720,13 @@ Ehrlich gesagt, was noch fehlt oder wacklig ist:
   weiterhin nur die gerade Verbindung zwischen den beiden Knoten.
 - **Das Wasser ist reine Optik.** Kein Auftrieb, keine Strömung; Bauteile
   dürfen mitten hindurch. Echtes Wasser würde die Kräfteberechnung verfälschen.
+- **Seile taugen nur an einer Stelle: neben der Fahrbahn.** Ein Seil kann nur
+  ziehen. Im Fachwerk steht oben alles unter Druck, also sind Seile dort
+  nutzlos — nachgemessen: eine reine Seilkonstruktion ließ sich in 11 von 12
+  Levels nicht einmal bauen. Wo sie sich lohnen, ist der **Untergurt**, denn
+  der steht unter Zug; dort ist ein Kabel halb so teuer wie Stahl. Das steht
+  jetzt in der Bauschule und in den Baustofftexten, war vorher aber nirgends
+  erklärt — und genau deshalb wirkten Seile wie totes Gewicht.
 - **Bögen und Hängebrücken tragen in diesem Modell nicht.** Beides ist gebaut
   und wird vom Prüfskript mitgetestet, aber beides scheitert an derselben
   Sache: Ein Bogen ist nur für eine **gleichmäßig verteilte** Last die richtige

@@ -200,10 +200,45 @@ function ForceEngine:evaluate(vehicleLoads: { [number]: number }?)
 	local worstJointKey = nil
 	local worstResidual = 0
 
+	--[[
+		WOMIT WIRD DIE RESTKRAFT VERGLICHEN?
+
+		Frueher nur mit der aeusseren Last am Knoten. Das ging schief: ein
+		Knoten oben im Fachwerk traegt kaum aeussere Last - nur sein bisschen
+		Eigengewicht -, waehrend in seinen Bauteilen 700 N stecken. Blieb dort
+		eine Restkraft von 40 N stehen, war das gemessen an 20 N Eigengewicht
+		riesig, gemessen an 700 N aber ein Rundungsfehler.
+
+		Der Knoten wurde deshalb als "nicht ausgesteift" gemeldet, obwohl vier
+		Bauteile daran hingen - und im Test hat das Spiel dort ein voellig
+		gesundes Bauteil zerstoert. Fuer den Spieler sah das aus, als bräche
+		die Bruecke ohne Grund.
+
+		Verglichen wird jetzt mit dem GROESSEREN von beidem: der aeusseren
+		Last und der groessten Kraft in den Bauteilen an diesem Knoten. Eine
+		echte Wackelstelle traegt gar nichts ab - dort ist die Restkraft so
+		gross wie die Last selbst und faellt weiterhin sofort auf.
+	]]
+	local strongestAt: { [number]: number } = {}
+	for index, member in members do
+		local force = math.abs(member.force)
+		local a, b = keyToSolver[member.keyA], keyToSolver[member.keyB]
+		if a and force > (strongestAt[a] or 0) then
+			strongestAt[a] = force
+		end
+		if b and force > (strongestAt[b] or 0) then
+			strongestAt[b] = force
+		end
+	end
+
 	for solverIndex, residual in result.residuals do
+		local reference = math.max(
+			loadMagnitude[solverIndex] or 0,
+			strongestAt[solverIndex] or 0
+		)
 		local tolerance = math.max(
 			Config.Physics.residualAbsolute,
-			(loadMagnitude[solverIndex] or 0) * Config.Physics.residualRelative
+			reference * Config.Physics.residualRelative
 		)
 		if residual > tolerance and residual > worstResidual then
 			unstable = true

@@ -137,6 +137,13 @@ function BuildController.new()
 	self.onRemoveRequest = nil -- (memberId)
 	self.onSelectionChanged = nil -- (material oder "Remove")
 	self.onDragChanged = nil -- (true/false) - fuer die Anleitung
+	--[[
+		Warum die Vorschau rot ist. Der Grund wurde bisher ausgerechnet und
+		dann weggeworfen - der Spieler sah nur eine rote Linie und musste
+		raten, ob sie zu lang war, im Felsen steckte oder das Budget nicht
+		reichte.
+	]]
+	self.onPreviewProblem = nil
 
 	self:createMarkers()
 	self:createGamepadCursor()
@@ -515,23 +522,23 @@ end
 	Vorschau, die erst nach der Antwort vom Server rot wird, zu spaet kommt:
 	da hat man schon losgelassen.
 ]]
-function BuildController:previewProblem(ax: number, ay: number, bx: number, by: number): string?
+function BuildController:previewProblem(ax: number, ay: number, bx: number, by: number)
 	local level = self.level
 	if not level then
-		return "Kein Level"
+		return { key = "notice.noLevel" }
 	end
 
 	local spec = Materials.get(self.selectedMaterial)
 	if not spec then
-		return "Unbekannter Baustoff"
+		return { key = "notice.unknownMaterial" }
 	end
 
 	local length = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
 	if length < spec.minLength - 0.01 then
-		return string.format("zu kurz (min %d)", spec.minLength)
+		return { key = "preview.tooShort", args = { spec.minLength } }
 	end
 	if length > spec.maxLength + 0.01 then
-		return string.format("zu lang (max %d)", spec.maxLength)
+		return { key = "preview.tooLong", args = { spec.maxLength } }
 	end
 
 	local area = level.buildArea
@@ -549,15 +556,15 @@ function BuildController:previewProblem(ax: number, ay: number, bx: number, by: 
 	end
 
 	if not insideArea(ax, ay) or not insideArea(bx, by) then
-		return "ausserhalb des Baubereichs"
+		return { key = "preview.outsideArea" }
 	end
 
 	if Terrain.segmentBlocked(level.terrain, ax, ay, bx, by) then
-		return "laeuft durch den Felsen"
+		return { key = "preview.throughRock" }
 	end
 
 	if Materials.cost(self.selectedMaterial, length) > self.budgetLeft then
-		return "Budget reicht nicht"
+		return { key = "preview.noBudget" }
 	end
 
 	return nil
@@ -631,15 +638,31 @@ function BuildController:update(dt: number)
 			self.preview.CFrame = CFrame.lookAt(startWorld + delta / 2, endWorld, up)
 			self.preview.Color = if problem then Color3.fromRGB(235, 90, 80) else Color3.fromRGB(120, 235, 150)
 			self.preview.Transparency = 0.2
-			self.previewProblemText = problem
+			self:reportPreviewProblem(problem)
 		else
 			self.preview.Transparency = 1
-			self.previewProblemText = nil
+			self:reportPreviewProblem(nil)
 		end
 	else
 		self.startMarker.Transparency = 1
 		self.preview.Transparency = 1
-		self.previewProblemText = nil
+		self:reportPreviewProblem(nil)
+	end
+end
+
+--[[
+	Den Grund nur melden, wenn er sich GEAENDERT hat. Beim Ziehen laeuft
+	update() sechzigmal je Sekunde; jedes Mal denselben Text neu zu setzen
+	waere verschwendete Arbeit und liesse die Anzeige flackern.
+]]
+function BuildController:reportPreviewProblem(problem)
+	local key = if problem then problem.key else nil
+	if key == self.lastProblemKey then
+		return
+	end
+	self.lastProblemKey = key
+	if self.onPreviewProblem then
+		self.onPreviewProblem(problem)
 	end
 end
 

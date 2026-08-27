@@ -436,6 +436,15 @@ controller.onSelectionChanged = function(key)
 	end
 end
 
+--[[
+	Waehrend des Ziehens anzeigen, warum die Vorschau rot ist. Ohne das sah
+	der Spieler nur eine rote Linie und musste raten, ob das Bauteil zu lang
+	war, im Felsen steckte oder das Budget nicht mehr reichte.
+]]
+controller.onPreviewProblem = function(problem)
+	hud:showDragProblem(problem)
+end
+
 -- Die Anleitung will wissen, wann zum ersten Mal gezogen wird.
 controller.onDragChanged = function(active)
 	if active then

@@ -867,15 +867,41 @@ end
 
 function BuildHud:buildStatus()
 	local status = Theme.panel(self.root, "Status")
-	status.Size = UDim2.fromOffset(460, 34)
+	-- Breiter und zweizeilig: der Hinweis sagt jetzt auch, was zu tun ist.
+	status.Size = UDim2.fromOffset(620, 46)
 	status.Position = UDim2.new(0.5, -230, 1, -142)
 	status.BackgroundTransparency = 0.15
 	status.Visible = false
 	self.statusPanel = status
 
-	self.statusLabel = Theme.label(status, "Text", {
+	--[[
+		WARUM DIE VORSCHAU ROT IST
+
+		Eine eigene Zeile, die nur waehrend des Ziehens erscheint. Sie steht
+		nahe an der Fussleiste, also dort, wo der Blick beim Bauen ohnehin
+		ist - und sie verdraengt die Stabilitaetswarnung nicht, denn die
+		beantwortet eine andere Frage.
+	]]
+	local dragHint = Theme.panel(self.root, "DragHint")
+	dragHint.Size = UDim2.fromOffset(320, 30)
+	dragHint.BackgroundTransparency = 0.1
+	dragHint.Visible = false
+	self.dragHintPanel = dragHint
+
+	self.dragHintLabel = Theme.label(dragHint, "Text", {
 		size = UDim2.new(1, -20, 1, 0),
 		position = UDim2.fromOffset(10, 0),
+		text = "",
+		textSize = 13,
+		bold = true,
+		color = Theme.colors.danger,
+		align = Enum.TextXAlignment.Center,
+	})
+
+	self.statusLabel = Theme.label(status, "Text", {
+		size = UDim2.new(1, -20, 1, -6),
+		position = UDim2.fromOffset(10, 3),
+		wrapped = true,
 		text = "",
 		textSize = 14,
 		bold = true,
@@ -887,6 +913,19 @@ end
 	Kurze Rueckmeldung, die nach ein paar Sekunden von selbst verschwindet.
 	Der Token verhindert, dass eine aeltere Meldung eine neuere wegraeumt.
 ]]
+--[[
+	Zeigt beim Ziehen an, warum die Vorschau rot ist - oder blendet die Zeile
+	aus, wenn alles in Ordnung ist.
+]]
+function BuildHud:showDragProblem(problem)
+	if not problem then
+		self.dragHintPanel.Visible = false
+		return
+	end
+	self.dragHintLabel.Text = I18n.message(problem)
+	self.dragHintPanel.Visible = true
+end
+
 function BuildHud:showNotice(text: string, color: Color3?)
 	self.noticeToken += 1
 	local token = self.noticeToken
@@ -1658,7 +1697,10 @@ function BuildHud:applyScale()
 	-- Statuszeile mittig ueber der Fussleiste
 	----------------------------------------------------------------------------
 
-	self.statusPanel.Position = UDim2.new(0.5, -230, 1, -(bottomHeight + inset + gap + 34))
+	-- Der Ziehhinweis sitzt knapp ueber der Stabilitaetszeile.
+	self.dragHintPanel.Position = UDim2.new(0.5, -160, 1, -(bottomHeight + inset + gap + 82))
+
+	self.statusPanel.Position = UDim2.new(0.5, -310, 1, -(bottomHeight + inset + gap + 34))
 end
 
 --[[

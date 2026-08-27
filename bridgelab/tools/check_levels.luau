@@ -268,9 +268,28 @@ local function evaluate(plan, placements)
 		nichts. Der schlimmste solche Knoten wird MIT NAMEN gemeldet: ohne ihn
 		steht in der Ausgabe nur "instabil", und man sucht sich tot.
 	]]
+	--[[
+		Verglichen wird mit dem GROESSEREN von aeusserer Last und groesster
+		Bauteilkraft an diesem Knoten - genauso wie im Spiel (ForceEngine).
+		Nur die aeussere Last zu nehmen, meldete Knoten als instabil, an denen
+		vier Bauteile hingen und in denen 700 N steckten.
+	]]
+	local strongestAt = {}
+	for index, m in plan.members do
+		local force = math.abs(res.forces[index] or 0)
+		local a, b = map[m.a], map[m.b]
+		if a and force > (strongestAt[a] or 0) then
+			strongestAt[a] = force
+		end
+		if b and force > (strongestAt[b] or 0) then
+			strongestAt[b] = force
+		end
+	end
+
 	local unstable, worstNode, worstResidual = false, nil, 0
 	for i, r in res.residuals do
-		if r > math.max(1.0, (mag[i] or 0) * 0.05) then
+		local reference = math.max(mag[i] or 0, strongestAt[i] or 0)
+		if r > math.max(1.0, reference * 0.05) then
 			unstable = true
 			if r > worstResidual then
 				worstResidual = r
@@ -922,35 +941,58 @@ local function blueprintPlan(level)
 	end
 
 	local segments = math.max(2, math.ceil(span / math.min(MAT[deckKey].maxLen, 8)))
-	local panel = span / segments
 
-	local longest = MAT[webKey].maxLen * 0.94
-	local maxDepth = math.sqrt(math.max(longest * longest - panel * panel, 1))
-	local depth = math.round(math.clamp(maxDepth, 4, 14) / GRID) * GRID
-
+	--[[
+		Genau dieselbe Rechnung wie in Blueprint.luau: erst die Knoten aufs
+		Raster runden, dann die BREITESTE Luecke suchen, und erst daraus die
+		Bauhoehe bestimmen. Aus der durchschnittlichen Feldbreite gerechnet
+		wurde die Diagonale ueber dem breitesten Feld zu lang und fiel weg -
+		und ein Fachwerk mit Luecke steht nicht.
+	]]
 	local plan = newPlan(level)
 	local deck, top = {}, {}
 	for i = 0, segments do
 		local t = i / segments
-		local x = math.round((a.x + span * t) / GRID) * GRID
-		local y = math.round((a.y + (b.y - a.y) * t) / GRID) * GRID
-		deck[i + 1] = { x, y }
-		top[i + 1] = { x, y + depth }
+		deck[i + 1] = {
+			math.round((a.x + span * t) / GRID) * GRID,
+			math.round((a.y + (b.y - a.y) * t) / GRID) * GRID,
+		}
+	end
+
+	local widestPanel = 0
+	for i = 1, segments do
+		local dx = deck[i + 1][1] - deck[i][1]
+		local dy = deck[i + 1][2] - deck[i][2]
+		widestPanel = math.max(widestPanel, math.sqrt(dx * dx + dy * dy))
+	end
+
+	local longest = math.min(MAT[webKey].maxLen, 16)
+	local room = longest * longest - widestPanel * widestPanel
+	if room <= 1 then
+		return nil
+	end
+
+	local depth = math.floor(math.sqrt(room) / GRID) * GRID
+	depth = math.clamp(depth, 4, 14)
+	depth = math.min(depth, math.floor(longest / GRID) * GRID)
+
+	for i = 1, segments + 1 do
+		top[i] = { deck[i][1], deck[i][2] + depth }
 	end
 	plan.deckPoints = deck
 
 	for i = 1, segments do
-		plan:tryAdd(deckKey, deck[i][1], deck[i][2], deck[i + 1][1], deck[i + 1][2])
-		plan:tryAdd(webKey, top[i][1], top[i][2], top[i + 1][1], top[i + 1][2])
+		plan:add(deckKey, deck[i][1], deck[i][2], deck[i + 1][1], deck[i + 1][2])
+		plan:add(webKey, top[i][1], top[i][2], top[i + 1][1], top[i + 1][2])
 	end
 	for i = 1, segments + 1 do
-		plan:tryAdd(webKey, deck[i][1], deck[i][2], top[i][1], top[i][2])
+		plan:add(webKey, deck[i][1], deck[i][2], top[i][1], top[i][2])
 	end
 	for i = 1, segments do
 		if i % 2 == 1 then
-			plan:tryAdd(webKey, deck[i][1], deck[i][2], top[i + 1][1], top[i + 1][2])
+			plan:add(webKey, deck[i][1], deck[i][2], top[i + 1][1], top[i + 1][2])
 		else
-			plan:tryAdd(webKey, top[i][1], top[i][2], deck[i + 1][1], deck[i + 1][2])
+			plan:add(webKey, top[i][1], top[i][2], deck[i + 1][1], deck[i + 1][2])
 		end
 	end
 

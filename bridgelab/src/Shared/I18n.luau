@@ -529,8 +529,8 @@ add("level.W1L4.hint2",
 	"Holz kostet 5 je Stud, Strasse 8. Jedes Stueck Strasse, das du weglaesst, spart bares Geld - aber die Fahrbahn muss durchgehend sein.",
 	"Wood costs 5 per stud, road costs 8. Every piece of road you leave out saves real money - but the roadway must stay continuous.")
 add("level.W1L4.hint3",
-	"Ein flacheres Fachwerk spart Material an den Streben, kostet aber mehr Kraft in den Gurten. Such den Punkt dazwischen - sechs Studs Bauhoehe reichen hier.",
-	"A shallower truss saves material on the web, but puts more force in the chords. Find the balance - six studs of depth is enough here.")
+	"Die Vorlage passt gerade so ins Budget, ist aber nicht die guenstigste Loesung. Ein flacheres Fachwerk spart Material an den Streben - sechs Studs Bauhoehe reichen hier und kosten rund sechzig weniger.",
+	"The blueprint just about fits the budget, but it is not the cheapest solution. A shallower truss saves material on the web - six studs of depth is enough here and costs about sixty less.")
 
 add("level.W2L5.name", "Weit gespannt", "Wide span")
 add("level.W2L5.subtitle", "Zweiundsiebzig Studs am Stueck. Nur Stahl traegt das.",
@@ -664,8 +664,14 @@ add("hud.peakLoad", "Hoechste Auslastung", "Peak load")
 add("hud.legendLow", "locker", "relaxed")
 add("hud.legendMid", "wird eng", "getting tight")
 add("hud.legendHigh", "am Limit", "at the limit")
-add("hud.unstable", "Struktur nicht stabil - die rote Markierung zeigt die schwache Stelle",
-	"Structure not stable - the red marker shows the weak spot")
+--[[
+	Diese Zeile steht beim BAUEN da, nicht erst nach dem Test. Sie sagt
+	deshalb nicht nur, dass etwas wackelt, sondern auch was zu tun ist -
+	sonst starrt man auf einen roten Punkt und probiert herum.
+]]
+add("hud.unstable",
+	"Nicht stabil: am roten Punkt haengt ein Knoten an zwei Bauteilen in einer Linie. Setze dort eine SCHRAEGE Verbindung - erst ein Dreieck haelt.",
+	"Not stable: at the red dot a joint hangs on two parts in one line. Add a DIAGONAL there - only a triangle holds.")
 add("hud.toLevelSelect", "Zur Levelauswahl", "Back to level select")
 add("hud.buildAgain", "Noch einmal bauen", "Build it again")
 add("hud.notPassed", "Nicht bestanden", "Not passed")
@@ -773,6 +779,23 @@ add("blueprint.shown",
 	"Die Vorlage zeigt die GRUNDFORM eines Fachwerks. In den ersten Leveln traegt sie so, spaeter musst du sie verstaerken - doppelte Diagonalen, zweites Bauteil neben der Fahrbahn, mehr Bauhoehe.",
 	"The blueprint shows the BASIC shape of a truss. In the first levels it holds as it is; later you will need to reinforce it - double diagonals, a second part beside the roadway, more depth.")
 add("blueprint.none", "Fuer dieses Level gibt es keine Vorlage.", "There is no blueprint for this level.")
+
+
+--------------------------------------------------------------------------------
+-- Warum die Vorschau rot ist
+--------------------------------------------------------------------------------
+
+--[[
+	Diese kurzen Gruende erscheinen WAEHREND des Ziehens. Sie sind bewusst
+	knapp: man liest sie mit einem halben Blick, waehrend die Hand noch die
+	Maustaste haelt.
+]]
+add("preview.tooShort", "Zu kurz - mindestens %d Studs", "Too short - at least %d studs")
+add("preview.tooLong", "Zu lang - hoechstens %d Studs", "Too long - at most %d studs")
+add("preview.outsideArea", "Ausserhalb des Baubereichs", "Outside the build area")
+add("preview.throughRock", "Laeuft durch den Felsen", "Runs through the rock")
+add("preview.noBudget", "Das Budget reicht nicht mehr", "Not enough budget left")
+add("notice.noLevel", "Kein Level geladen", "No level loaded")
 
 
 return I18n
