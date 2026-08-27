@@ -221,12 +221,12 @@ add("material.Steel.info", "Sehr tragfaehig und weit spannend. Das Rueckgrat gro
 	"Very strong and long-spanning. The backbone of big bridges.")
 
 add("material.Rope.name", "Seil", "Rope")
-add("material.Rope.info", "Kann nur ziehen, nie druecken. Sehr billig und sehr weit.",
-	"Can only pull, never push. Very cheap and very long.")
+add("material.Rope.info", "Kann nur ziehen, nie druecken. Taugt nur dort, wo Zug herrscht - etwa neben der Fahrbahn.",
+	"Can only pull, never push. Only useful where there is tension - for example beside the roadway.")
 
 add("material.Cable.name", "Kabel", "Cable")
-add("material.Cable.info", "Stahlseil. Zieht fast dreimal so stark wie ein Seil.",
-	"Steel cable. Pulls almost three times as hard as a rope.")
+add("material.Cable.info", "Stahlseil, zieht fast dreimal so stark wie ein Seil. Neben der Fahrbahn halb so teuer wie Stahl.",
+	"Steel cable, pulls almost three times as hard as a rope. Beside the roadway it costs half as much as steel.")
 
 add("material.Hydraulic.name", "Hydraulik", "Hydraulics")
 add("material.Hydraulic.info", "Faehrt in seiner Phase aus und hebt dabei alles daran. Teuer.",
@@ -711,6 +711,68 @@ add("school.depth.title", "Hoeher bauen heisst weniger Kraft",
 add("school.depth.text",
 	"Die Kraft in den Gurten ist ungefaehr Gewicht mal Spannweite geteilt durch das Vierfache der Bauhoehe. Doppelte Bauhoehe heisst also HALBE Kraft. Ein hohes Fachwerk ist fast immer billiger als ein niedriges aus staerkerem Material.",
 	"Chord force is roughly weight times span divided by four times the depth. So twice the depth means HALF the force. A tall truss is almost always cheaper than a shallow one built from stronger material.")
+
+
+--------------------------------------------------------------------------------
+-- Was soll ich denn noch dazu bauen?
+--------------------------------------------------------------------------------
+
+--[[
+	Diese Saetze erscheinen nach einem gescheiterten Test unter der
+	Begruendung. Sie sagen als Einziges im ganzen Spiel, was konkret zu TUN
+	ist - deshalb sind sie bewusst als Handlungsanweisung formuliert und
+	nicht als Erklaerung.
+]]
+
+add("advice.title", "Was du tun kannst", "What you can do")
+
+add("advice.roadBroke",
+	"Die FAHRBAHN ist gerissen. Sie traegt beim Fachwerk doppelt: als Strasse und als Untergurt. Lege ein zweites Bauteil auf genau dieselben zwei Punkte - Stahl, oder billiger noch ein Kabel, denn der Untergurt steht unter Zug.",
+	"The ROADWAY broke. In a truss it does double duty: as road and as bottom chord. Put a second part on exactly the same two joints - steel, or cheaper still a cable, since the bottom chord is in tension.")
+
+add("advice.chordBroke",
+	"Der OBERGURT ist gerissen. Zwei Dinge helfen: baue das Fachwerk HOEHER - doppelte Bauhoehe heisst halbe Kraft - oder lege ein zweites Bauteil auf dieselben zwei Punkte.",
+	"The TOP CHORD broke. Two things help: build the truss TALLER - twice the depth means half the force - or put a second part on the same two joints.")
+
+add("advice.diagonalBroke",
+	"Eine DIAGONALE ist gerissen. Mit nur einer Diagonale je Feld gibt es genau einen Weg fuer die Kraft, und der traegt alles allein. Setze in jedes Feld die ZWEITE Diagonale, so dass ein liegendes Kreuz entsteht.",
+	"A DIAGONAL broke. With only one diagonal per bay there is exactly one path for the force, and it carries everything alone. Add the SECOND diagonal in every bay so each forms a lying cross.")
+
+add("advice.postBroke",
+	"Ein senkrechter PFOSTEN ist gerissen. Er ist meist zu lang: teile ihn in zwei kuerzere Stuecke und verbinde die Mitte schraeg zur Fahrbahn, damit er nicht seitlich wegknickt.",
+	"A vertical POST broke. It is usually too long: split it into two shorter pieces and brace the middle diagonally to the roadway so it cannot buckle sideways.")
+
+add("advice.unstable",
+	"Hier ist nichts ausgesteift: an dieser Stelle haengt ein Knoten an nur zwei Bauteilen, die in derselben Linie liegen. So ein Knoten kann keine Last nach unten aufnehmen. Setze eine SCHRAEGE Verbindung dorthin - erst ein Dreieck haelt.",
+	"Nothing is braced here: that joint hangs on only two parts lying in the same line. Such a joint cannot take any downward load. Add a DIAGONAL there - only a triangle holds.")
+
+add("advice.fell",
+	"Das Fahrzeug ist abgestuerzt. Meist hat die Fahrbahn eine LUECKE, oder ein Stueck ist zu steil - ueber etwa 33 Grad faellt das Fahrzeug hindurch. Fahre die Strecke im Kopf ab: liegt ueberall Strasse, und liegt sie flach genug?",
+	"The vehicle fell. Usually the roadway has a GAP, or a piece is too steep - beyond about 33 degrees the vehicle falls straight through. Walk the route in your head: is there road everywhere, and is it flat enough?")
+
+add("advice.tipped",
+	"Das Fahrzeug ist gekippt. Meistens liegt das an einer Stufe in der Fahrbahn. Achte darauf, dass benachbarte Fahrbahnstuecke an denselben Knoten haengen und keinen Absatz bilden.",
+	"The vehicle tipped over. Usually there is a step in the roadway. Make sure neighbouring road pieces share the same joints and do not form a ledge.")
+
+add("advice.timeout",
+	"Die Zeit ist abgelaufen. Stelle am Tacho ein hoeheres Tempo ein - oder pruefe, ob das Fahrzeug irgendwo haengengeblieben ist.",
+	"Time ran out. Set a higher speed on the dial - or check whether the vehicle got stuck somewhere.")
+
+add("advice.boatBlocked",
+	"Die Bruecke steht dem Schiff im Weg. Baue ein Stueck Fahrbahn auf HYDRAULIK und schalte es in der Fussleiste hoch, bevor das Schiff kommt.",
+	"The bridge is in the ship's way. Put a section of roadway on HYDRAULICS and raise it from the bottom bar before the ship arrives.")
+
+
+add("school.cables.title", "Seile koennen nur ziehen", "Ropes can only pull")
+add("school.cables.text",
+	"Ein Seil traegt, wenn daran GEZOGEN wird - muesste es druecken, haengt es einfach durch und traegt gar nichts. Deshalb sind Seile oben am Obergurt nutzlos.\n\nWo sie sich lohnen: der UNTERGURT eines Fachwerks steht unter Zug. Ein Kabel neben der Fahrbahn kostet 5 je Stud statt 10 fuer Stahl - halber Preis, gleiche Wirkung.",
+	"A rope carries when something PULLS on it - if it would have to push, it simply goes slack and carries nothing. That is why ropes are useless along the top chord.\n\nWhere they pay off: the BOTTOM chord of a truss is in tension. A cable beside the roadway costs 5 per stud instead of 10 for steel - half the price, same effect.")
+
+
+add("blueprint.shown",
+	"Die Vorlage zeigt die GRUNDFORM eines Fachwerks. In den ersten Leveln traegt sie so, spaeter musst du sie verstaerken - doppelte Diagonalen, zweites Bauteil neben der Fahrbahn, mehr Bauhoehe.",
+	"The blueprint shows the BASIC shape of a truss. In the first levels it holds as it is; later you will need to reinforce it - double diagonals, a second part beside the roadway, more depth.")
+add("blueprint.none", "Fuer dieses Level gibt es keine Vorlage.", "There is no blueprint for this level.")
 
 
 return I18n

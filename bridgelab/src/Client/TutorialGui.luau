@@ -469,12 +469,22 @@ end
 --------------------------------------------------------------------------------
 
 function TutorialGui:applyScale()
-	self.scale.Scale = Device.uiScale()
+	local factor = Device.uiScale()
+	self.scale.Scale = factor
+
+	--[[
+		Die Wurzel wird um den Kehrwert groesser gemacht, weil ein UIScale
+		auch die POSITIONEN seiner Kinder mitskaliert. Ohne das laege eine
+		Angabe wie "am unteren Bildrand" nicht am Bildrand, sondern bei 70
+		Prozent der Hoehe - das Fenster sitzt dann mitten im Bild statt dort,
+		wo es hingehoert.
+	]]
+	self.root.Size = UDim2.fromScale(1 / factor, 1 / factor)
 
 	local camera = workspace.CurrentCamera
 	local viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
-	local effectiveWidth = viewport.X / math.max(self.scale.Scale, 0.1)
-	local effectiveHeight = viewport.Y / math.max(self.scale.Scale, 0.1)
+	local effectiveWidth = viewport.X / math.max(factor, 0.1)
+	local effectiveHeight = viewport.Y / math.max(factor, 0.1)
 
 	--[[
 		Wohin mit dem Fenster? Es darf die Fussleiste nicht verdecken, denn

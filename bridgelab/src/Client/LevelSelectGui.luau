@@ -69,7 +69,19 @@ function LevelSelectGui:build()
 	gui.Parent = self.player:WaitForChild("PlayerGui")
 	self.gui = gui
 
-	-- Hintergrund mit weichem Farbverlauf statt einer flachen Flaeche.
+	--[[
+		DER HINTERGRUND WIRD NIE MITSKALIERT
+
+		Hier lag ein Fehler: der UIScale hing frueher am Hintergrund selbst.
+		Auf einem Fenster schmaler als 1280 Pixel liefert Device.uiScale()
+		einen Wert unter 1 - und damit schrumpfte die Hintergrundflaeche auf
+		bis zu 70 Prozent. Rundherum sah man dann die 3D-Welt mit der
+		Spawn-Stelle und verschwommenem Zeug drumherum.
+
+		Der Hintergrund fuellt jetzt IMMER den ganzen Bildschirm. Skaliert
+		wird nur der Inhalt darin - und dessen Groesse wird gegengerechnet
+		(siehe applyScale), damit er nach dem Skalieren wieder genau passt.
+	]]
 	local backdrop = Instance.new("Frame")
 	backdrop.Name = "Backdrop"
 	backdrop.Size = UDim2.fromScale(1, 1)
@@ -86,8 +98,15 @@ function LevelSelectGui:build()
 	backdropGradient.Rotation = 70
 	backdropGradient.Parent = backdrop
 
+	local content = Instance.new("Frame")
+	content.Name = "Content"
+	content.Size = UDim2.fromScale(1, 1)
+	content.BackgroundTransparency = 1
+	content.Parent = backdrop
+	self.content = content
+
 	local scale = Instance.new("UIScale")
-	scale.Parent = backdrop
+	scale.Parent = content
 	self.scale = scale
 
 	----------------------------------------------------------------------------
@@ -98,7 +117,7 @@ function LevelSelectGui:build()
 	header.Name = "Header"
 	header.Size = UDim2.new(1, 0, 0, 112)
 	header.BackgroundTransparency = 1
-	header.Parent = backdrop
+	header.Parent = content
 	self.header = header
 
 	local title = Theme.label(header, "Title", {
@@ -194,7 +213,7 @@ function LevelSelectGui:build()
 	list.ScrollBarImageColor3 = Theme.colors.border
 	list.CanvasSize = UDim2.fromScale(0, 0)
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	list.Parent = backdrop
+	list.Parent = content
 	self.list = list
 
 	local grid = Instance.new("UIGridLayout")
@@ -647,11 +666,21 @@ end
 --------------------------------------------------------------------------------
 
 function LevelSelectGui:applyScale()
-	self.scale.Scale = Device.uiScale()
+	local factor = Device.uiScale()
+	self.scale.Scale = factor
+
+	--[[
+		Der Inhalt wird um den Kehrwert groesser gemacht, bevor er skaliert
+		wird. Nach dem Skalieren fuellt er damit wieder genau den Bildschirm.
+
+		Ohne diese Gegenrechnung endete der Inhalt bei einem Massstab von 0,7
+		nach 70 Prozent der Breite, und rechts sowie unten klaffte eine Luecke.
+	]]
+	self.content.Size = UDim2.fromScale(1 / factor, 1 / factor)
 
 	local camera = workspace.CurrentCamera
 	local width = if camera then camera.ViewportSize.X else 1280
-	local effectiveWidth = width / math.max(self.scale.Scale, 0.1)
+	local effectiveWidth = width / math.max(factor, 0.1)
 
 	-- Auf schmalen Bildschirmen eine Karte pro Zeile, sonst zwei.
 	if effectiveWidth < 1000 then

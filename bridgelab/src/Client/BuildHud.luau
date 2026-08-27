@@ -335,11 +335,31 @@ function BuildHud:buildMaterialRail()
 	rail.BackgroundTransparency = 0.08
 	self.materialRail = rail
 
-	local list = Instance.new("Frame")
+	--[[
+		DIE LEISTE MUSS SCROLLEN KOENNEN
+
+		Sieben Baustoffe brauchen rund 450 Pixel Hoehe. Auf einem flachen
+		Fenster - und im Studio-Testfenster ist es fast immer flach - ist so
+		viel Platz nicht da. Vorher wurde die Leiste dann einfach abgeschnitten:
+		die unteren Baustoffe waren unsichtbar und nicht anwaehlbar, und in den
+		spaeteren Leveln fehlten damit genau Stahl, Kabel und Hydraulik.
+
+		Als ScrollingFrame ist immer alles erreichbar, egal wie flach das
+		Fenster ist. ClipsDescendants sorgt nebenbei dafuer, dass nichts mehr
+		ueber die Leiste hinaus in die Fussleiste ragt.
+	]]
+	local list = Instance.new("ScrollingFrame")
 	list.Name = "List"
-	list.Size = UDim2.new(1, -16, 1, -16)
+	list.Size = UDim2.new(1, -12, 1, -16)
 	list.Position = UDim2.fromOffset(8, 8)
 	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ClipsDescendants = true
+	list.ScrollBarThickness = 4
+	list.ScrollBarImageColor3 = Theme.colors.border
+	list.ScrollingDirection = Enum.ScrollingDirection.Y
+	list.CanvasSize = UDim2.new()
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.Parent = rail
 
 	local layout = Instance.new("UIListLayout")
@@ -347,6 +367,13 @@ function BuildHud:buildMaterialRail()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Padding = UDim.new(0, 6)
 	layout.Parent = list
+
+	-- Etwas Luft unten, damit der letzte Knopf nicht am Rand klebt.
+	local padding = Instance.new("UIPadding")
+	padding.PaddingBottom = UDim.new(0, 8)
+	padding.PaddingRight = UDim.new(0, 4)
+	padding.Parent = list
+
 	self.materialList = list
 
 	for order, key in Materials.order do
@@ -437,8 +464,18 @@ end
 	es das Level schlicht nicht vorsieht.
 ]]
 function BuildHud:setAvailableMaterials(list)
+	local changed = false
 	for key, button in self.materialButtons do
-		button.Visible = list == nil or table.find(list, key) ~= nil
+		local visible = list == nil or table.find(list, key) ~= nil
+		if button.Visible ~= visible then
+			button.Visible = visible
+			changed = true
+		end
+	end
+
+	-- Weniger Baustoffe heisst kuerzere Leiste - also neu einteilen.
+	if changed then
+		self:applyScale()
 	end
 end
 
@@ -988,8 +1025,9 @@ end
 
 function BuildHud:buildResultPanel()
 	local panel = Theme.panel(self.root, "ResultPanel")
-	panel.Size = UDim2.fromOffset(440, 210)
-	panel.Position = UDim2.new(0.5, -220, 0.5, -105)
+	-- Hoeher als frueher: darunter steht jetzt der Rat, was zu tun ist.
+	panel.Size = UDim2.fromOffset(460, 330)
+	panel.Position = UDim2.new(0.5, -230, 0.5, -165)
 	panel.BackgroundTransparency = 0.02
 	panel.Visible = false
 	self.resultPanel = panel
@@ -1004,8 +1042,8 @@ function BuildHud:buildResultPanel()
 	})
 
 	self.resultReason = Theme.label(panel, "Reason", {
-		size = UDim2.new(1, -40, 0, 70),
-		position = UDim2.fromOffset(20, 56),
+		size = UDim2.new(1, -40, 0, 42),
+		position = UDim2.fromOffset(20, 54),
 		text = "",
 		textSize = 14,
 		color = Theme.colors.textDim,
@@ -1014,9 +1052,60 @@ function BuildHud:buildResultPanel()
 		wrapped = true,
 	})
 
+	--[[
+		DER RAT - das Wichtigste im ganzen Fenster
+
+		Darueber steht, WAS kaputtgegangen ist. Hier steht, was man dagegen
+		tun kann. Ohne diesen Kasten wusste der Spieler nur, dass etwas
+		gerissen ist, und blieb genau daran haengen.
+
+		Deshalb ist er abgesetzt und farbig hinterlegt: er soll nicht wie eine
+		weitere Zeile Erklaerung aussehen, sondern wie eine Handlungsanweisung.
+	]]
+	local adviceBox = Instance.new("Frame")
+	adviceBox.Name = "AdviceBox"
+	adviceBox.Size = UDim2.new(1, -40, 0, 128)
+	adviceBox.Position = UDim2.fromOffset(20, 100)
+	adviceBox.BackgroundColor3 = Theme.colors.panelLight
+	adviceBox.BorderSizePixel = 0
+	adviceBox.Visible = false
+	adviceBox.Parent = panel
+	Theme.corner(adviceBox, 8)
+	self.adviceBox = adviceBox
+
+	-- Farbstreifen links: dieselbe Farbe wie der Tipp-Knopf, damit man den
+	-- Kasten als "hier steht Hilfe" wiedererkennt.
+	local adviceStripe = Instance.new("Frame")
+	adviceStripe.Name = "Streifen"
+	adviceStripe.Size = UDim2.new(0, 4, 1, -16)
+	adviceStripe.Position = UDim2.fromOffset(8, 8)
+	adviceStripe.BackgroundColor3 = Theme.colors.accent
+	adviceStripe.BorderSizePixel = 0
+	adviceStripe.Parent = adviceBox
+	Theme.corner(adviceStripe, 2)
+
+	Theme.label(adviceBox, "Caption", {
+		size = UDim2.new(1, -32, 0, 16),
+		position = UDim2.fromOffset(20, 8),
+		text = I18n.t("advice.title"),
+		textSize = 12,
+		bold = true,
+		color = Theme.colors.accent,
+	})
+
+	self.adviceLabel = Theme.label(adviceBox, "Text", {
+		size = UDim2.new(1, -34, 1, -32),
+		position = UDim2.fromOffset(20, 26),
+		text = "",
+		textSize = 13,
+		color = Theme.colors.text,
+		wrapped = true,
+		alignY = Enum.TextYAlignment.Top,
+	})
+
 	local retry = Theme.button(panel, "Retry", {
 		size = UDim2.fromOffset(180, 42),
-		position = UDim2.fromOffset(24, 146),
+		position = UDim2.fromOffset(24, 262),
 		text = I18n.t("result.retry"),
 		textSize = 15,
 		color = Theme.colors.accent,
@@ -1034,7 +1123,7 @@ function BuildHud:buildResultPanel()
 
 	local toMenu = Theme.button(panel, "ToMenu", {
 		size = UDim2.fromOffset(180, 42),
-		position = UDim2.new(1, -204, 0, 146),
+		position = UDim2.new(1, -204, 0, 262),
 		text = I18n.t("hud.toLevelSelect"),
 		textSize = 15,
 		color = Theme.colors.panelLight,
@@ -1060,7 +1149,7 @@ function BuildHud:buildResultPanel()
 	]]
 	local school = Theme.button(panel, "School", {
 		size = UDim2.fromOffset(150, 42),
-		position = UDim2.new(0.5, -75, 0, 146),
+		position = UDim2.new(0.5, -75, 0, 262),
 		text = I18n.t("school.open"),
 		textSize = 14,
 		color = Theme.colors.panelLight,
@@ -1386,6 +1475,17 @@ function BuildHud:updateResultPanel(result)
 	end
 	self.resultReason.Text = I18n.message(result.reason)
 
+	--[[
+		Nach einem Erfolg gibt es nichts zu raten - da waere der Kasten nur
+		ein Vorwurf. Nach einem Misserfolg ist er das Wichtigste im Fenster.
+	]]
+	if result.advice and not result.success then
+		self.adviceLabel.Text = I18n.t(result.advice)
+		self.adviceBox.Visible = true
+	else
+		self.adviceBox.Visible = false
+	end
+
 	if Device.isGamepad() then
 		GuiService.SelectedObject = self.retryButton
 	end
@@ -1438,7 +1538,25 @@ end
 	anschliessend alles gemeinsam, deshalb muss hier nichts umgerechnet werden.
 ]]
 function BuildHud:applyScale()
-	self.scale.Scale = Device.uiScale()
+	local factor = Device.uiScale()
+	self.scale.Scale = factor
+
+	--[[
+		DIE WURZEL WIRD GEGENGERECHNET - hier lag ein echter Fehler
+
+		Ein UIScale skaliert nicht nur die Groessen, sondern auch die
+		POSITIONEN seiner Kinder. Die Wurzel war bildschirmfuellend
+		(1 mal 1), und bei einem Massstab von 0,7 landete ihre rechte Kante
+		dadurch bei 70 Prozent der Bildschirmbreite. Die ganze Oberflaeche
+		wurde in die linke obere Ecke gequetscht: die Fussleiste sass mitten
+		im Bild, die Baustoffleiste ragte darueber, und alles lag
+		uebereinander.
+
+		Wird die Wurzel vorher um den Kehrwert groesser gemacht, fuellt sie
+		nach dem Skalieren wieder genau den Bildschirm - und die Leisten
+		sitzen wieder an den echten Bildschirmkanten.
+	]]
+	self.root.Size = UDim2.fromScale(1 / factor, 1 / factor)
 
 	local inset = Device.edgeInset()
 	local topHeight = 58
@@ -1446,7 +1564,7 @@ function BuildHud:applyScale()
 	local gap = 10
 
 	-- Die nutzbare Flaeche in unskalierten Pixeln.
-	local viewport = workspace.CurrentCamera.ViewportSize / math.max(self.scale.Scale, 0.01)
+	local viewport = workspace.CurrentCamera.ViewportSize / math.max(factor, 0.01)
 
 	local contentTop = inset + topHeight + gap
 	local contentBottom = bottomHeight + inset + gap
@@ -1468,11 +1586,22 @@ function BuildHud:applyScale()
 
 	--[[
 		Die Leiste ist so hoch wie noetig, aber nie hoeher als der freie
-		Bereich. Auf einem flachen Bildschirm wuerde sie sonst unten in die
-		Fussleiste hineinragen.
+		Bereich. Reicht der Platz nicht, wird der Rest gescrollt - abgeschnitten
+		wird nichts mehr.
+
+		Gezaehlt werden nur die Baustoffe, die dieses Level ueberhaupt anbietet:
+		in Welt 1 sind es drei, und dafuer eine Leiste in voller Hoehe
+		stehenzulassen waere nur verschenkter Platz vor der Bruecke.
 	]]
 	local railWidth = 168
-	local railHeight = math.min(#Materials.order * 62 + 56, contentHeight)
+	local visible = 0
+	for _, button in self.materialButtons do
+		if button.Visible then
+			visible += 1
+		end
+	end
+	visible = math.max(visible, 1)
+	local railHeight = math.min(visible * 62 + 56, contentHeight)
 
 	self.materialRail.Position = UDim2.fromOffset(inset, contentTop)
 	self.materialRail.Size = UDim2.fromOffset(railWidth, railHeight)

@@ -370,6 +370,13 @@ hud.onBlueprint = function()
 	local visible = controller:toggleBlueprint()
 	hud:setBlueprintActive(visible, controller:hasBlueprint())
 	if visible then
+		--[[
+			Einmal sagen, was die Vorlage wert ist. Sie haelt in den ersten
+			Leveln so, wie sie da liegt - spaeter nicht mehr. Wer das nicht
+			weiss, baut sie in Level 5 genau nach, sieht sie brechen und
+			haelt die Vorlage fuer kaputt.
+		]]
+		hud:showNotice(I18n.t("blueprint.shown"), Theme.colors.accent)
 		tutorial:notify("blueprintShown")
 	end
 end

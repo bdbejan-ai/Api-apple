@@ -448,8 +448,11 @@ local function trussPlan(level, deckMat, webMat, options)
 	plan.deckPoints = deck
 	plan:chain(deckMat, deck)
 	if options.reinforce then
-		-- Zweites Bauteil auf denselben Knoten: die eigentliche Verstaerkung.
-		plan:chain(webMat, deck)
+		--[[
+			Zweites Bauteil auf denselben Knoten: die eigentliche Verstaerkung.
+			Womit verstaerkt wird, ist eine eigene Frage - deshalb waehlbar.
+		]]
+		plan:chain(options.reinforceMat or webMat, deck)
 	end
 
 	local top = {}
@@ -802,6 +805,158 @@ local function addPiers(plan, level, mat, deckA, deckB, deck)
 	end
 end
 
+--[[
+	FAECHER - die Fahrbahn haengt an hohen Ankern
+
+	Liegen die Anker UEBER der Fahrbahn, laesst sich die Fahrbahn daran
+	aufhaengen. Von jedem hohen Anker laufen Seile schraeg hinunter zu den
+	Fahrbahnknoten, wie bei einer Schraegseilbruecke:
+
+	         A                       A     hohe Anker
+	        /|\                     /|\
+	       / | \                   / | \   Seile, nur Zug
+	      /  |  \                 /  |  \
+	    o--o--o--o---------------o--o--o--o   Fahrbahn
+
+	WARUM DAS ZUVERLAESSIG RECHNET
+	Jeder Fahrbahnknoten haengt an genau einem schraegen Seil. Zusammen mit
+	den beiden waagerechten Fahrbahnstuecken sind das drei Bauteile in
+	verschiedenen Richtungen - die Rechnung ist damit eindeutig, ohne
+	Mehrdeutigkeit durch ueberzaehlige Bauteile.
+
+	Und vor allem: die Seile stehen hier ZWANGSLAEUFIG unter Zug. Ein Seil
+	kann nur ziehen, und ueber der Fahrbahn haengend zieht es immer. Damit
+	sind Seil und Kabel in dieser Form nicht nur brauchbar, sondern die
+	einzige sinnvolle Wahl - und zum halben Preis von Stahl.
+]]
+local function fanPlan(level, deckMat, cableMat, panel, reinforceMat)
+	local da, db = deckAnchors(level)
+	if not da or not db then
+		return nil
+	end
+
+	-- Anker deutlich UEBER der Fahrbahn suchen.
+	local high = {}
+	for _, anchor in level.anchors do
+		if anchor.y > math.max(da.y, db.y) + 6 then
+			table.insert(high, anchor)
+		end
+	end
+	if #high == 0 then
+		return nil
+	end
+
+	local plan = newPlan(level)
+	local span = db.x - da.x
+	local segments = math.max(2, math.round(span / panel))
+
+	local deck = line(da.x, da.y, db.x, db.y, segments)
+	plan.deckPoints = deck
+	plan:chain(deckMat, deck)
+	if reinforceMat then
+		plan:chain(reinforceMat, deck)
+	end
+
+	--[[
+		Jeder Fahrbahnknoten bekommt ein Seil zum NAECHSTGELEGENEN hohen
+		Anker. Der naechste ist der steilste - und je steiler das Seil, desto
+		mehr von seiner Kraft wirkt senkrecht, also dort, wo sie gebraucht
+		wird.
+	]]
+	local attached = 0
+	for i = 2, segments do
+		local point = deck[i]
+		local best, bestDistance = nil, math.huge
+		for _, anchor in high do
+			local distance = math.sqrt((anchor.x - point[1]) ^ 2 + (anchor.y - point[2]) ^ 2)
+			if distance < bestDistance then
+				best, bestDistance = anchor, distance
+			end
+		end
+		if best and bestDistance <= MAT[cableMat].maxLen then
+			plan:add(cableMat, point[1], point[2], best.x, best.y)
+			attached += 1
+		end
+	end
+
+	if attached == 0 then
+		return nil
+	end
+	return plan
+end
+
+--[[
+	DIE BAUVORLAGE - genau die Form, die das Spiel dem Spieler zeigt
+
+	Blueprint.luau erzeugt im Spiel eine blasse Zeichnung, an der sich
+	Anfaenger orientieren. Diese Funktion baut GENAU DIESELBE Form nach, damit
+	die Pruefung sagen kann, ob sie ueberhaupt haelt.
+
+	Das ist kein Selbstzweck: eine Vorlage, die der Spieler sorgfaeltig
+	nachbaut und die dann bricht, ist schlimmer als gar keine. Er haette alles
+	richtig gemacht und stuende trotzdem vor einem Truemmerhaufen.
+
+	Die Regeln fuer Feldbreite und Bauhoehe stehen deshalb hier genauso wie in
+	Blueprint.luau. Laufen die beiden auseinander, prueft dieses Skript etwas
+	anderes, als das Spiel zeigt - deshalb der Hinweis in beiden Dateien.
+]]
+local function blueprintPlan(level)
+	if level.requiresJump then
+		return nil
+	end
+
+	local a, b = deckAnchors(level)
+	if not a or not b then
+		return nil
+	end
+
+	local deckKey = if level.allowsMaterial("Road") then "Road" else "ReinforcedRoad"
+	local webKey = if level.allowsMaterial("Steel") then "Steel" else "Wood"
+	if not MAT[deckKey] or not MAT[webKey] then
+		return nil
+	end
+
+	local span = b.x - a.x
+	if span < 4 then
+		return nil
+	end
+
+	local segments = math.max(2, math.ceil(span / math.min(MAT[deckKey].maxLen, 8)))
+	local panel = span / segments
+
+	local longest = MAT[webKey].maxLen * 0.94
+	local maxDepth = math.sqrt(math.max(longest * longest - panel * panel, 1))
+	local depth = math.round(math.clamp(maxDepth, 4, 14) / GRID) * GRID
+
+	local plan = newPlan(level)
+	local deck, top = {}, {}
+	for i = 0, segments do
+		local t = i / segments
+		local x = math.round((a.x + span * t) / GRID) * GRID
+		local y = math.round((a.y + (b.y - a.y) * t) / GRID) * GRID
+		deck[i + 1] = { x, y }
+		top[i + 1] = { x, y + depth }
+	end
+	plan.deckPoints = deck
+
+	for i = 1, segments do
+		plan:tryAdd(deckKey, deck[i][1], deck[i][2], deck[i + 1][1], deck[i + 1][2])
+		plan:tryAdd(webKey, top[i][1], top[i][2], top[i + 1][1], top[i + 1][2])
+	end
+	for i = 1, segments + 1 do
+		plan:tryAdd(webKey, deck[i][1], deck[i][2], top[i][1], top[i][2])
+	end
+	for i = 1, segments do
+		if i % 2 == 1 then
+			plan:tryAdd(webKey, deck[i][1], deck[i][2], top[i + 1][1], top[i + 1][2])
+		else
+			plan:tryAdd(webKey, top[i][1], top[i][2], deck[i + 1][1], deck[i + 1][2])
+		end
+	end
+
+	return plan
+end
+
 --------------------------------------------------------------------------------
 -- Durchlauf
 --------------------------------------------------------------------------------
@@ -855,6 +1010,9 @@ local function candidatesFor(level)
 		einmal auf den zusaetzlichen Ankern abgestuetzt. Nur so zeigt sich,
 		ob ein Level die Pfeiler wirklich braucht oder ob es auch ohne geht.
 	]]
+	-- Die Vorlage als eigene Form: haelt das, was dem Spieler gezeigt wird?
+	try("Vorlage", blueprintPlan(level))
+
 	local dA, dB = deckAnchors(level)
 	local hasSpareAnchors = dA ~= nil and dB ~= nil and #level.anchors > 2
 
@@ -915,6 +1073,29 @@ local function candidatesFor(level)
 	end
 
 	local cableMat = if level.allowsMaterial("Cable") then "Cable" else "Rope"
+
+	--[[
+		Kabelvarianten: einmal die Fahrbahn mit Kabel statt Stahl verstaerkt,
+		einmal die Faecherform an hohen Ankern.
+	]]
+	for _, deckMat in deckMats do
+		for _, panel in { 6, 8, 10 } do
+			for _, cross in { false, true } do
+				if level.allowsMaterial("Cable") then
+					try(string.format("Kabelgurt %s/%s p%d%s", strong, deckMat, panel, if cross then " X" else ""),
+						trussPlan(level, deckMat, strong, {
+							depth = 10, panel = panel, cross = cross,
+							reinforce = true, reinforceMat = "Cable", doubleTop = true,
+						}))
+				end
+			end
+
+			try(string.format("Faecher %s/%s p%d", cableMat, deckMat, panel),
+				fanPlan(level, deckMat, cableMat, panel, nil))
+			try(string.format("Faecher %s/%s p%d verstaerkt", cableMat, deckMat, panel),
+				fanPlan(level, deckMat, cableMat, panel, strong))
+		end
+	end
 	for _, panel in { 8, 10 } do
 		try(
 			string.format("Haengebruecke %s p%d", cableMat, panel),
@@ -1057,12 +1238,18 @@ for _, level in Levels.list do
 	local familyOrder = {}
 
 	local function familyOf(name: string): string
-		if string.find(name, "Bogen", 1, true) then
+		if string.find(name, "Vorlage", 1, true) then
+			return "DIE VORLAGE"
+		elseif string.find(name, "Bogen", 1, true) then
 			return "Bogen"
 		elseif string.find(name, "Haengebruecke", 1, true) then
 			return "Haengebruecke"
 		elseif string.find(name, "+Pfeiler", 1, true) then
 			return "mit Pfeiler"
+		elseif string.find(name, "Faecher", 1, true) then
+			return "Faecher an hohen Ankern"
+		elseif string.find(name, "Kabelgurt", 1, true) then
+			return "Fahrbahn mit Kabel"
 		elseif string.find(name, "Verstaerkt", 1, true) then
 			return "verstaerktes Fachwerk"
 		end

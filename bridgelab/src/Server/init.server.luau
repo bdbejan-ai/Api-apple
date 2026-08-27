@@ -19,6 +19,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
@@ -62,6 +63,49 @@ if Workspace.StreamingEnabled then
 			.. "Bitte in Studio unter Workspace den Haken bei StreamingEnabled entfernen."
 	)
 end
+
+--------------------------------------------------------------------------------
+-- Die Standardwelt von Roblox wegraeumen
+--------------------------------------------------------------------------------
+
+--[[
+	Ein neues Roblox-Projekt bringt eine graue Grundplatte und eine
+	Spawn-Plattform mit. BridgeLab baut seine Welt vollstaendig selbst, und
+	dann stehen die beiden nur im Bild: die Grundplatte liegt genau im
+	Ursprung, also dort, wo auch die erste Arena steht, und man sieht sie
+	unter und neben der Bruecke.
+
+	Beim Blick ins Menue faellt es am meisten auf - dort schaut die Kamera in
+	eine Welt, in der es sonst nichts gibt, und man sieht die Spawn-Plattform
+	mit verschwommenem Zeug drumherum.
+
+	Weggeraeumt wird NUR, was Roblox von sich aus anlegt, und nur direkt
+	unterhalb von Workspace. Alles andere koennte jemand absichtlich
+	hinzugefuegt haben.
+]]
+local function clearDefaultWorld()
+	for _, item in Workspace:GetChildren() do
+		local isDefaultGround = item:IsA("BasePart") and (item.Name == "Baseplate" or item.Name == "Base")
+		local isSpawn = item:IsA("SpawnLocation")
+		if isDefaultGround or isSpawn then
+			item:Destroy()
+		end
+	end
+end
+
+clearDefaultWorld()
+
+--[[
+	Der Himmel bekommt einen freundlichen Grundton und keinen Nebel. Ohne das
+	verliert sich die Bruecke bei weit herausgezoomter Kamera im Dunst - was
+	besonders in der grossen Schlucht stoert, wo man ohnehin weit weg ist.
+]]
+Lighting.Ambient = Color3.fromRGB(88, 92, 104)
+Lighting.OutdoorAmbient = Color3.fromRGB(112, 120, 138)
+Lighting.Brightness = 2.4
+Lighting.FogEnd = 100000
+Lighting.ClockTime = 14
+Lighting.GeographicLatitude = 20
 
 Remotes.createAll()
 

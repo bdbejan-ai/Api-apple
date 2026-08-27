@@ -499,6 +499,45 @@ end
 -- Bruchpruefung
 --------------------------------------------------------------------------------
 
+--[[
+	WAS SOLL ICH DENN NOCH DAZU BAUEN?
+
+	Nach einem gescheiterten Test wusste der Spieler bisher nur, DASS etwas
+	gerissen ist - nicht, was er dagegen tun kann. Genau daran bleibt man
+	haengen: man sieht ein rotes Teil, baut irgendetwas daneben und hofft.
+
+	Das Spiel weiss es aber. Es kennt das Bauteil, seinen Baustoff und seine
+	Lage. Daraus laesst sich ein konkreter Rat ableiten, und der ist fuer
+	jede der vier Rollen im Fachwerk ein anderer:
+
+	    waagerecht und befahrbar  -> die Fahrbahn: zweites Teil daneben
+	    waagerecht darueber       -> der Obergurt: hoeher bauen
+	    schraeg                   -> eine Diagonale: die zweite dazusetzen
+	    senkrecht                 -> ein Pfosten: kuerzer teilen oder abstuetzen
+
+	Die Rolle wird aus der RICHTUNG bestimmt, nicht aus dem Baustoff - ein
+	Spieler kann ja jedes Material ueberall einsetzen.
+]]
+local function adviceForMember(member, spec): string
+	local dx = member.bx - member.ax
+	local dy = member.by - member.ay
+	local length = math.max(math.sqrt(dx * dx + dy * dy), 1e-4)
+
+	local rise = math.abs(dy) / length
+	local run = math.abs(dx) / length
+
+	if rise < 0.3 then
+		-- Waagerecht: Fahrbahn oder Gurt.
+		if spec and spec.drivable then
+			return "advice.roadBroke"
+		end
+		return "advice.chordBroke"
+	elseif run < 0.3 then
+		return "advice.postBroke"
+	end
+	return "advice.diagonalBroke"
+end
+
 function TestRun:checkForBreaks(result): boolean
 	local structure = self.structure
 	local broke = false
@@ -507,6 +546,7 @@ function TestRun:checkForBreaks(result): boolean
 		local limit = Materials.limitFor(member.material, member.force)
 		if math.abs(member.force) > limit then
 			self.brokenMaterial = Materials.nameKey(member.material)
+			self.advice = adviceForMember(member, Materials.get(member.material))
 			structure:breakMember(member)
 			broke = true
 		end
@@ -526,6 +566,8 @@ function TestRun:checkForBreaks(result): boolean
 		end
 		if worst then
 			self.brokenMaterial = Materials.nameKey(worst.material)
+			-- Nicht ueberlastet, sondern nicht ausgesteift: anderer Rat.
+			self.advice = "advice.unstable"
 			structure:breakMember(worst)
 			broke = true
 		end
@@ -538,11 +580,11 @@ end
 -- Ein Simulationsschritt
 --------------------------------------------------------------------------------
 
-function TestRun:finish(success: boolean, reason)
+function TestRun:finish(success: boolean, reason, advice: string?)
 	local callback = self.onFinished
 	self:stop()
 	if callback then
-		callback(success, reason)
+		callback(success, reason, advice)
 	end
 end
 
@@ -608,7 +650,7 @@ function TestRun:step(dt: number)
 		-- der kurze Ruck beim Loesen der Verankerung sofort etwas.
 		if self.driveStartTime and os.clock() - self.driveStartTime > Config.Physics.breakGracePeriod then
 			if self:checkForBreaks(result) then
-				self:finish(false, { key = "result.broken", args = { self.brokenMaterial or "?" } })
+				self:finish(false, { key = "result.broken", args = { self.brokenMaterial or "?" } }, self.advice)
 				return
 			end
 		end
@@ -654,7 +696,7 @@ function TestRun:step(dt: number)
 
 	-- 8. Steht die Bruecke dem Schiff im Weg?
 	if self:boatIsBlocked() then
-		self:finish(false, { key = "result.boatBlocked" })
+		self:finish(false, { key = "result.boatBlocked" }, "advice.boatBlocked")
 		return
 	end
 
@@ -683,7 +725,7 @@ function TestRun:step(dt: number)
 		allFinished = false
 
 		if position.Y < vehicle.floorY then
-			self:finish(false, { key = "result.fell", args = { spec.index } })
+			self:finish(false, { key = "result.fell", args = { spec.index } }, "advice.fell")
 			return
 		end
 
@@ -696,7 +738,7 @@ function TestRun:step(dt: number)
 		]]
 		local airborne = math.abs(part.AssemblyLinearVelocity.Y) > 8
 		if not airborne and part.CFrame.UpVector:Dot(Vector3.yAxis) < 0.7 then
-			self:finish(false, { key = "result.tipped", args = { spec.index } })
+			self:finish(false, { key = "result.tipped", args = { spec.index } }, "advice.tipped")
 			return
 		end
 	end
@@ -716,7 +758,7 @@ function TestRun:step(dt: number)
 	end
 
 	if os.clock() - self.driveStartTime > self:currentTimeLimit() then
-		self:finish(false, { key = "result.timeout" })
+		self:finish(false, { key = "result.timeout" }, "advice.timeout")
 		return
 	end
 end
@@ -745,6 +787,7 @@ function TestRun:start(speed: number, onProgress, onFinished)
 	self:setSpeed(speed)
 
 	self.brokenMaterial = nil
+	self.advice = nil
 	self.solveAccumulator = 0
 	self.labelAccumulator = 0
 	self.progressAccumulator = 0

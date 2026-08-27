@@ -302,9 +302,14 @@ function Arena:startTest(speed: number, onComplete): (boolean, string)
 		-- Fortschritt waehrend der Fahrt (Countdown, Zeit, hoechste Auslastung)
 		self.testProgress = progress
 		self:notify()
-	end, function(success, reason)
+	end, function(success, reason, advice)
 		self.phase = "Result"
-		self.result = { success = success, reason = reason }
+		--[[
+			Der Rat gehoert zum Ergebnis: er sagt dem Spieler, was er als
+			Naechstes bauen soll. Ohne ihn steht da nur, DASS etwas gerissen
+			ist - und genau daran bleibt man haengen.
+		]]
+		self.result = { success = success, reason = reason, advice = advice }
 		self.message = reason
 		self.testProgress = nil
 		-- Einmal nachrechnen, damit die Bauteile wieder ihre eigene Farbe

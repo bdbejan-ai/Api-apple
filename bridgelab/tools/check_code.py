@@ -299,6 +299,27 @@ for m in re.finditer(r"^\t(\w+)\s*=", config_text, re.M):
     if key not in other:
         note(f'Config: "{key}" wird nirgends benutzt')
 
+# --- 8a: UIScale auf einer bildschirmfuellenden Wurzel -------------------------
+
+# Ein UIScale skaliert nicht nur Groessen, sondern auch POSITIONEN. Sitzt er
+# auf einer Wurzel, die den ganzen Bildschirm fuellt, landet deren rechte Kante
+# bei einem Massstab von 0,7 nur noch bei 70 Prozent der Breite - die ganze
+# Oberflaeche wird in die linke obere Ecke gequetscht, und die Leisten liegen
+# uebereinander. Genau das war in VIER Dateien gleichzeitig falsch.
+#
+# Richtig ist, die Wurzel vorher um den Kehrwert groesser zu machen. Danach
+# gesucht wird hier.
+for path in (SRC / "Client").rglob("*.luau"):
+    text = path.read_text(encoding="utf-8")
+    if 'Instance.new("UIScale")' not in text:
+        continue
+    if "1 / factor" in text or "1 / math.max(factor" in text:
+        continue
+    note(
+        f"{path.stem}: setzt einen UIScale, rechnet die Wurzel aber nicht gegen "
+        "- die Oberflaeche wuerde in die linke obere Ecke rutschen"
+    )
+
 # --- 8b: Sprachschluessel -----------------------------------------------------
 
 # Steht im Code ein Schluessel, den I18n nicht kennt, zeigt das Spiel den

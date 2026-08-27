@@ -197,11 +197,64 @@ local function drawDepth(box: Frame)
 	line(box, 194, 70, 240, 18, { color = WOOD })
 end
 
+--[[
+	Bild 5: wann ein Seil etwas bringt und wann nicht.
+
+	Oben zieht ein Seil eine Last nach oben - es steht unter Zug und traegt.
+	Unten soll es eine Last stuetzen, muesste dafuer druecken, und haengt
+	deshalb einfach durch. Rechts der Fall, um den es im Spiel geht: der
+	Untergurt eines Fachwerks steht unter Zug, also darf dort ein Kabel neben
+	die Fahrbahn - zum halben Preis von Stahl.
+]]
+local CABLE = Color3.fromRGB(150, 160, 174)
+
+local function drawCables(box: Frame)
+	-- Oben: Seil zieht - haelt
+	dot(box, 40, 14, Color3.fromRGB(228, 168, 72))
+	line(box, 40, 14, 40, 44, { color = CABLE, thickness = 3 })
+	local load = Instance.new("Frame")
+	load.Size = UDim2.fromOffset(22, 12)
+	load.AnchorPoint = Vector2.new(0.5, 0)
+	load.Position = UDim2.fromOffset(40, 44)
+	load.BackgroundColor3 = GOOD
+	load.BorderSizePixel = 0
+	load.ZIndex = 3
+	load.Parent = box
+	Theme.corner(load, 3)
+
+	-- Unten: Seil muesste druecken - haengt durch
+	dot(box, 100, 76, Color3.fromRGB(228, 168, 72))
+	line(box, 100, 76, 108, 62, { color = BAD, thickness = 3, transparency = 0.35 })
+	line(box, 108, 62, 116, 66, { color = BAD, thickness = 3, transparency = 0.35 })
+	line(box, 116, 66, 124, 50, { color = BAD, thickness = 3, transparency = 0.35 })
+	local weight = Instance.new("Frame")
+	weight.Size = UDim2.fromOffset(22, 12)
+	weight.Position = UDim2.fromOffset(114, 38)
+	weight.BackgroundColor3 = BAD
+	weight.BorderSizePixel = 0
+	weight.ZIndex = 3
+	weight.Parent = box
+	Theme.corner(weight, 3)
+
+	-- Rechts: Untergurt unter Zug - hier gehoert ein Kabel hin
+	line(box, 160, 26, 240, 26, { color = STEEL })
+	line(box, 160, 70, 240, 70, { color = ROAD, thickness = 5 })
+	line(box, 160, 78, 240, 78, { color = CABLE, thickness = 4 })
+	line(box, 160, 26, 160, 70, { color = WOOD })
+	line(box, 200, 26, 200, 70, { color = WOOD })
+	line(box, 240, 26, 240, 70, { color = WOOD })
+	line(box, 160, 70, 200, 26, { color = WOOD })
+	line(box, 200, 70, 240, 26, { color = WOOD })
+	dot(box, 160, 74, Color3.fromRGB(228, 168, 72), 7)
+	dot(box, 240, 74, Color3.fromRGB(228, 168, 72), 7)
+end
+
 local CARDS = {
 	{ key = "school.triangles", draw = drawTriangles },
 	{ key = "school.truss", draw = drawTruss },
 	{ key = "school.doubling", draw = drawDoubling },
 	{ key = "school.depth", draw = drawDepth },
+	{ key = "school.cables", draw = drawCables },
 }
 
 --------------------------------------------------------------------------------
@@ -382,7 +435,16 @@ end
 function BuildingSchool:applyScale()
 	local viewport = workspace.CurrentCamera.ViewportSize
 	local fit = math.min(viewport.X / 640, viewport.Y / 600, 1)
-	self.scale.Scale = math.max(fit, 0.55) * Device.uiScale()
+	local factor = math.max(fit, 0.55) * Device.uiScale()
+	self.scale.Scale = factor
+
+	--[[
+		Die Wurzel wird gegengerechnet, damit sie nach dem Skalieren wieder
+		den ganzen Bildschirm fuellt. Sonst laege das mittig gesetzte Fenster
+		nicht in der Bildschirmmitte, sondern in der Mitte einer geschrumpften
+		Flaeche - also deutlich links oben.
+	]]
+	self.root.Size = UDim2.fromScale(1 / factor, 1 / factor)
 end
 
 function BuildingSchool:show()
