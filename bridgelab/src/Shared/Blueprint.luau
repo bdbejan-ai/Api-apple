@@ -178,35 +178,59 @@ function Blueprint.forLevel(level)
 		}
 	end
 
-	local widestPanel = 0
-	for i = 1, segments do
-		local dx = deck[i + 1][1] - deck[i][1]
-		local dy = deck[i + 1][2] - deck[i][2]
-		widestPanel = math.max(widestPanel, math.sqrt(dx * dx + dy * dy))
+	--[[
+		DIE BAUHOEHE WIRD DURCHPROBIERT, NICHT AUSGERECHNET
+
+		Bei waagerechter Fahrbahn ist die Diagonale Wurzel(Feld^2 + Hoehe^2).
+		Bei SCHRAEGER Fahrbahn stimmt das nicht mehr: dort laeuft die Diagonale
+		von einem Fahrbahnknoten zum Obergurtknoten des NAECHSTEN Feldes, und
+		dessen Hoehenunterschied ist Feldsteigung PLUS Bauhoehe.
+
+		Im Level "Steile Kante" wurde die Diagonale dadurch 17,9 Studs lang
+		statt der gerechneten 16 - und fiel weg. Eine Formel, die nur den
+		einen Fall trifft, ist hier also schlechter als schlichtes Ausprobieren.
+
+		Deshalb wird von der groessten Bauhoehe abwaerts jede Stufe geprueft,
+		und genommen wird die erste, bei der WIRKLICH jedes Bauteil hineinpasst.
+		Das sind hoechstens sechs Versuche und laeuft einmal beim Levelstart.
+	]]
+	local grid = Config.Build.gridSize
+	local depth = nil
+
+	local function everythingFits(candidate: number): boolean
+		for i = 1, segments do
+			local dx = deck[i + 1][1] - deck[i][1]
+			local dy = deck[i + 1][2] - deck[i][2]
+
+			-- Fahrbahn und Obergurt laufen parallel, sind also gleich lang.
+			local chord = math.sqrt(dx * dx + dy * dy)
+			if chord > deckSpec.maxLength + 0.01 or chord > webSpec.maxLength + 0.01 then
+				return false
+			end
+
+			-- Beide Richtungen der Diagonale koennen vorkommen.
+			local up = math.sqrt(dx * dx + (dy + candidate) ^ 2)
+			local down = math.sqrt(dx * dx + (dy - candidate) ^ 2)
+			if math.max(up, down) > webSpec.maxLength + 0.01 then
+				return false
+			end
+		end
+
+		-- Die senkrechten Pfosten sind genau so lang wie die Bauhoehe.
+		return candidate <= webSpec.maxLength + 0.01 and candidate >= webSpec.minLength - 0.01
 	end
 
-	--[[
-		Die Diagonale ueber dem BREITESTEN Feld ist das laengste Bauteil im
-		ganzen Fachwerk. Nach ihr richtet sich die Bauhoehe:
+	for candidate = 14, 4, -grid do
+		if everythingFits(candidate) then
+			depth = candidate
+			break
+		end
+	end
 
-		    Wurzel(breitestes Feld^2 + Bauhoehe^2) <= erlaubte Laenge
-
-		Danach wird auf das Raster abgerundet - aufrunden koennte die Grenze
-		wieder ueberschreiten.
-	]]
-	local longest = math.min(webSpec.maxLength, 16)
-	local room = longest * longest - widestPanel * widestPanel
-	if room <= 1 then
-		-- Selbst ohne Bauhoehe passt keine Diagonale: hier hilft keine Vorlage.
+	-- Passt keine einzige Bauhoehe, gibt es hier keine sinnvolle Vorlage.
+	if not depth then
 		return nil
 	end
-
-	local grid = Config.Build.gridSize
-	local depth = math.floor(math.sqrt(room) / grid) * grid
-	depth = math.clamp(depth, 4, 14)
-
-	-- Auch der Pfosten darf nicht laenger als erlaubt werden.
-	depth = math.min(depth, math.floor(longest / grid) * grid)
 
 	for i = 1, segments + 1 do
 		top[i] = { deck[i][1], deck[i][2] + depth }

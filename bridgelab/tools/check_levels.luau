@@ -959,22 +959,43 @@ local function blueprintPlan(level)
 		}
 	end
 
-	local widestPanel = 0
-	for i = 1, segments do
-		local dx = deck[i + 1][1] - deck[i][1]
-		local dy = deck[i + 1][2] - deck[i][2]
-		widestPanel = math.max(widestPanel, math.sqrt(dx * dx + dy * dy))
+	--[[
+		Bauhoehe durchprobieren statt ausrechnen - genau wie Blueprint.luau.
+		Bei schraeger Fahrbahn ist die Diagonale Wurzel(dx^2 + (dy+Hoehe)^2),
+		nicht Wurzel(Feld^2 + Hoehe^2); eine Formel fuer den waagerechten Fall
+		liefert dort zu grosse Hoehen, und Teile fallen weg.
+	]]
+	local depth = nil
+
+	local function everythingFits(candidate)
+		for i = 1, segments do
+			local dx = deck[i + 1][1] - deck[i][1]
+			local dy = deck[i + 1][2] - deck[i][2]
+
+			local chord = math.sqrt(dx * dx + dy * dy)
+			if chord > MAT[deckKey].maxLen + 0.01 or chord > MAT[webKey].maxLen + 0.01 then
+				return false
+			end
+
+			local up = math.sqrt(dx * dx + (dy + candidate) ^ 2)
+			local down = math.sqrt(dx * dx + (dy - candidate) ^ 2)
+			if math.max(up, down) > MAT[webKey].maxLen + 0.01 then
+				return false
+			end
+		end
+		return candidate <= MAT[webKey].maxLen + 0.01
 	end
 
-	local longest = math.min(MAT[webKey].maxLen, 16)
-	local room = longest * longest - widestPanel * widestPanel
-	if room <= 1 then
+	for candidate = 14, 4, -GRID do
+		if everythingFits(candidate) then
+			depth = candidate
+			break
+		end
+	end
+
+	if not depth then
 		return nil
 	end
-
-	local depth = math.floor(math.sqrt(room) / GRID) * GRID
-	depth = math.clamp(depth, 4, 14)
-	depth = math.min(depth, math.floor(longest / GRID) * GRID)
 
 	for i = 1, segments + 1 do
 		top[i] = { deck[i][1], deck[i][2] + depth }
