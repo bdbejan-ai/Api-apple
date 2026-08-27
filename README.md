@@ -83,3 +83,12 @@ beim Schließen des Tabs verloren, worauf die Startseite hinweist.
 - Die Fachinhalte von M1 sind ungeprüft und sollten vor dem Unterrichtseinsatz
   von einer Lehrkraft gegengelesen werden.
 - M2 bis M8 fehlen.
+
+---
+
+## Weiteres Projekt in diesem Repository
+
+Im Ordner [`bridgelab/`](bridgelab/) liegt ein davon unabhängiges Projekt:
+**BridgeLab**, ein Physik-Baurätsel für Roblox (Luau, Rojo). Es hat mit dem
+Lernprogramm nichts zu tun und teilt keinen Code. Die eigene
+[README](bridgelab/README.md) beschreibt Installation und Aufbau.

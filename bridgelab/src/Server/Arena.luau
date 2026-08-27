@@ -1,0 +1,440 @@
+--[[
+	Arena
+	-----
+	Die Spielsitzung EINES Spielers: sein Level, seine Bauteile, sein Test.
+
+	Warum bekommt jeder Spieler eine eigene Arena?
+	Weil jeder sein eigenes Level waehlen darf. Zwei Spieler koennten also
+	gleichzeitig an voellig verschiedenen Bruecken bauen. Die Arenen liegen
+	senkrecht uebereinander gestapelt (siehe Config.Arena) und stoeren sich
+	dadurch nicht - die Kamera schaut waagerecht und sieht immer nur eine.
+
+	Diese Klasse fasst alles zusammen, was zu einer Sitzung gehoert, und
+	haelt die Phase fest:
+	  "Build"  - es wird gebaut
+	  "Test"   - der Belastungstest laeuft
+	  "Result" - der Test ist vorbei, das Ergebnis steht fest
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
+local Config = require(Shared.Config)
+local Blueprint = require(Shared.Blueprint)
+
+local LevelBuilder = require(script.Parent.LevelBuilder)
+local Structure = require(script.Parent.Structure)
+local ForceEngine = require(script.Parent.ForceEngine)
+local TestRun = require(script.Parent.TestRun)
+local Diagnosis = require(script.Parent.Diagnosis)
+
+local Arena = {}
+Arena.__index = Arena
+
+--------------------------------------------------------------------------------
+-- Aufbau und Abbau
+--------------------------------------------------------------------------------
+
+function Arena.new(player: Player, level, slotIndex: number, parentFolder: Instance)
+	local self = setmetatable({}, Arena)
+
+	self.player = player
+	self.level = level
+	self.slotIndex = slotIndex
+
+	-- Jede Arena sitzt um ein Vielfaches von spacingY hoeher als die erste.
+	self.origin = Vector3.new(0, slotIndex * Config.Arena.spacingY, 0)
+
+	self.folders = LevelBuilder.build(level, self.origin, parentFolder)
+	self.folders.root.Name = string.format("Arena_%d_%s", slotIndex, player.Name)
+	-- Damit der Client SEINE Arena zweifelsfrei wiederfindet. Ueber den Namen
+	-- zu suchen waere unsicher, Namen koennen sich aehneln.
+	self.folders.root:SetAttribute("OwnerUserId", player.UserId)
+
+	self.structure = Structure.new(level, self.origin, self.folders)
+	self.forceEngine = ForceEngine.new(level, self.structure)
+	self.testRun = TestRun.new(level, self.origin, self.folders, self.structure, self.forceEngine)
+
+	self.phase = "Build"
+	self.stable = true
+	self.unstableJoint = nil
+	self.testPhase = 0
+	self.needsLevelInfo = true
+	self.message = nil
+	self.lastBreak = nil
+	self.result = nil
+	self.testProgress = nil
+	self.unlockedHints = {}
+
+	-- Vom Spieler am Tacho eingestellte Fahrgeschwindigkeit.
+	self.testSpeed = Config.Test.defaultSpeed
+
+	--[[
+		Muss neu gerechnet werden?
+		Im Baumodus sind alle Knoten verankert - es bewegt sich nichts, und
+		das Ergebnis kann sich nur aendern, wenn ein Bauteil dazukommt oder
+		verschwindet. Staendiges Nachrechnen waere reine Verschwendung,
+		besonders bei sechzehn Arenen gleichzeitig.
+	]]
+	self.needsAnalysis = false
+
+	-- Wird von aussen gesetzt: "der Zustand hat sich geaendert, bitte senden".
+	self.onStateChanged = nil
+
+	return self
+end
+
+function Arena:destroy()
+	if self.testRun:isRunning() then
+		self.testRun:stop()
+	end
+	self.structure:clear()
+	if self.folders.root then
+		self.folders.root:Destroy()
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Zustand fuer den Client
+--------------------------------------------------------------------------------
+
+--[[
+	DIE SCHWEREN LEVELDATEN GEHEN NUR EINMAL UEBER DIE LEITUNG
+
+	Der Client braucht Gelaende, Anker und Baubereich, um die Bauvorschau
+	selbst pruefen zu koennen - sonst wuerde sie erst gruen oder rot, wenn die
+	Antwort vom Server da ist, und das ist nach dem Loslassen zu spaet.
+
+	Diese Angaben aendern sich waehrend eines Levels aber NIE. Sie in jeden
+	Zustandsbericht zu packen waere teuer: der Bericht geht bei jedem gesetzten
+	Bauteil raus, und das Gelaendeprofil der grossen Schlucht hat zehn Punkte
+	plus vier Anker. Bei sechzehn Spielern, die zuegig bauen, waere das
+	dauerndes Senden derselben unveraenderten Zahlen.
+
+	Deshalb bekommt nur der ERSTE Bericht nach dem Levelstart sie mit.
+]]
+function Arena:levelInfo()
+	return {
+		buildArea = self.level.buildArea,
+		anchors = self.level.anchors,
+		terrain = self.level.terrain,
+		waterY = self.level.waterY,
+		z = self.level.z or 0,
+
+		--[[
+			Die Bauvorlage wird einmal beim Levelstart mitgeschickt. Sie
+			aendert sich nie, also gehoert sie zu den Leveldaten und nicht in
+			jeden Zustandsbericht.
+		]]
+		blueprint = Blueprint.forLevel(self.level),
+	}
+end
+
+function Arena:buildState()
+	--[[
+		Beim ersten Bericht sind die Leveldaten dabei, danach nicht mehr.
+		Der Client merkt sie sich; sein enterLevel laeuft ohnehin nur einmal
+		je Level.
+	]]
+	local info = nil
+	if self.needsLevelInfo then
+		self.needsLevelInfo = false
+		info = self:levelInfo()
+	end
+
+	return {
+		levelInfo = info,
+		levelId = self.level.id,
+		levelNameKey = self.level.nameKey,
+		difficulty = self.level.difficulty,
+
+		phase = self.phase,
+		budgetTotal = self.level.budget,
+		budgetUsed = self.structure:usedBudget(),
+		memberCount = #self.structure.members,
+
+		stable = self.stable,
+		unstableJoint = self.unstableJoint,
+		message = self.message,
+		result = self.result,
+		--[[
+			Die Bruchstelle ueberlebt das Ergebnisfenster: der Client
+			markiert sie in der Welt, waehrend weitergebaut wird. Genau dann
+			wird sie gebraucht - im Fenster ist sie nur eine Zahl.
+		]]
+		lastBreak = self.lastBreak,
+		testProgress = self.testProgress,
+
+		materials = self.level.materials,
+		testSpeed = self.testSpeed,
+		vehicleCount = #self.level.vehicles,
+		unlockedHints = self.unlockedHints,
+		hintTotal = #self.level.hints,
+		freeHints = self.level.freeHints,
+
+		hasHydraulics = self.level.allowsMaterial("Hydraulic"),
+		phaseIndex = self.testPhase,
+
+		-- Die Kamera des Clients muss wissen, wo seine Arena steht.
+		originY = self.origin.Y,
+		bounds = self.level.bounds,
+		deckY = self.level.focusY,
+	}
+end
+
+function Arena:notify()
+	if self.onStateChanged then
+		self.onStateChanged(self)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Baumodus: Kraefte regelmaessig nachrechnen
+--------------------------------------------------------------------------------
+
+--[[
+	Wird jeden Frame vom Hauptskript aufgerufen, rechnet aber nur dann wirklich,
+	wenn sich seit dem letzten Mal etwas geaendert hat.
+]]
+function Arena:tick(dt: number)
+	--[[
+		Waehrend des Tests rechnet TestRun selbst - und zwar mit den Lasten der
+		Fahrzeuge. Hier waere das doppelt gemoppelt.
+	]]
+	if self.phase == "Test" then
+		return
+	end
+
+	--[[
+		Ausserhalb des Tests sind alle Knoten verankert: es bewegt sich nichts.
+		Das Ergebnis kann sich also nur aendern, wenn ein Bauteil dazukommt
+		oder verschwindet. Deshalb wird nur auf Anforderung gerechnet - bei
+		sechzehn Arenen spart das eine Menge Rechenzeit.
+	]]
+	if not self.needsAnalysis then
+		return
+	end
+	self.needsAnalysis = false
+
+	self:updateAnalysis()
+end
+
+-- Kraefte neu bestimmen, einfaerben und bei Aenderung den Client benachrichtigen.
+function Arena:updateAnalysis()
+	local result = self.forceEngine:evaluate(nil)
+	-- Im Baumodus behalten die Bauteile ihre eigene Farbe (Stahl, Beton, Seil).
+	self.forceEngine:applyColors(false)
+
+	local stable = not result.unstable
+	if stable ~= self.stable or result.worstJointKey ~= self.unstableJoint then
+		self.stable = stable
+		self.unstableJoint = result.worstJointKey
+		self:notify()
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Aktionen des Spielers
+--------------------------------------------------------------------------------
+
+-- Rueckgabe: erfolgreich (boolean), Meldung fuer den Spieler (string)
+function Arena:placeMember(material: string, ax: number, ay: number, bx: number, by: number, phase: number?): (boolean, string)
+	if self.phase ~= "Build" then
+		return false, { key = "notice.noBuildDuringTest" }
+	end
+
+	local allowed, reason = self.structure:canPlace(material, ax, ay, bx, by)
+	if not allowed then
+		return false, reason
+	end
+
+	local member = self.structure:place(material, ax, ay, bx, by, phase)
+	self.message = nil
+	self:updateAnalysis()
+	self:notify()
+
+	--[[
+		Gleich nachsehen, ob das neue Seil ueberhaupt etwas tut. Seile koennen
+		nur ziehen; muesste eins an dieser Stelle druecken, haengt es einfach
+		durch. Ohne Hinweis waere voellig unklar, warum sich nichts aendert.
+	]]
+	if member and member.slack then
+		return true, nil, { key = "notice.slackRope" }
+	end
+
+	return true, nil
+end
+
+function Arena:removeMember(memberId: number): (boolean, string)
+	if self.phase ~= "Build" then
+		return false, { key = "notice.noRemoveDuringTest" }
+	end
+	if not self.structure:remove(memberId) then
+		return false, nil
+	end
+	self:updateAnalysis()
+	self:notify()
+	return true, nil
+end
+
+--[[
+	Startet den Belastungstest.
+	onComplete(success, reason) wird aufgerufen, wenn der Test vorbei ist -
+	das Hauptskript nutzt das, um den Levelfortschritt zu speichern.
+]]
+function Arena:startTest(speed: number, onComplete): (boolean, string)
+	if self.phase ~= "Build" then
+		return false, { key = "notice.testRunning" }
+	end
+	if #self.structure.members == 0 then
+		return false, { key = "notice.buildFirst" }
+	end
+
+	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
+
+	self.phase = "Test"
+	self.result = nil
+	self.lastBreak = nil
+	self.message = { key = "hud.testRunning" }
+	self.testProgress = {
+		countdown = Config.Test.countdownSeconds,
+		elapsed = 0,
+		maxUtilisation = 0,
+		speed = self.testSpeed,
+		phase = 0,
+		vehiclesDone = 0,
+		vehicleCount = #self.level.vehicles,
+	}
+	self.testPhase = 0
+	self:notify()
+
+	self.testRun:start(self.testSpeed, function(progress)
+		-- Fortschritt waehrend der Fahrt (Countdown, Zeit, hoechste Auslastung)
+		self.testProgress = progress
+		self:notify()
+	end, function(success, reason, failure)
+		self.phase = "Result"
+
+		--[[
+			Zum Ergebnis gehoert der ganze Steckbrief: was gebrochen ist, wie
+			knapp es war, wo es sass und wie weit das Fahrzeug kam. Dazu die
+			Beobachtungen ueber die Bruecke als Ganzes.
+
+			Die Beobachtungen entstehen ERST HIER, nach dem Test. Vorher
+			waeren sie sinnlos - sie haengen davon ab, wie knapp es war: bei
+			13 Prozent Ueberlastung hilft ein zweites Bauteil, bei 300 nicht.
+		]]
+		if failure then
+			failure.tips = Diagnosis.observations(self.structure, self.level, failure)
+		end
+
+		self.result = { success = success, reason = reason, failure = failure }
+		if failure and failure.x and failure.y and not success then
+			self.lastBreak = { x = failure.x, y = failure.y }
+		else
+			self.lastBreak = nil
+		end
+		self.message = reason
+		self.testProgress = nil
+		-- Einmal nachrechnen, damit die Bauteile wieder ihre eigene Farbe
+		-- bekommen statt der Auslastungsfarbe aus dem Test.
+		self.needsAnalysis = true
+		self:notify()
+
+		if onComplete then
+			onComplete(success, reason)
+		end
+	end)
+
+	return true, nil
+end
+
+--[[
+	Geschwindigkeit am Tacho veraendern. Erlaubt ist das jederzeit - auch
+	mitten in der Fahrt. Der Server begrenzt den Wert selbst, damit ein
+	veraenderter Client kein unsinniges Tempo durchsetzen kann.
+]]
+--[[
+	Hydraulik weiterschalten. Phase 0 heisst "alles eingefahren", jede weitere
+	Phase faehrt die Zylinder aus, die ihr zugeordnet sind.
+
+	Sinnvoll ist das nur waehrend des Tests: im Baumodus stehen alle Knoten
+	fest, da wuerde sich nichts bewegen.
+]]
+function Arena:setPhase(phase: number): (boolean, string)
+	if not self.testRun:isRunning() then
+		return false, { key = "notice.phaseOnlyInTest" }
+	end
+
+	local wanted = math.clamp(math.round(phase), 0, Config.Hydraulics.phaseCount)
+	if wanted == self.testPhase then
+		return false, nil
+	end
+
+	self.testPhase = wanted
+	self.testRun:setPhase(wanted)
+	return true, nil
+end
+
+function Arena:setTestSpeed(speed: number)
+	self.testSpeed = math.clamp(speed, Config.Test.minSpeed, Config.Test.maxSpeed)
+
+	if self.testRun:isRunning() then
+		self.testRun:setSpeed(self.testSpeed)
+		--[[
+			Waehrend der Fahrt NICHT eigens melden: der Fortschrittsbericht
+			des Tests traegt die Geschwindigkeit ohnehin mit, und zwar fuenfmal
+			pro Sekunde. Wuerden wir hier zusaetzlich senden, ginge beim Ziehen
+			am Regler zwanzigmal pro Sekunde der komplette Spielzustand ueber
+			die Leitung.
+		]]
+		return
+	end
+
+	self:notify()
+end
+
+-- Konstruktion in den Ausgangszustand bringen. Der Bauplan bleibt erhalten.
+function Arena:reset()
+	if self.testRun:isRunning() then
+		self.testRun:stop()
+	end
+	self.structure:rebuild()
+	self.phase = "Build"
+	self.result = nil
+	self.testProgress = nil
+	self.message = nil
+	self.needsAnalysis = true
+	self:updateAnalysis()
+	self:notify()
+end
+
+-- Alles abreissen und mit leerem Bauplan neu anfangen.
+function Arena:clearBuild()
+	if self.testRun:isRunning() then
+		self.testRun:stop()
+	end
+	self.structure:clear()
+	self.phase = "Build"
+	self.result = nil
+	self.lastBreak = nil
+	self.testProgress = nil
+	self.message = nil
+	self.stable = true
+	self.unstableJoint = nil
+	self:notify()
+end
+
+--------------------------------------------------------------------------------
+-- Tipps
+--------------------------------------------------------------------------------
+
+-- Merkt sich einen aufgedeckten Tipp, damit er nach einem Neuladen wieder da ist.
+function Arena:addUnlockedHint(text: string)
+	table.insert(self.unlockedHints, text)
+end
+
+function Arena:setUnlockedHints(list: { string })
+	self.unlockedHints = list
+end
+
+return Arena

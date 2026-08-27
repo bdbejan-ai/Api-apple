@@ -1,0 +1,13 @@
+# Studio-Dateien: enthalten den Weltzustand, gehoeren nicht ins Repository
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+
+# Rojo / Rokit
+.rojo/
+~/
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
