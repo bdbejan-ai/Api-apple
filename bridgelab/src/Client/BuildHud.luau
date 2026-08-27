@@ -1065,8 +1065,12 @@ end
 function BuildHud:buildResultPanel()
 	local panel = Theme.panel(self.root, "ResultPanel")
 	-- Hoeher als frueher: darunter steht jetzt der Rat, was zu tun ist.
-	panel.Size = UDim2.fromOffset(460, 330)
-	panel.Position = UDim2.new(0.5, -230, 0.5, -165)
+	--[[
+		Das Fenster traegt jetzt drei Bloecke: was passiert ist, was auffiel,
+		und was zu tun ist. Deshalb ist es deutlich groesser als frueher.
+	]]
+	panel.Size = UDim2.fromOffset(520, 430)
+	panel.Position = UDim2.new(0.5, -260, 0.5, -215)
 	panel.BackgroundTransparency = 0.02
 	panel.Visible = false
 	self.resultPanel = panel
@@ -1081,10 +1085,32 @@ function BuildHud:buildResultPanel()
 	})
 
 	self.resultReason = Theme.label(panel, "Reason", {
-		size = UDim2.new(1, -40, 0, 42),
-		position = UDim2.fromOffset(20, 54),
+		size = UDim2.new(1, -40, 0, 38),
+		position = UDim2.fromOffset(20, 52),
 		text = "",
 		textSize = 14,
+		color = Theme.colors.textDim,
+		align = Enum.TextXAlignment.Center,
+		alignY = Enum.TextYAlignment.Top,
+		wrapped = true,
+	})
+
+	--[[
+		DIE HARTEN ZAHLEN
+
+		Kraft gegen Grenzwert, Ort, und wie weit das Fahrzeug kam. Aus genau
+		diesen drei Angaben liest man ab, ob man nachbessern oder umbauen
+		muss - "13 Prozent zu viel bei 90 Prozent der Strecke" ist eine ganz
+		andere Lage als "300 Prozent zu viel bei 5 Prozent".
+
+		Sie stehen in kleinerer, ruhigerer Schrift als der Rat: sie sind die
+		Begruendung, nicht die Handlungsanweisung.
+	]]
+	self.resultFactsLabel = Theme.label(panel, "Facts", {
+		size = UDim2.new(1, -40, 0, 54),
+		position = UDim2.fromOffset(20, 90),
+		text = "",
+		textSize = 12,
 		color = Theme.colors.textDim,
 		align = Enum.TextXAlignment.Center,
 		alignY = Enum.TextYAlignment.Top,
@@ -1103,8 +1129,8 @@ function BuildHud:buildResultPanel()
 	]]
 	local adviceBox = Instance.new("Frame")
 	adviceBox.Name = "AdviceBox"
-	adviceBox.Size = UDim2.new(1, -40, 0, 128)
-	adviceBox.Position = UDim2.fromOffset(20, 100)
+	adviceBox.Size = UDim2.new(1, -40, 0, 116)
+	adviceBox.Position = UDim2.fromOffset(20, 148)
 	adviceBox.BackgroundColor3 = Theme.colors.panelLight
 	adviceBox.BorderSizePixel = 0
 	adviceBox.Visible = false
@@ -1142,9 +1168,73 @@ function BuildHud:buildResultPanel()
 		alignY = Enum.TextYAlignment.Top,
 	})
 
+	--[[
+		DIE BEOBACHTUNGEN
+
+		Hinweise, die sich aus der ganzen Bruecke ergeben statt aus dem einen
+		gebrochenen Teil - "keine einzige Diagonale", "nirgends verdoppelt".
+		Sie treffen oft genauer als der Rat oben, weil sie die Ursache
+		beschreiben und nicht das Symptom.
+
+		Hoechstens zwei. Fuenf Hinweise auf einmal liest niemand.
+	]]
+	self.tipsBox = Instance.new("Frame")
+	self.tipsBox.Name = "TipsBox"
+	self.tipsBox.Size = UDim2.new(1, -40, 0, 94)
+	self.tipsBox.Position = UDim2.fromOffset(20, 270)
+	self.tipsBox.BackgroundTransparency = 1
+	self.tipsBox.Visible = false
+	self.tipsBox.Parent = panel
+
+	local tipsLayout = Instance.new("UIListLayout")
+	tipsLayout.FillDirection = Enum.FillDirection.Vertical
+	tipsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tipsLayout.Padding = UDim.new(0, 4)
+	tipsLayout.Parent = self.tipsBox
+
+	self.tipsTitle = Theme.label(self.tipsBox, "TipsTitle", {
+		size = UDim2.new(1, 0, 0, 14),
+		text = I18n.t("tip.title"),
+		textSize = 11,
+		bold = true,
+		color = Theme.colors.warning,
+	})
+	self.tipsTitle.LayoutOrder = 0
+
+	self.tipLabels = {}
+	for index = 1, 2 do
+		local row = Instance.new("Frame")
+		row.Name = "Tip" .. index
+		row.Size = UDim2.new(1, 0, 0, 36)
+		row.BackgroundTransparency = 1
+		row.LayoutOrder = index
+		row.Visible = false
+		row.Parent = self.tipsBox
+
+		Theme.label(row, "Bullet", {
+			size = UDim2.fromOffset(14, 16),
+			position = UDim2.fromOffset(0, 1),
+			text = "▸",
+			textSize = 12,
+			bold = true,
+			color = Theme.colors.warning,
+		})
+
+		self.tipLabels[index] = Theme.label(row, "Text", {
+			size = UDim2.new(1, -18, 1, 0),
+			position = UDim2.fromOffset(18, 0),
+			text = "",
+			textSize = 12,
+			color = Theme.colors.textDim,
+			wrapped = true,
+			alignY = Enum.TextYAlignment.Top,
+		})
+		self.tipLabels[index].Parent = row
+	end
+
 	local retry = Theme.button(panel, "Retry", {
 		size = UDim2.fromOffset(180, 42),
-		position = UDim2.fromOffset(24, 262),
+		position = UDim2.fromOffset(24, 370),
 		text = I18n.t("result.retry"),
 		textSize = 15,
 		color = Theme.colors.accent,
@@ -1162,7 +1252,7 @@ function BuildHud:buildResultPanel()
 
 	local toMenu = Theme.button(panel, "ToMenu", {
 		size = UDim2.fromOffset(180, 42),
-		position = UDim2.new(1, -204, 0, 262),
+		position = UDim2.new(1, -204, 0, 370),
 		text = I18n.t("hud.toLevelSelect"),
 		textSize = 15,
 		color = Theme.colors.panelLight,
@@ -1188,7 +1278,7 @@ function BuildHud:buildResultPanel()
 	]]
 	local school = Theme.button(panel, "School", {
 		size = UDim2.fromOffset(150, 42),
-		position = UDim2.new(0.5, -75, 0, 262),
+		position = UDim2.new(0.5, -75, 0, 370),
 		text = I18n.t("school.open"),
 		textSize = 14,
 		color = Theme.colors.panelLight,
@@ -1488,6 +1578,83 @@ function BuildHud:updateTestPanel(state)
 	self.testLoadFill.BackgroundColor3 = Config.utilisationColor(utilisation)
 end
 
+--[[
+	Der Befund als mehrzeiliger Text.
+
+	Bewusst kurze Zeilen statt eines Absatzes: der Spieler soll die Zahl
+	finden koennen, ohne zu lesen.
+]]
+function BuildHud:buildFailureFacts(failure): string
+	local lines = {}
+
+	--[[
+		Rolle und Baustoff zusammen. Beide sind Schluessel, keine fertigen
+		Woerter - sonst waere die Zeile nur auf Deutsch richtig.
+	]]
+	if failure.roleKey and failure.materialKey then
+		table.insert(lines, I18n.t(
+			failure.reason or "failure.overloaded",
+			I18n.t(failure.roleKey),
+			I18n.t(failure.materialKey)
+		))
+	end
+
+	--[[
+		Die Kraefte. Bei einer instabilen Stelle ist die Ueberlastung 0 - dann
+		waere "0 % zu viel" schlicht falsch, und es bleibt bei den zwei
+		gemessenen Werten.
+	]]
+	if failure.force and failure.limit then
+		if failure.overload and failure.overload > 0 then
+			table.insert(lines, I18n.t("failure.force", failure.force, failure.limit, failure.overload))
+		else
+			table.insert(lines, I18n.t("failure.forceExact", failure.force, failure.limit))
+		end
+	end
+
+	if failure.x and failure.y then
+		table.insert(lines, I18n.t("failure.where", math.floor(failure.x + 0.5), math.floor(failure.y + 0.5)))
+	end
+
+	--[[
+		Wie weit das Fahrzeug kam. Bei 0 Prozent ist die Bruecke unter ihrem
+		eigenen Gewicht zusammengefallen - eine ganz andere Lage als ein Riss
+		kurz vor dem Ziel, und deshalb ein eigener Satz.
+	]]
+	local progress = failure.progress
+	if progress then
+		if progress <= 0 then
+			table.insert(lines, I18n.t("failure.progressNone"))
+		else
+			table.insert(lines, I18n.t("failure.progress", math.floor(progress + 0.5)))
+		end
+	end
+
+	return table.concat(lines, "\n")
+end
+
+--[[
+	Die zusaetzlichen Beobachtungen. Hoechstens zwei - eine Liste mit sechs
+	Punkten liest niemand, und der wichtigste ginge darin unter.
+]]
+function BuildHud:updateTips(tips)
+	local shown = 0
+
+	for index, label in self.tipLabels do
+		local key = tips and tips[index]
+		local row = label.Parent
+		if key then
+			label.Text = I18n.t(key)
+			row.Visible = true
+			shown += 1
+		else
+			row.Visible = false
+		end
+	end
+
+	self.tipsBox.Visible = shown > 0
+end
+
 function BuildHud:updateResultPanel(result)
 	if result.success then
 		self.resultTitle.Text = I18n.t("result.success")
@@ -1515,15 +1682,35 @@ function BuildHud:updateResultPanel(result)
 	self.resultReason.Text = I18n.message(result.reason)
 
 	--[[
-		Nach einem Erfolg gibt es nichts zu raten - da waere der Kasten nur
-		ein Vorwurf. Nach einem Misserfolg ist er das Wichtigste im Fenster.
+		DER BEFUND
+
+		"Stahl gerissen" hat der Spieler bisher gelesen und nichts damit
+		anfangen koennen. Jetzt steht dort, WELCHES Bauteil (seine Rolle im
+		Fachwerk), WIE STARK es ueberlastet war, WO es sass und wie weit das
+		Fahrzeug ueberhaupt gekommen ist. Aus diesen vier Angaben laesst sich
+		der naechste Versuch planen; aus einem Materialnamen nicht.
+
+		Nach einem Erfolg bleiben Befund, Rat und Beobachtungen weg - dort
+		waeren sie nur ein Vorwurf.
 	]]
-	if result.advice and not result.success then
-		self.adviceLabel.Text = I18n.t(result.advice)
+	local failure = if result.success then nil else result.failure
+
+	if failure then
+		self.resultFactsLabel.Text = self:buildFailureFacts(failure)
+		self.resultFactsLabel.Visible = true
+	else
+		self.resultFactsLabel.Visible = false
+	end
+
+	local advice = failure and failure.advice
+	if advice then
+		self.adviceLabel.Text = I18n.t(advice)
 		self.adviceBox.Visible = true
 	else
 		self.adviceBox.Visible = false
 	end
+
+	self:updateTips(failure and failure.tips)
 
 	if Device.isGamepad() then
 		GuiService.SelectedObject = self.retryButton

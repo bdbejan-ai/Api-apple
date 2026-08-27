@@ -530,6 +530,20 @@ remote.StateChanged.OnClientEvent:Connect(function(state)
 	hud:update(state)
 	controller:setPhase(state.phase)
 	controller:setUnstableJoint(if state.stable then nil else state.unstableJoint)
+
+	--[[
+		DIE BRUCHSTELLE IN DER WELT ZEIGEN
+
+		Im Ergebnisfenster steht die Stelle als Zahlenpaar - das ist genau,
+		aber niemand sucht danach in der eigenen Bruecke. Deshalb steht nach
+		einem gescheiterten Test eine Kugel genau dort, solange gebaut wird.
+	]]
+	local lastBreak = state.lastBreak
+	if state.phase == "Build" and lastBreak then
+		controller:setBreakPoint(lastBreak.x, lastBreak.y)
+	else
+		controller:setBreakPoint(nil, nil)
+	end
 	-- Damit die Vorschau rot wird, sobald das Budget nicht mehr reicht.
 	controller:setBudgetLeft((state.budgetTotal or 0) - (state.budgetUsed or 0))
 

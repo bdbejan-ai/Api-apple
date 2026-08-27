@@ -313,8 +313,12 @@ add("result.oneVehicle", "Geschafft! Das Fahrzeug hat die andere Seite erreicht.
 add("result.withBoat", "Geschafft! Fahrzeug und Schiff sind durchgekommen.",
 	"Well done! Both the vehicle and the ship got through.")
 
-add("result.broken", "Bauteil gebrochen: %s war ueberlastet.",
-	"A part broke: the %s was overloaded.")
+--[[
+	Nur die Ueberschrift. Welches Bauteil aus welchem Baustoff, mit welcher
+	Kraft und an welcher Stelle - das steht darunter im Befund und muss hier
+	nicht noch einmal stehen.
+]]
+add("result.broken", "Die Bruecke ist gebrochen.", "The bridge broke.")
 add("result.fell", "Fahrzeug %d ist abgestuerzt.", "Vehicle %d fell.")
 add("result.tipped", "Fahrzeug %d ist gekippt.", "Vehicle %d tipped over.")
 add("result.timeout", "Zeitlimit ueberschritten.", "Out of time.")
@@ -796,6 +800,77 @@ add("preview.outsideArea", "Ausserhalb des Baubereichs", "Outside the build area
 add("preview.throughRock", "Laeuft durch den Felsen", "Runs through the rock")
 add("preview.noBudget", "Das Budget reicht nicht mehr", "Not enough budget left")
 add("notice.noLevel", "Kein Level geladen", "No level loaded")
+
+
+--------------------------------------------------------------------------------
+-- Woran es gescheitert ist
+--------------------------------------------------------------------------------
+
+add("failure.title", "Woran es gescheitert ist", "What went wrong")
+
+--[[
+	Die Rolle im Fachwerk. Genau dieses Wort fehlte bisher: "Stahl gerissen"
+	sagt nichts, "der OBERGURT ist gerissen" sagt alles - denn zu jeder Rolle
+	gehoert eine andere Abhilfe.
+]]
+add("role.road", "die Fahrbahn", "the roadway")
+add("role.chord", "ein Gurt", "a chord")
+add("role.post", "ein senkrechter Pfosten", "a vertical post")
+add("role.diagonal", "eine Diagonale", "a diagonal")
+
+add("failure.overloaded", "%s aus %s war ueberlastet.", "%s made of %s was overloaded.")
+add("failure.unstable", "%s aus %s war nicht ausgesteift.", "%s made of %s was not braced.")
+
+--[[
+	Die entscheidende Zahl. Bei 13 Prozent reicht ein zweites Bauteil, bei
+	300 Prozent muss die Form anders werden - und genau diesen Unterschied
+	konnte der Spieler bisher nicht sehen.
+]]
+add("failure.force", "%d N gemessen, %d N erlaubt - also %d%% zu viel.",
+	"%d N measured, %d N allowed - that is %d%% too much.")
+add("failure.forceExact", "%d N gemessen, %d N erlaubt.",
+	"%d N measured, %d N allowed.")
+add("failure.where", "Stelle: %d | %d", "Location: %d | %d")
+add("failure.progress", "Das Fahrzeug war bei %d%% der Strecke.",
+	"The vehicle got %d%% of the way across.")
+add("failure.progressNone", "Die Bruecke hat schon ihr eigenes Gewicht nicht getragen.",
+	"The bridge could not even carry its own weight.")
+
+--------------------------------------------------------------------------------
+-- Zusaetzliche Beobachtungen
+--------------------------------------------------------------------------------
+
+add("tip.title", "Aufgefallen", "Also noticed")
+
+add("tip.noDiagonals",
+	"Deine Bruecke hat keine einzige SCHRAEGE Verbindung. Ohne Diagonalen sind alle Felder Vierecke, und Vierecke kippen um.",
+	"Your bridge has no DIAGONAL parts at all. Without them every bay is a rectangle, and rectangles collapse.")
+
+add("tip.noDoubling",
+	"Du hast nirgends zwei Bauteile auf dieselben zwei Punkte gelegt. Genau das halbiert die Kraft im belasteten Teil - und es war knapp.",
+	"You never put two parts on the same two joints. That is exactly what halves the force in an overloaded part - and it was close.")
+
+add("tip.tooFlat",
+	"Deine Bruecke ist sehr flach. Bauhoehe ist der billigste Hebel: doppelte Hoehe heisst halbe Kraft in den Gurten.",
+	"Your bridge is very shallow. Depth is the cheapest lever you have: twice the depth means half the force in the chords.")
+
+add("tip.budgetLeft",
+	"Du hast noch reichlich Budget uebrig. Verstaerken kostet dich hier also nichts ausser ein paar Handgriffen.",
+	"You still have plenty of budget left. Reinforcing costs you nothing here but a few more parts.")
+
+add("tip.atMaxLength",
+	"Das gebrochene Bauteil war fast so lang wie erlaubt. Lange Teile tragen am wenigsten - zwei kurze mit einem Knoten dazwischen sind stabiler.",
+	"The part that broke was almost at its maximum length. Long parts carry the least - two short ones with a joint between them are stronger.")
+
+--------------------------------------------------------------------------------
+-- Markierung in der Welt
+--------------------------------------------------------------------------------
+
+--[[
+	Kurz halten: der Text schwebt in der Welt ueber der Bruchstelle und darf
+	die Bruecke darunter nicht verdecken.
+]]
+add("marker.brokeHere", "Hier gerissen", "Broke here")
 
 
 return I18n

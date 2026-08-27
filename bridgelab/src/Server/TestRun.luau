@@ -42,6 +42,7 @@ local Config = require(Shared.Config)
 local Materials = require(Shared.Materials)
 
 local ForceEngine = require(script.Parent.ForceEngine)
+local Diagnosis = require(script.Parent.Diagnosis)
 
 local TestRun = {}
 TestRun.__index = TestRun
@@ -499,57 +500,33 @@ end
 -- Bruchpruefung
 --------------------------------------------------------------------------------
 
---[[
-	WAS SOLL ICH DENN NOCH DAZU BAUEN?
-
-	Nach einem gescheiterten Test wusste der Spieler bisher nur, DASS etwas
-	gerissen ist - nicht, was er dagegen tun kann. Genau daran bleibt man
-	haengen: man sieht ein rotes Teil, baut irgendetwas daneben und hofft.
-
-	Das Spiel weiss es aber. Es kennt das Bauteil, seinen Baustoff und seine
-	Lage. Daraus laesst sich ein konkreter Rat ableiten, und der ist fuer
-	jede der vier Rollen im Fachwerk ein anderer:
-
-	    waagerecht und befahrbar  -> die Fahrbahn: zweites Teil daneben
-	    waagerecht darueber       -> der Obergurt: hoeher bauen
-	    schraeg                   -> eine Diagonale: die zweite dazusetzen
-	    senkrecht                 -> ein Pfosten: kuerzer teilen oder abstuetzen
-
-	Die Rolle wird aus der RICHTUNG bestimmt, nicht aus dem Baustoff - ein
-	Spieler kann ja jedes Material ueberall einsetzen.
-]]
-local function adviceForMember(member, spec): string
-	local dx = member.bx - member.ax
-	local dy = member.by - member.ay
-	local length = math.max(math.sqrt(dx * dx + dy * dy), 1e-4)
-
-	local rise = math.abs(dy) / length
-	local run = math.abs(dx) / length
-
-	if rise < 0.3 then
-		-- Waagerecht: Fahrbahn oder Gurt.
-		if spec and spec.drivable then
-			return "advice.roadBroke"
-		end
-		return "advice.chordBroke"
-	elseif run < 0.3 then
-		return "advice.postBroke"
-	end
-	return "advice.diagonalBroke"
-end
-
 function TestRun:checkForBreaks(result): boolean
 	local structure = self.structure
 	local broke = false
 
+	--[[
+		Bricht in einem Rechenschritt mehr als ein Bauteil, wird das AM
+		STAERKSTEN ueberlastete zum Steckbrief gemacht. Es ist die eigentliche
+		Ursache; die anderen sind meist Folgeschaeden derselben Ueberlastung.
+	]]
+	local worstOverload, worstBroken = -1, nil
+
 	for _, member in structure:activeMembers() do
 		local limit = Materials.limitFor(member.material, member.force)
-		if math.abs(member.force) > limit then
-			self.brokenMaterial = Materials.nameKey(member.material)
-			self.advice = adviceForMember(member, Materials.get(member.material))
+		local force = math.abs(member.force)
+		if force > limit then
+			local overload = force / math.max(limit, 1e-6)
+			if overload > worstOverload then
+				worstOverload = overload
+				worstBroken = Diagnosis.describeBreak(member, "failure.overloaded")
+			end
 			structure:breakMember(member)
 			broke = true
 		end
+	end
+
+	if worstBroken then
+		self.failure = worstBroken
 	end
 
 	-- Ein Knoten, der seine Last ueberhaupt nicht abtragen kann, bedeutet:
@@ -565,9 +542,14 @@ function TestRun:checkForBreaks(result): boolean
 			end
 		end
 		if worst then
-			self.brokenMaterial = Materials.nameKey(worst.material)
-			-- Nicht ueberlastet, sondern nicht ausgesteift: anderer Rat.
-			self.advice = "advice.unstable"
+			--[[
+				Nicht ueberlastet, sondern nicht ausgesteift. Der Steckbrief
+				bekommt deshalb einen anderen Grund und einen anderen Rat -
+				die Zahlen zur Ueberlastung waeren hier irrefuehrend.
+			]]
+			self.failure = Diagnosis.describeBreak(worst, "failure.unstable")
+			self.failure.advice = "advice.unstable"
+			self.failure.overload = 0
 			structure:breakMember(worst)
 			broke = true
 		end
@@ -580,12 +562,46 @@ end
 -- Ein Simulationsschritt
 --------------------------------------------------------------------------------
 
+--[[
+	Beim Abschluss geht der ganze Steckbrief mit: was gebrochen ist, wie sehr
+	es ueberlastet war, wo es sass und wie weit das Fahrzeug kam.
+]]
 function TestRun:finish(success: boolean, reason, advice: string?)
 	local callback = self.onFinished
+
+	local failure = self.failure
+	if not success then
+		failure = failure or {}
+		failure.advice = failure.advice or advice
+		failure.progress = self:vehicleProgress()
+	else
+		failure = nil
+	end
+
 	self:stop()
 	if callback then
-		callback(success, reason, advice)
+		callback(success, reason, failure)
 	end
+end
+
+--[[
+	Wie weit ist das fuehrende Fahrzeug gekommen, als Anteil der Strecke?
+
+	Das ist die zweite Zahl, die ueber "nachbessern oder neu bauen"
+	entscheidet: bei 90 Prozent fehlt ein Handgriff, bei 10 Prozent bricht
+	die Bruecke schon unter ihrem eigenen Gewicht.
+]]
+function TestRun:vehicleProgress(): number
+	local best = 0
+	for _, vehicle in self.vehicles do
+		local spec = vehicle.spec
+		local span = spec.toX - spec.fromX
+		if math.abs(span) > 1e-6 and vehicle.part then
+			local travelled = (vehicle.part.Position.X - self.origin.X - spec.fromX) / span
+			best = math.max(best, math.clamp(travelled, 0, 1))
+		end
+	end
+	return math.floor(best * 100 + 0.5)
 end
 
 -- Zeitlimit richtet sich nach der gewaehlten Geschwindigkeit: langsam fahren
@@ -650,7 +666,7 @@ function TestRun:step(dt: number)
 		-- der kurze Ruck beim Loesen der Verankerung sofort etwas.
 		if self.driveStartTime and os.clock() - self.driveStartTime > Config.Physics.breakGracePeriod then
 			if self:checkForBreaks(result) then
-				self:finish(false, { key = "result.broken", args = { self.brokenMaterial or "?" } }, self.advice)
+				self:finish(false, { key = "result.broken" })
 				return
 			end
 		end
@@ -786,8 +802,7 @@ function TestRun:start(speed: number, onProgress, onFinished)
 	self.onFinished = onFinished
 	self:setSpeed(speed)
 
-	self.brokenMaterial = nil
-	self.advice = nil
+	self.failure = nil
 	self.solveAccumulator = 0
 	self.labelAccumulator = 0
 	self.progressAccumulator = 0

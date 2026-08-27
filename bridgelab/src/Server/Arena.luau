@@ -25,6 +25,7 @@ local LevelBuilder = require(script.Parent.LevelBuilder)
 local Structure = require(script.Parent.Structure)
 local ForceEngine = require(script.Parent.ForceEngine)
 local TestRun = require(script.Parent.TestRun)
+local Diagnosis = require(script.Parent.Diagnosis)
 
 local Arena = {}
 Arena.__index = Arena
@@ -59,6 +60,7 @@ function Arena.new(player: Player, level, slotIndex: number, parentFolder: Insta
 	self.testPhase = 0
 	self.needsLevelInfo = true
 	self.message = nil
+	self.lastBreak = nil
 	self.result = nil
 	self.testProgress = nil
 	self.unlockedHints = {}
@@ -154,6 +156,12 @@ function Arena:buildState()
 		unstableJoint = self.unstableJoint,
 		message = self.message,
 		result = self.result,
+		--[[
+			Die Bruchstelle ueberlebt das Ergebnisfenster: der Client
+			markiert sie in der Welt, waehrend weitergebaut wird. Genau dann
+			wird sie gebraucht - im Fenster ist sie nur eine Zahl.
+		]]
+		lastBreak = self.lastBreak,
 		testProgress = self.testProgress,
 
 		materials = self.level.materials,
@@ -285,6 +293,7 @@ function Arena:startTest(speed: number, onComplete): (boolean, string)
 
 	self.phase = "Test"
 	self.result = nil
+	self.lastBreak = nil
 	self.message = { key = "hud.testRunning" }
 	self.testProgress = {
 		countdown = Config.Test.countdownSeconds,
@@ -302,14 +311,28 @@ function Arena:startTest(speed: number, onComplete): (boolean, string)
 		-- Fortschritt waehrend der Fahrt (Countdown, Zeit, hoechste Auslastung)
 		self.testProgress = progress
 		self:notify()
-	end, function(success, reason, advice)
+	end, function(success, reason, failure)
 		self.phase = "Result"
+
 		--[[
-			Der Rat gehoert zum Ergebnis: er sagt dem Spieler, was er als
-			Naechstes bauen soll. Ohne ihn steht da nur, DASS etwas gerissen
-			ist - und genau daran bleibt man haengen.
+			Zum Ergebnis gehoert der ganze Steckbrief: was gebrochen ist, wie
+			knapp es war, wo es sass und wie weit das Fahrzeug kam. Dazu die
+			Beobachtungen ueber die Bruecke als Ganzes.
+
+			Die Beobachtungen entstehen ERST HIER, nach dem Test. Vorher
+			waeren sie sinnlos - sie haengen davon ab, wie knapp es war: bei
+			13 Prozent Ueberlastung hilft ein zweites Bauteil, bei 300 nicht.
 		]]
-		self.result = { success = success, reason = reason, advice = advice }
+		if failure then
+			failure.tips = Diagnosis.observations(self.structure, self.level, failure)
+		end
+
+		self.result = { success = success, reason = reason, failure = failure }
+		if failure and failure.x and failure.y and not success then
+			self.lastBreak = { x = failure.x, y = failure.y }
+		else
+			self.lastBreak = nil
+		end
 		self.message = reason
 		self.testProgress = nil
 		-- Einmal nachrechnen, damit die Bauteile wieder ihre eigene Farbe
@@ -393,6 +416,7 @@ function Arena:clearBuild()
 	self.structure:clear()
 	self.phase = "Build"
 	self.result = nil
+	self.lastBreak = nil
 	self.testProgress = nil
 	self.message = nil
 	self.stable = true

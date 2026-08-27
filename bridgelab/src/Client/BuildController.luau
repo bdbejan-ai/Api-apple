@@ -46,6 +46,7 @@ local Shared = ReplicatedStorage:WaitForChild("BridgeLab")
 local Config = require(Shared.Config)
 local Materials = require(Shared.Materials)
 local Terrain = require(Shared.Terrain)
+local I18n = require(Shared.I18n)
 
 local Device = require(script.Parent.Device)
 
@@ -198,6 +199,37 @@ function BuildController:createMarkers()
 	highlight.Adornee = nil
 	highlight.Parent = workspace
 	self.removeHighlight = highlight
+
+	--[[
+		DIE BRUCHSTELLE
+
+		Der Bericht nennt die Stelle als Zahlenpaar - aber niemand rechnet
+		Koordinaten in seine eigene Bruecke um. Diese Kugel steht nach einem
+		gescheiterten Test genau dort, wo das Bauteil gerissen ist, und bleibt
+		stehen, bis weitergebaut wird.
+	]]
+	self.breakMarker = marker("BreakMarker", Color3.fromRGB(255, 70, 60), 3.6)
+
+	local breakLabel = Instance.new("BillboardGui")
+	breakLabel.Name = "BreakLabel"
+	breakLabel.Size = UDim2.fromOffset(150, 22)
+	breakLabel.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+	breakLabel.AlwaysOnTop = true
+	breakLabel.Enabled = false
+	breakLabel.Adornee = self.breakMarker
+	breakLabel.Parent = self.breakMarker
+
+	local breakText = Instance.new("TextLabel")
+	breakText.Size = UDim2.fromScale(1, 1)
+	breakText.BackgroundTransparency = 1
+	breakText.Font = Enum.Font.GothamBold
+	breakText.TextSize = 14
+	breakText.TextColor3 = Color3.fromRGB(255, 150, 140)
+	breakText.TextStrokeTransparency = 0.4
+	breakText.Text = I18n.t("marker.brokeHere")
+	breakText.Parent = breakLabel
+	self.breakLabel = breakLabel
+	self.breakText = breakText
 
 	-- Vorschaulinie waehrend des Ziehens
 	local preview = Instance.new("Part")
@@ -909,6 +941,25 @@ function BuildController:setPhase(phase: string)
 	if phase ~= "Build" then
 		self:cancelDrag()
 	end
+end
+
+--[[
+	Markiert die Stelle, an der es gerissen ist.
+
+	Ohne Angabe verschwindet die Markierung - so verschwindet sie beim
+	naechsten Test von selbst und haengt nicht als alte Warnung herum.
+]]
+function BuildController:setBreakPoint(x: number?, y: number?)
+	if not x or not y or not self.level then
+		self.breakMarker.Transparency = 1
+		self.breakLabel.Enabled = false
+		return
+	end
+
+	self.breakMarker.Position = self:toWorld(x, y)
+	self.breakMarker.Transparency = 0.25
+	self.breakText.Text = I18n.t("marker.brokeHere")
+	self.breakLabel.Enabled = true
 end
 
 --[[
