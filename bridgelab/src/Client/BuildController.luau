@@ -317,6 +317,11 @@ function BuildController:hideMarkers()
 	self.preview.Transparency = 1
 	self.weakMarker.Transparency = 1
 	self.removeHighlight.Adornee = nil
+	--[[
+		Auch den Ziehhinweis wegnehmen. Sonst bliebe beim Start des Tests ein
+		"Zu lang" mitten im Bild stehen, obwohl gar nicht mehr gebaut wird.
+	]]
+	self:reportPreviewProblem(nil)
 end
 
 --------------------------------------------------------------------------------

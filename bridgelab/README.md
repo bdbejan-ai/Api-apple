@@ -43,6 +43,7 @@ Arbeitstitel — der Name lässt sich jederzeit ändern (siehe [Umbenennen](#umb
 | **Hydraulik** | Zylinder fahren auf Knopfdruck aus und heben, was an ihnen hängt. Damit baut man Klappbrücken |
 | **Schiff** | In „Klappbrücke" muss ein Schiff unter der Brücke durch. Steht sie im Weg, ist der Test gescheitert — auch wenn nichts gebrochen ist |
 | **Sprung** | In „Der Sprung" gibt es nur **einen** Anker. Das Fahrzeug muss über die Lücke fliegen |
+| **Sofortige Rückmeldung** | Während du ziehst, steht da, *warum* die Vorschau rot ist — zu lang, im Felsen, Budget leer. Beim Bauen sagt die Stabilitätswarnung, was zu tun ist, nicht nur dass etwas wackelt |
 | **Genaues Abreißen** | Das Bauteil unter dem Zeiger wird hervorgehoben, bevor man klickt — auch bei dünnen Seilen und sich kreuzenden Streben |
 | **Tipps** | Drei pro Level. Bei Schwierigkeit 1–3 ist der erste gratis, ab Schwierigkeit 4 kostet schon der erste Robux |
 | **Fortschritt** | Geschaffte Level, gesehene Anleitung und gekaufte Tipp‑Gutscheine werden dauerhaft gespeichert |

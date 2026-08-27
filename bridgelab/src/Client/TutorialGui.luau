@@ -487,17 +487,24 @@ function TutorialGui:applyScale()
 	local effectiveHeight = viewport.Y / math.max(factor, 0.1)
 
 	--[[
-		Wohin mit dem Fenster? Es darf die Fussleiste nicht verdecken, denn
-		genau dort soll der Spieler ja klicken. Auf breiten Bildschirmen steht
-		es deshalb links, auf schmalen oben.
+		WOHIN MIT DEM FENSTER? IN DIE MITTE.
+
+		Es stand frueher LINKS - und genau dort sitzt seit dem Umbau die
+		Baustoffleiste. Das Anleitungsfenster verdeckte damit ausgerechnet die
+		Knoepfe, auf die es zeigen wollte: im Schritt "Waehle die Strasse aus"
+		lag es genau ueber dem Strassenknopf.
+
+		Frei sind drei Streifen: die Baustoffleiste links, die rechte Spalte
+		mit Test- und Tippfenster, und die Fussleiste unten. Uebrig bleibt die
+		MITTE, und dort steht es jetzt - waagerecht zentriert, oben unter der
+		Kopfzeile.
 	]]
-	if effectiveWidth < 820 then
-		self.panel.Size = UDim2.fromOffset(math.min(effectiveWidth - 32, 420), 280)
-		self.panel.Position = UDim2.fromOffset(16, 78)
-	else
-		self.panel.Size = UDim2.fromOffset(400, math.min(320, effectiveHeight - 220))
-		self.panel.Position = UDim2.fromOffset(Device.edgeInset(), 84)
-	end
+	local panelWidth = math.min(effectiveWidth - 400, 420)
+	panelWidth = math.max(panelWidth, 300)
+	local panelHeight = math.min(300, math.max(effectiveHeight - 230, 200))
+
+	self.panel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+	self.panel.Position = UDim2.new(0.5, -panelWidth / 2, 0, 84)
 end
 
 return TutorialGui
